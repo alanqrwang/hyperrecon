@@ -81,6 +81,13 @@ class HyperNetwork(nn.Module):
 
         return x 
 
+class Conv(nn.Module):
+    def __init__(self):
+        super(Conv, self).__init__()
+
+    def forward(self, x, w, b):
+        return F.conv2d(x, w, bias=b, padding=1)
+
 class Unet(nn.Module):
     def __init__(self, device, num_hyperparams, nh=64, residual=True):
         super(Unet, self).__init__()
