@@ -68,7 +68,7 @@ def unsup_loss(x_hat, y, mask, hyperparams, device):
     '''
     Loss = (1-alpha) * DC + alpha * Reg
     Loss = (alpha*beta) * DC + (1-alpha)*beta * Reg1 + (1-alpha)*(1-beta) * Reg2
-    hyperparams: matrix of hyperparams (num_hyperparams, batch_size)
+    hyperparams: matrix of hyperparams (batch_size, num_hyperparams)
     '''
     l1 = torch.nn.L1Loss(reduction='none')
     l2 = torch.nn.MSELoss(reduction='none')
@@ -86,15 +86,15 @@ def unsup_loss(x_hat, y, mask, hyperparams, device):
     wavelets = get_wavelets(x_hat, device)
     l1_wavelet = torch.sum(l1(wavelets, torch.zeros_like(wavelets)), dim=(1, 2, 3)) 
  
-    if len(hyperparams) == 2:
-        w_coeff = hyperparams[0]
-        tv_coeff = hyperparams[1]
+    if hyperparams.shape[1] == 2:
+        w_coeff = hyperparams[:, 0]
+        tv_coeff = hyperparams[:, 1]
         loss = (w_coeff*tv_coeff) * dc + (1-w_coeff)*tv_coeff * l1_wavelet + (1-w_coeff)*(1-tv_coeff) * tv
     else:
         tv_coeff = hyperparams[0]
         loss = (1-tv_coeff)*dc + tv_coeff*tv
 
-    return torch.sum(loss)
+    return loss, dc
 
 def unsup_loss_single_batch(x_hat, y, mask, hyperparams, device):
     '''

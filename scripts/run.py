@@ -88,4 +88,4 @@ if __name__ == "__main__":
         os.makedirs(model_folder)
     args.filename = model_folder
 
-    train.train(xdata, gt_data, vars(args))
+    train.trainer(xdata, gt_data, vars(args))

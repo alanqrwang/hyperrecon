@@ -11,7 +11,7 @@ import sys
 import glob
 import os
 
-def train(xdata, gt_data, conf):
+def trainer(xdata, gt_data, conf):
     ###############  Dataset ########################
     trainset = dataset.Dataset(xdata[:int(len(xdata)*0.8)], gt_data[:int(len(gt_data)*0.8)])
     valset = dataset.Dataset(xdata[int(len(xdata)*0.8):], gt_data[int(len(gt_data)*0.8):])
@@ -60,8 +60,10 @@ def train(xdata, gt_data, conf):
         # scheduler.load_state_dict(checkpoint['scheduler'])
 
     for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
-        network, optimizer, train_epoch_loss, val_epoch_loss, prior_map = trainer(network, dataloaders, optimizer, conf['mask'], conf['num_hyperparams'], \
-                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], conf['topK'])
+        topK = conf['topK'] if epoch > 500 else None
+
+        network, optimizer, train_epoch_loss, val_epoch_loss, prior_map = train(network, dataloaders, optimizer, conf['mask'], conf['num_hyperparams'], \
+                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK)
         # scheduler.step()
             
         # Optionally save checkpoints here, e.g.:
@@ -76,7 +78,7 @@ def train(xdata, gt_data, conf):
         np.save(os.path.join(priormaps_dir, '{epoch:04d}'.format(epoch=epoch)), prior_map)
 
 
-def trainer(network, dataloaders, optimizer, mask, num_hyperparams, filename, device, alpha_bound, beta_bound, topK):
+def train(network, dataloaders, optimizer, mask, num_hyperparams, filename, device, alpha_bound, beta_bound, topK):
     samples = 100
     grid = np.zeros((samples+1, samples+1))
     grid_offset = np.array([alpha_bound[0], beta_bound[0]])
@@ -92,10 +94,10 @@ def trainer(network, dataloaders, optimizer, mask, num_hyperparams, filename, de
         epoch_samples = 0
 
         for batch_idx, (y, gt) in tqdm(enumerate(dataloaders[phase]), total=len(dataloaders[phase])):
-            hyper_batchsize = 32
             y = y.float().to(device)
             gt = gt.float().to(device)
 
+            optimizer.zero_grad()
             with torch.set_grad_enabled(phase == 'train'):
                 zf = utils.ifft(y)
                 y, zf = utils.scale(y, zf)
@@ -103,88 +105,45 @@ def trainer(network, dataloaders, optimizer, mask, num_hyperparams, filename, de
                 if num_hyperparams == 2:
                     r1 = float(alpha_bound[0])
                     r2 = float(alpha_bound[1])
-                    alpha = utils.sample_alpha(hyper_batchsize, r1, r2, fixed=True).to(device)
+                    alpha = utils.sample_alpha(len(y), r1, r2, fixed=False).to(device)
                     r1 = float(beta_bound[0])
                     r2 = float(beta_bound[1])
-                    beta = utils.sample_alpha(hyper_batchsize, r1, r2, fixed=False).to(device)
+                    beta = utils.sample_alpha(len(y), r1, r2, fixed=False).to(device)
 
                     hyperparams = torch.cat([alpha, beta], dim=1)
                 else:
                     alpha = utils.sample_alpha().to(device).view(1)
                     hyperparams = torch.cat([alpha], dim=0)
-                    print('alpha', alpha.item())
 
-                ############ Batch-hps ################
-                # losses = torch.zeros(hyper_batchsize)
-                # optimizer.zero_grad()
-                # for h in range(hyper_batchsize):
-                #     print(h)
-                #     x_hat = network(zf, y, hyperparams[h])
-                #     total_loss, dc_loss = losslayer.unsup_loss_single_batch(x_hat, y, mask, hyperparams[h], device)
-                #     losses[h] = total_loss
-                # loss = torch.sum(losses) # Take all losses
-                # if phase == 'train':
-                #     print('backproping')
-                #     loss.backward()
-                #     optimizer.step()
-
-                ######## Batch-hps-top8 ############
-                losses = torch.zeros(hyper_batchsize)
-                dc_losses = torch.zeros(hyper_batchsize)
-                optimizer.zero_grad()
-                for h in range(hyper_batchsize):
-                    x_hat = network(zf, y, hyperparams[h])
-                    total_loss, dc_loss = losslayer.unsup_loss_single_batch(x_hat, y, mask, hyperparams[h], device)
-                    losses[h] = total_loss
-                    dc_losses[h] = dc_loss
+                # (b, l, w, 2), (b, 2)
+                x_hat = network(zf, y, hyperparams)
+                unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device)
                     
-                _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
-                sort_losses = losses[perm] # Reorder total losses by lowest to highest DC loss
-                sort_hyperparams = hyperparams[perm]
+                if topK is not None:
+                    print('doing topK')
+                    _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
+                    sort_losses = unsup_losses[perm] # Reorder total losses by lowest to highest DC loss
+                    sort_hyperparams = hyperparams[perm]
 
-                loss = torch.sum(sort_losses[:topK]) # Take only the losses with lowest DC
+                    loss = torch.sum(sort_losses[:topK]) # Take only the losses with lowest DC
+                else:
+                    print('doing vanilla')
+                    loss = torch.sum(unsup_losses)
+                    sort_hyperparams = hyperparams
+
                 if phase == 'train':
-                    print('backproping')
                     loss.backward()
                     optimizer.step()
 
                     # Find nearest discrete grid points
-                    gpoints = np.rint((sort_hyperparams[:topK].cpu().detach().numpy() - grid_offset) / grid_spacing)
-
+                    if topK is not None:
+                        gpoints = np.rint((sort_hyperparams[:topK].cpu().detach().numpy() - grid_offset) / grid_spacing)
+                    else:
+                        gpoints = np.rint((sort_hyperparams.cpu().detach().numpy() - grid_offset) / grid_spacing)
                     for gp in gpoints:
-                        print(gp)
                         gp = gp.astype(int)
                         grid[tuple(gp)] += 1
 
-                ############ Single-hps ################
-                # for h in range(hyper_batchsize):
-                #     optimizer.zero_grad()
-                #     print(h)
-                #     x_hat = network(zf, y, hyperparams[h])
-                #     loss, _ = losslayer.unsup_loss_single_batch(x_hat, y, mask, hyperparams[h], device)
-                    
-                #     if phase == 'train':
-                #         print('backproping')
-                #         loss.backward()
-                #         optimizer.step()
-
-                ############ Single-hps-top8 ################
-                # best_dc_loss = sys.maxsize
-                # best_loss = 0
-                # for h in range(hyper_batchsize):
-                #     optimizer.zero_grad()
-                #     print(h)
-                #     x_hat = network(zf, y, hyperparams[h])
-                #     total_loss, dc_loss = losslayer.unsup_loss_single_batch(x_hat, y, mask, hyperparams[h], device)
-                #     if dc_loss < best_dc_loss:
-                #         print(hyperparams[h])
-                #         best_dc_loss = dc_loss
-                #         best_loss = total_loss
-                    
-                # if phase == 'train':
-                #     print('backproping')
-                #     best_loss.backward()
-                #     optimizer.step()
 
                 epoch_loss += loss.data.cpu().numpy()
 
