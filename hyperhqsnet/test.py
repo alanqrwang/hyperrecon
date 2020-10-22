@@ -41,8 +41,8 @@ def test_hqsnet(trained_model, xdata, device, hyperparams, mask):
             y, zf = utils.scale(y, zf)
 
         print(hyperparams)
-        pred = trained_model(zf, y, hyperparams)
-        loss, _ = losslayer.unsup_loss(pred, y, mask, hyperparams, device)
+        pred, cap_reg = trained_model(zf, y, hyperparams)
+        loss, _ = losslayer.unsup_loss(pred, y, mask, hyperparams, device, cap_reg)
         recons.append(pred.cpu().detach().numpy())
         losses.append(loss.item())
 

@@ -34,7 +34,8 @@ def trainer(xdata, gt_data, conf):
     optimizer = torch.optim.Adam(network.parameters(), lr=conf['lr'])
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50)
-    scheduler = None
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50])
+    # scheduler = None
     ##################################################
 
     if conf['load_checkpoint'] != 0:
@@ -57,19 +58,19 @@ def trainer(xdata, gt_data, conf):
         checkpoint = torch.load(pretrain_path, map_location=torch.device('cpu'))
         network.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        # scheduler.load_state_dict(checkpoint['scheduler'])
+        if checkpoint['scheduler'] is not None:
+            scheduler.load_state_dict(checkpoint['scheduler'])
 
     for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
         topK = conf['topK'] if epoch > 500 else None
 
         network, optimizer, train_epoch_loss, val_epoch_loss, prior_map = train(network, dataloaders, optimizer, conf['mask'], conf['num_hyperparams'], \
                 conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK)
-        # scheduler.step()
+        scheduler.step()
             
         # Optionally save checkpoints here, e.g.:
         myutils.io.save_losses(epoch, train_epoch_loss, val_epoch_loss, conf['filename'])
-        # myutils.io.save_checkpoint(epoch, network.state_dict(), optimizer.state_dict(), scheduler.state_dict(), train_epoch_loss, val_epoch_loss, conf['filename'], conf['log_interval'])
-        myutils.io.save_checkpoint(epoch, network.state_dict(), optimizer.state_dict(), train_epoch_loss, val_epoch_loss, conf['filename'], conf['log_interval'])
+        myutils.io.save_checkpoint(epoch, network.state_dict(), optimizer.state_dict(), train_epoch_loss, val_epoch_loss, conf['filename'], conf['log_interval'], scheduler.state_dict())
 
         # Save prior maps
         priormaps_dir = os.path.join(conf['filename'], 'priormaps')
@@ -116,8 +117,8 @@ def train(network, dataloaders, optimizer, mask, num_hyperparams, filename, devi
                     hyperparams = torch.cat([alpha], dim=0)
 
                 # (b, l, w, 2), (b, 2)
-                x_hat = network(zf, y, hyperparams)
-                unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device)
+                x_hat, cap_reg = network(zf, y, hyperparams)
+                unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, cap_reg)
                     
                 if topK is not None:
                     print('doing topK')

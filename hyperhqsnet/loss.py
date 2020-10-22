@@ -64,12 +64,13 @@ def nextPowerOf2(n):
 
     return 1 << count;
 
-def unsup_loss(x_hat, y, mask, hyperparams, device):
+def unsup_loss(x_hat, y, mask, hyperparams, device, cap_reg):
     '''
     Loss = (1-alpha) * DC + alpha * Reg
     Loss = (alpha*beta) * DC + (1-alpha)*beta * Reg1 + (1-alpha)*(1-beta) * Reg2
     hyperparams: matrix of hyperparams (batch_size, num_hyperparams)
     '''
+    print('using cap reg')
     l1 = torch.nn.L1Loss(reduction='none')
     l2 = torch.nn.MSELoss(reduction='none')
  

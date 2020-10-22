@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--num_hidden', type=int, default=64)
     parser.add_argument('--K', type=int, default=5)
-    parser.add_argument('--topK', type=int, default=1)
+    parser.add_argument('--topK', type=int, default=None)
     
     args = parser.parse_args()
     if torch.cuda.is_available():
