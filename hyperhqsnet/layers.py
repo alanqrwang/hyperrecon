@@ -13,12 +13,13 @@ class Upsample(nn.Module):
 
 class BatchConv2DLayer(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1,
-                 padding=0, dilation=1):
+                 padding=0, dilation=1, ks=3):
         super(BatchConv2DLayer, self).__init__()
 
         self.stride = stride
         self.padding = padding
         self.dilation = dilation
+        self.ks = ks
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -32,6 +33,9 @@ class BatchConv2DLayer(nn.Module):
 
         b_i, b_j, c, h, w = x.shape
         b_i, out_channels, in_channels, kernel_height_size, kernel_width_size = weight.shape
+        assert out_channels == self.out_channels, 'Invalid out_channels in weights'
+        assert in_channels == self.in_channels, 'Invalid in_channels in weights'
+        assert kernel_height_size == self.ks and kernel_width_size == self.ks, 'Invalid kernel size in weights'
 
         out = x.permute([1, 0, 2, 3, 4]).contiguous().view(b_j, b_i * c, h, w)
         weight = weight.contiguous().view(b_i * out_channels, in_channels, kernel_height_size, kernel_width_size)
@@ -48,3 +52,9 @@ class BatchConv2DLayer(nn.Module):
             out = out + bias.unsqueeze(1).unsqueeze(3).unsqueeze(3)
 
         return out
+
+    def get_weight_shape(self):
+        return [self.out_channels, self.in_channels, self.ks, self.ks]
+
+    def get_bias_shape(self):
+        return [self.out_channels]
