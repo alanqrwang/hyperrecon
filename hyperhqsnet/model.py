@@ -126,6 +126,7 @@ class Unet(nn.Module):
         l1_weights = 0
         for w, b in zip(wl, bl):
             l1_weights = l1_weights + torch.sum(torch.abs(w), dim=(1, 2, 3, 4)) + torch.sum(torch.abs(b), dim=(1))
+        print(l1_weights)
 
         # conv_down1
         x = x.unsqueeze(1)

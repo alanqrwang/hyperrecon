@@ -58,7 +58,7 @@ def trainer(xdata, gt_data, conf):
         checkpoint = torch.load(pretrain_path, map_location=torch.device('cpu'))
         network.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        if checkpoint['scheduler'] is not None:
+        if 'scheduler' in checkpoint and checkpoint['scheduler'] is not None:
             scheduler.load_state_dict(checkpoint['scheduler'])
 
     for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
@@ -113,8 +113,9 @@ def train(network, dataloaders, optimizer, mask, num_hyperparams, filename, devi
 
                     hyperparams = torch.cat([alpha, beta], dim=1)
                 else:
-                    alpha = utils.sample_alpha().to(device).view(1)
-                    hyperparams = torch.cat([alpha], dim=0)
+                    r1 = float(alpha_bound[0])
+                    r2 = float(alpha_bound[1])
+                    hyperparams = utils.sample_alpha(len(y), r1, r2, fixed=False).to(device)
 
                 # (b, l, w, 2), (b, 2)
                 x_hat, cap_reg = network(zf, y, hyperparams)
@@ -137,13 +138,13 @@ def train(network, dataloaders, optimizer, mask, num_hyperparams, filename, devi
                     optimizer.step()
 
                     # Find nearest discrete grid points
-                    if topK is not None:
-                        gpoints = np.rint((sort_hyperparams[:topK].cpu().detach().numpy() - grid_offset) / grid_spacing)
-                    else:
-                        gpoints = np.rint((sort_hyperparams.cpu().detach().numpy() - grid_offset) / grid_spacing)
-                    for gp in gpoints:
-                        gp = gp.astype(int)
-                        grid[tuple(gp)] += 1
+                    # if topK is not None:
+                    #     gpoints = np.rint((sort_hyperparams[:topK].cpu().detach().numpy() - grid_offset) / grid_spacing)
+                    # else:
+                    #     gpoints = np.rint((sort_hyperparams.cpu().detach().numpy() - grid_offset) / grid_spacing)
+                    # for gp in gpoints:
+                    #     gp = gp.astype(int)
+                    #     grid[tuple(gp)] += 1
 
 
                 epoch_loss += loss.data.cpu().numpy()

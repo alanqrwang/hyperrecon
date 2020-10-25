@@ -10,7 +10,6 @@ def test(model_path, xdata, alpha, config, device):
     n_hidden = int(config['n_hidden'])
     lmbda = float(config['lmbda'])
     K = int(config['K'])
-    # learn_reg_coeff = True if config['learn_reg_coeff'] == 'True' else False
     learn_reg_coeff = config['learn_reg_coeff']
     if learn_reg_coeff == 'True':
         learn_reg_coeff = 2
@@ -19,7 +18,6 @@ def test(model_path, xdata, alpha, config, device):
     mask = utils.get_mask(maskname)
     mask = torch.tensor(mask, requires_grad=False).float().to(device)
 
-    print(learn_reg_coeff)
     if recon_type == 'unroll':
         network = model.HQSNet(K, mask, lmbda, learn_reg_coeff, device, n_hidden).to(device) 
     else:
@@ -28,7 +26,6 @@ def test(model_path, xdata, alpha, config, device):
     network = myutils.io.load_checkpoint(network, model_path)
 
     alpha = torch.tensor(alpha).to(device).float()
-    # hyperparams = torch.cat([alpha], dim=0)
     return test_hqsnet(network, xdata, device, alpha, mask)
 
 def test_hqsnet(trained_model, xdata, device, hyperparams, mask):
@@ -44,7 +41,7 @@ def test_hqsnet(trained_model, xdata, device, hyperparams, mask):
         pred, cap_reg = trained_model(zf, y, hyperparams)
         loss, _ = losslayer.unsup_loss(pred, y, mask, hyperparams, device, cap_reg)
         recons.append(pred.cpu().detach().numpy())
-        losses.append(loss.item())
+        losses.append(cap_reg.item())
 
     preds = np.array(recons).squeeze()
     return preds, losses
