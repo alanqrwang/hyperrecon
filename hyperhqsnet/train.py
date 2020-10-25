@@ -63,9 +63,10 @@ def trainer(xdata, gt_data, conf):
 
     for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
         topK = conf['topK'] if epoch > 500 else None
+        range_restrict = True if conf['range_restrict'] == 'True' else False
 
         network, optimizer, train_epoch_loss, val_epoch_loss, prior_map = train(network, dataloaders, optimizer, conf['mask'], conf['num_hyperparams'], \
-                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK)
+                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], range_restrict)
         scheduler.step()
             
         # Optionally save checkpoints here, e.g.:
@@ -79,7 +80,7 @@ def trainer(xdata, gt_data, conf):
         np.save(os.path.join(priormaps_dir, '{epoch:04d}'.format(epoch=epoch)), prior_map)
 
 
-def train(network, dataloaders, optimizer, mask, num_hyperparams, filename, device, alpha_bound, beta_bound, topK):
+def train(network, dataloaders, optimizer, mask, num_hyperparams, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
     samples = 100
     grid = np.zeros((samples+1, samples+1))
     grid_offset = np.array([alpha_bound[0], beta_bound[0]])
@@ -103,23 +104,10 @@ def train(network, dataloaders, optimizer, mask, num_hyperparams, filename, devi
                 zf = utils.ifft(y)
                 y, zf = utils.scale(y, zf)
 
-                if num_hyperparams == 2:
-                    r1 = float(alpha_bound[0])
-                    r2 = float(alpha_bound[1])
-                    alpha = utils.sample_alpha(len(y), r1, r2, fixed=False).to(device)
-                    r1 = float(beta_bound[0])
-                    r2 = float(beta_bound[1])
-                    beta = utils.sample_alpha(len(y), r1, r2, fixed=False).to(device)
+                hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound)
 
-                    hyperparams = torch.cat([alpha, beta], dim=1)
-                else:
-                    r1 = float(alpha_bound[0])
-                    r2 = float(alpha_bound[1])
-                    hyperparams = utils.sample_alpha(len(y), r1, r2, fixed=False).to(device)
-
-                # (b, l, w, 2), (b, 2)
                 x_hat, cap_reg = network(zf, y, hyperparams)
-                unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, cap_reg)
+                unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
                     
                 if topK is not None:
                     print('doing topK')

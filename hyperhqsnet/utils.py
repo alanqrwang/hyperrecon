@@ -109,11 +109,20 @@ def get_train_xdata(dataset, maskname):
 
     data = get_data(data_path.format(maskname=maskname))
     return data
-'''
-0 w.p. 0.25
-logunif(1e-5, 1) w.p. 0.75
-'''
-def sample_alpha(batch_size, r1=0, r2=1, fixed=False):
+
+
+def sample_hyperparams(batch_size, num_hyperparams, alpha_bound, beta_bound):
+    if num_hyperparams == 2:
+        alpha = sample_alpha(len(y), alpha_bound, fixed=False).to(device)
+        beta = sample_alpha(len(y), beta_bound, fixed=False).to(device)
+
+        hyperparams = torch.cat([alpha, beta], dim=1)
+    else:
+        hyperparams = sample_alpha(len(y), alpha_bound, fixed=False).to(device)
+
+def sample_alpha(batch_size, bound, fixed=False):
+    r1 = float(bound[0])
+    r2 = float(bound[1])
     # if fixed:
     #     if torch.rand(()) < 0.1:
     #         sample = torch.tensor(1.)
@@ -123,20 +132,6 @@ def sample_alpha(batch_size, r1=0, r2=1, fixed=False):
     # else:
     #     sample = ((r1 - r2) * torch.rand(()) + r2)
     sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
-
-    # sample = sample.view(1)
-
-    # Log uniform
-    # rvs = loguniform.rvs(low, high)
-    # sample = torch.tensor(rvs)
-    # print(sample.shape)
-
-    # Normal
-    # sample = torch.normal(0.001, 0.001, size=())
-    # print(sample)
-    # sample_max = torch.clamp(sample, min=0)
-    # print('sample', sample, 'max', sample_max)
-
     return sample
 
 def count_parameters(model):
