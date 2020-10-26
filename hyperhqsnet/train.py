@@ -29,7 +29,7 @@ def trainer(xdata, gt_data, conf):
     if conf['recon_type'] == 'unroll':
         network = model.HQSNet(conf['K'], conf['mask'], conf['lmbda'], conf['learn_reg_coeff'], conf['device'], n_hidden=conf['num_hidden']).to(conf['device'])
     elif conf['recon_type'] == 'unet':
-        network = model.Unet(conf['device'], num_hyperparams=conf['num_hyperparams'], nh=conf['num_hidden']).to(conf['device'])
+        network = model.Unet(conf['device'], num_hyperparams=len(conf['reg_types']), nh=conf['num_hidden']).to(conf['device'])
 
     optimizer = torch.optim.Adam(network.parameters(), lr=conf['lr'])
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
@@ -63,10 +63,10 @@ def trainer(xdata, gt_data, conf):
 
     for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
         topK = conf['topK'] if epoch > 500 else None
-        range_restrict = True if conf['range_restrict'] == 'True' else False
+        print(type(conf['range_restrict']))
 
-        network, optimizer, train_epoch_loss, val_epoch_loss, prior_map = train(network, dataloaders, optimizer, conf['mask'], conf['num_hyperparams'], \
-                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], range_restrict)
+        network, optimizer, train_epoch_loss, val_epoch_loss, prior_map = train(network, dataloaders, optimizer, conf['mask'], \
+                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
         scheduler.step()
             
         # Optionally save checkpoints here, e.g.:
@@ -80,7 +80,7 @@ def trainer(xdata, gt_data, conf):
         np.save(os.path.join(priormaps_dir, '{epoch:04d}'.format(epoch=epoch)), prior_map)
 
 
-def train(network, dataloaders, optimizer, mask, num_hyperparams, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
+def train(network, dataloaders, optimizer, mask, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
     samples = 100
     grid = np.zeros((samples+1, samples+1))
     grid_offset = np.array([alpha_bound[0], beta_bound[0]])
@@ -104,7 +104,8 @@ def train(network, dataloaders, optimizer, mask, num_hyperparams, filename, devi
                 zf = utils.ifft(y)
                 y, zf = utils.scale(y, zf)
 
-                hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound)
+                hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
+                print(hyperparams)
 
                 x_hat, cap_reg = network(zf, y, hyperparams)
                 unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)

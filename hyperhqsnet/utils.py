@@ -113,12 +113,13 @@ def get_train_xdata(dataset, maskname):
 
 def sample_hyperparams(batch_size, num_hyperparams, alpha_bound, beta_bound):
     if num_hyperparams == 2:
-        alpha = sample_alpha(len(y), alpha_bound, fixed=False).to(device)
-        beta = sample_alpha(len(y), beta_bound, fixed=False).to(device)
+        alpha = sample_alpha(batch_size, alpha_bound, fixed=False)
+        beta = sample_alpha(batch_size, beta_bound, fixed=False)
 
         hyperparams = torch.cat([alpha, beta], dim=1)
     else:
-        hyperparams = sample_alpha(len(y), alpha_bound, fixed=False).to(device)
+        hyperparams = sample_alpha(batch_size, alpha_bound, fixed=False)
+    return hyperparams
 
 def sample_alpha(batch_size, bound, fixed=False):
     r1 = float(bound[0])

@@ -19,7 +19,6 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
     parser.add_argument('--lmbda', type=float, default=0, help='gpu id to train on')
     parser.add_argument('--num_epochs', type=int, default=100)
-    parser.add_argument('--num_hyperparams', type=int, default=2)
     parser.add_argument('--load_checkpoint', type=int, default=0)
     parser.add_argument('--log_interval', type=int, default=1)
     parser.add_argument('--gpu_id', type=int, default=0, help='gpu id to train on')
@@ -29,7 +28,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--alpha_bound', nargs='+', type=float, help='<Required> Set flag', required=True)
     parser.add_argument('--beta_bound', nargs='+', type=float, help='<Required> Set flag', required=True)
-    utils.add_bool_arg(parser, 'learn_reg_coeff')
+    parser.add_argument('--reg_types', nargs='+', type=str, help='<Required> Set flag', required=True)
+    utils.add_bool_arg(parser, 'range_restrict')
 
     parser.add_argument('--num_hidden', type=int, default=64)
     parser.add_argument('--K', type=int, default=5)
@@ -69,15 +69,16 @@ if __name__ == "__main__":
 
 
     ################### Filename #####################
-    local_name = '{prefix}_{recon_type}_{lr}_{lmbda}_{K}_{learn_reg_coeff}_{num_hidden}_{alpha_bound}_{beta_bound}_{topK}/{dataset}_{undersample_rate}'.format(
+    local_name = '{prefix}_{recon_type}_{lr}_{batch_size}_{lmbda}_{K}_{reg_types}_{num_hidden}_{alpha_bound}_{beta_bound}_{topK}/{dataset}_{undersample_rate}'.format(
         prefix=args.filename_prefix,
         dataset=args.dataset,
         undersample_rate=args.undersample_rate,
         recon_type=args.recon_type,
         lr=args.lr,
+        batch_size=args.batch_size,
         lmbda=args.lmbda,
         K=args.K,
-        learn_reg_coeff=args.learn_reg_coeff,
+        reg_types=args.reg_types,
         num_hidden=args.num_hidden,
         alpha_bound=args.alpha_bound,
         beta_bound=args.beta_bound,
