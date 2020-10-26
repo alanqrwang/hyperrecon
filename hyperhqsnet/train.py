@@ -61,11 +61,14 @@ def trainer(xdata, gt_data, conf):
         if 'scheduler' in checkpoint and checkpoint['scheduler'] is not None:
             scheduler.load_state_dict(checkpoint['scheduler'])
 
+    # Training loop
     for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
         topK = conf['topK'] if epoch > 500 else None
         print(type(conf['range_restrict']))
 
-        network, optimizer, train_epoch_loss, val_epoch_loss, prior_map = train(network, dataloaders, optimizer, conf['mask'], \
+        network, optimizer, train_epoch_loss, prior_map = train(network, dataloaders['train'], optimizer, conf['mask'], \
+                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
+        network, val_epoch_loss = test(network, dataloaders['val'], conf['mask'], \
                 conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
         scheduler.step()
             
@@ -80,69 +83,89 @@ def trainer(xdata, gt_data, conf):
         np.save(os.path.join(priormaps_dir, '{epoch:04d}'.format(epoch=epoch)), prior_map)
 
 
-def train(network, dataloaders, optimizer, mask, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
+def train(network, dataloader, optimizer, mask, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
     samples = 100
     grid = np.zeros((samples+1, samples+1))
     grid_offset = np.array([alpha_bound[0], beta_bound[0]])
     grid_spacing = np.array([(alpha_bound[1]-alpha_bound[0])/samples, (beta_bound[1]-beta_bound[0])/samples])
 
-    for phase in ['train', 'val']:
-        if phase == 'train':
-            network.train()
-        elif phase == 'val':
-            network.eval()
+    network.train()
 
-        epoch_loss = 0
-        epoch_samples = 0
+    epoch_loss = 0
+    epoch_samples = 0
 
-        for batch_idx, (y, gt) in tqdm(enumerate(dataloaders[phase]), total=len(dataloaders[phase])):
-            y = y.float().to(device)
-            gt = gt.float().to(device)
+    for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        y = y.float().to(device)
+        gt = gt.float().to(device)
 
-            optimizer.zero_grad()
-            with torch.set_grad_enabled(phase == 'train'):
-                zf = utils.ifft(y)
-                y, zf = utils.scale(y, zf)
+        optimizer.zero_grad()
+        with torch.set_grad_enabled(True):
+            zf = utils.ifft(y)
+            y, zf = utils.scale(y, zf)
 
-                hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
-                print(hyperparams)
+            hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
 
-                x_hat, cap_reg = network(zf, y, hyperparams)
-                unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
-                    
-                if topK is not None:
-                    print('doing topK')
-                    _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
-                    sort_losses = unsup_losses[perm] # Reorder total losses by lowest to highest DC loss
-                    sort_hyperparams = hyperparams[perm]
+            x_hat, cap_reg = network(zf, y, hyperparams)
+            unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
+                
+            if topK is not None:
+                _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
+                sort_losses = unsup_losses[perm] # Reorder total losses by lowest to highest DC loss
+                sort_hyperparams = hyperparams[perm]
 
-                    loss = torch.sum(sort_losses[:topK]) # Take only the losses with lowest DC
-                else:
-                    print('doing vanilla')
-                    loss = torch.sum(unsup_losses)
-                    sort_hyperparams = hyperparams
+                loss = torch.sum(sort_losses[:topK]) # Take only the losses with lowest DC
+            else:
+                loss = torch.sum(unsup_losses)
+                sort_hyperparams = hyperparams
 
-                if phase == 'train':
-                    loss.backward()
-                    optimizer.step()
+            loss.backward()
+            optimizer.step()
 
-                    # Find nearest discrete grid points
-                    # if topK is not None:
-                    #     gpoints = np.rint((sort_hyperparams[:topK].cpu().detach().numpy() - grid_offset) / grid_spacing)
-                    # else:
-                    #     gpoints = np.rint((sort_hyperparams.cpu().detach().numpy() - grid_offset) / grid_spacing)
-                    # for gp in gpoints:
-                    #     gp = gp.astype(int)
-                    #     grid[tuple(gp)] += 1
+            # Find nearest discrete grid points
+            # if topK is not None:
+            #     gpoints = np.rint((sort_hyperparams[:topK].cpu().detach().numpy() - grid_offset) / grid_spacing)
+            # else:
+            #     gpoints = np.rint((sort_hyperparams.cpu().detach().numpy() - grid_offset) / grid_spacing)
+            # for gp in gpoints:
+            #     gp = gp.astype(int)
+            #     grid[tuple(gp)] += 1
 
 
-                epoch_loss += loss.data.cpu().numpy()
+            epoch_loss += loss.data.cpu().numpy()
+        epoch_samples += len(y)
+    epoch_loss /= epoch_samples
+    return network, optimizer, epoch_loss, grid.T
 
-            epoch_samples += len(y)
+def test(network, dataloader, mask, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
+    network.eval()
 
-        epoch_loss /= epoch_samples
-        if phase == 'train':
-            train_epoch_loss = epoch_loss
-        if phase == 'val':
-            val_epoch_loss = epoch_loss
-    return network, optimizer, train_epoch_loss, val_epoch_loss, grid.T
+    epoch_loss = 0
+    epoch_samples = 0
+
+    for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        y = y.float().to(device)
+        gt = gt.float().to(device)
+
+        with torch.set_grad_enabled(False):
+            zf = utils.ifft(y)
+            y, zf = utils.scale(y, zf)
+
+            hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
+
+            x_hat, cap_reg = network(zf, y, hyperparams)
+            unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
+                
+            if topK is not None:
+                print('doing topK')
+                _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
+                sort_losses = unsup_losses[perm] # Reorder total losses by lowest to highest DC loss
+
+                loss = torch.sum(sort_losses[:topK]) # Take only the losses with lowest DC
+            else:
+                print('doing vanilla')
+                loss = torch.sum(unsup_losses)
+
+            epoch_loss += loss.data.cpu().numpy()
+        epoch_samples += len(y)
+    epoch_loss /= epoch_samples
+    return network, epoch_loss
