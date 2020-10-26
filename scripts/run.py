@@ -82,6 +82,7 @@ if __name__ == "__main__":
         num_hidden=args.num_hidden,
         alpha_bound=args.alpha_bound,
         beta_bound=args.beta_bound,
+        range_restrict=args.range_restrict,
         topK=args.topK,
         )
     model_folder = os.path.join(args.models_dir, local_name)

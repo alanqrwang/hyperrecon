@@ -70,6 +70,7 @@ def unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_re
     Loss = (alpha*beta) * DC + (1-alpha)*beta * Reg1 + (1-alpha)*(1-beta) * Reg2
     hyperparams: matrix of hyperparams (batch_size, num_hyperparams)
     '''
+    print(reg_types, hyperparams.shape)
     assert len(reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'
     
     l1 = torch.nn.L1Loss(reduction='none')
