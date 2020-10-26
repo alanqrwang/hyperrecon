@@ -90,13 +90,18 @@ def unsup_loss(x_hat, y, mask, hyperparams, device, cap_reg):
     if hyperparams.shape[1] == 2:
         w_coeff = hyperparams[:, 0]
         tv_coeff = hyperparams[:, 1]
-        # print('doing range-restricted loss')
-        # loss = (w_coeff*tv_coeff) * dc + (1-w_coeff)*tv_coeff * cap_reg + (1-w_coeff)*(1-tv_coeff) * tv
-        print('w_tv non-range-restricted loss')
-        loss = dc + w_coeff * l1_wavelet + tv_coeff * tv
+        print('doing range-restricted loss')
+        loss = (w_coeff*tv_coeff) * dc + (1-w_coeff)*tv_coeff * cap_reg + (1-w_coeff)*(1-tv_coeff) * tv
+        # print('w_tv non-range-restricted loss')
+        # loss = dc + w_coeff * l1_wavelet + tv_coeff * tv
+        # print('cap_reg non-range-restricted loss')
+        # loss = dc + w_coeff * cap_reg + tv_coeff * tv
     else:
         tv_coeff = hyperparams[:, 0]
+        print('just tv')
         loss = (1-tv_coeff)*dc + tv_coeff*tv
+        # print('non range restricted just cap reg')
+        # loss = dc + tv_coeff*cap_reg
 
     return loss, dc
 
