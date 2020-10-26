@@ -12,7 +12,7 @@ def test(model_path, xdata, alpha, config, device):
     K = int(config['K'])
     learn_reg_coeff = config['learn_reg_coeff']
     if learn_reg_coeff == 'True':
-        learn_reg_coeff = 2
+        learn_reg_coeff = 1
     recon_type = config['recon_type']
 
     mask = utils.get_mask(maskname)
@@ -45,22 +45,3 @@ def test_hqsnet(trained_model, xdata, device, hyperparams, mask):
 
     preds = np.array(recons).squeeze()
     return preds, losses
-
-def test_alpha_range(trained_model, xdata, config, device, alphas, N=1):
-    recons = []
-    for alpha in alphas:
-        print(alpha)
-        y = torch.as_tensor(xdata[N:N+1]).to(device).float()
-        zf = utils.ifft(y)
-
-        zf[:,100:103,100:102,:] = 0.5
-        y = utils.fft(zf)
-
-        if True:
-            y, zf = utils.scale(y, zf)
-
-        pred = trained_model(zf, y, alpha)
-        recons.append(pred.cpu().detach().numpy())
-
-    preds = np.array(recons).squeeze()
-    return preds
