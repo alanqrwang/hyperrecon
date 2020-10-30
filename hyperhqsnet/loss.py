@@ -70,7 +70,6 @@ def unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_re
     Loss = (alpha*beta) * DC + (1-alpha)*beta * Reg1 + (1-alpha)*(1-beta) * Reg2
     hyperparams: matrix of hyperparams (batch_size, num_hyperparams)
     '''
-    print(reg_types, hyperparams.shape)
     assert len(reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'
     
     l1 = torch.nn.L1Loss(reduction='none')
@@ -86,6 +85,7 @@ def unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_re
     # Regularization
     regs = {}
     regs['cap'] = cap_reg
+    print(cap_reg.requires_grad)
 
     x_hat = x_hat.permute(0, 3, 1, 2)
     tv = get_tv(x_hat)
@@ -116,7 +116,7 @@ def unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_re
     else:
         raise NameError('Bad loss')
 
-    return loss, dc
+    return loss, dc, tv
 
 def unsup_loss_single_batch(x_hat, y, mask, hyperparams, device):
     '''

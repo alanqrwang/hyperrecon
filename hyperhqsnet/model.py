@@ -14,21 +14,33 @@ class HyperNetwork(nn.Module):
         for layer in conv_layers.values():
             weight_shapes.append(layer.get_weight_shape())
             bias_shapes.append(layer.get_bias_shape())
-
         self.weight_shapes = torch.tensor(weight_shapes)
         self.bias_shapes = torch.tensor(bias_shapes)
 
         # Compute output dimension from conv layer dimensions
         out_dim = (torch.sum(torch.prod(self.weight_shapes, dim=1))+torch.sum(torch.prod(self.bias_shapes, dim=1))).item()
+        print('out dimension', out_dim)
 
         # Compute weight and bias indices for flattened array
         self.wind = torch.cumsum(torch.prod(self.weight_shapes, dim=1), dim=0)
         self.bind = torch.cumsum(torch.prod(self.bias_shapes, dim=1), dim=0) + torch.sum(torch.prod(self.weight_shapes, dim=1))
 
         # Network layers
-        self.lin1 = nn.Linear(in_dim, h_dim)
-        self.lin2 = nn.Linear(h_dim, h_dim)
-        self.lin_out = nn.Linear(h_dim, out_dim)
+        self.lin1 = nn.Linear(in_dim, 100)
+        self.lin2 = nn.Linear(100, 1000)
+        self.lin3 = nn.Linear(1000, 10000)
+        self.lin4 = nn.Linear(10000,10000)
+        self.lin5 = nn.Linear(10000,10000)
+        # self.lin6 = nn.Linear(20000,30000)
+        self.lin_out = nn.Linear(10000, out_dim)
+
+
+        # Network layers
+        # self.lin1 = nn.Linear(in_dim, h_dim)
+        # self.lin2 = nn.Linear(h_dim, h_dim)
+        # self.lin_out = nn.Linear(h_dim, out_dim)
+
+        # Activations
         self.relu = nn.LeakyReLU(inplace=True)
         self.tanh = nn.Tanh()
 
@@ -41,9 +53,18 @@ class HyperNetwork(nn.Module):
         self.lin_out.bias.data.normal_(std=1/(h_dim*unet_nh)**(1/2))
 
     def forward(self, x):
-        x = self.lin1(x)
-        x = self.lin2(x)
-        weights = self.tanh(self.lin_out(x))
+        # x = self.lin1(x)
+        # x = self.lin2(x)
+
+        x = self.relu(self.lin1(x))
+        x = self.relu(self.lin2(x))
+        x = self.relu(self.lin3(x))
+        x = self.relu(self.lin4(x))
+        x = self.relu(self.lin5(x))
+        # x = self.relu(self.lin6(x))
+        # x = self.relu(self.lin4(x))
+        # weights = self.tanh(self.lin_out(x))
+        weights = self.lin_out(x)
 
         # Reorganize weight vector into weight and bias shapes
         wl = []
@@ -97,8 +118,9 @@ class Unet(nn.Module):
 
         wl, bl = self.hnet(hyperparams)
         l1_weights = 0
-        for w, b in zip(wl, bl):
+        for i, (w, b) in enumerate(zip(wl, bl)):
             l1_weights = l1_weights + torch.sum(torch.abs(w), dim=(1, 2, 3, 4)) + torch.sum(torch.abs(b), dim=(1))
+            print('l1 of %d layer:' % i, wl[i].abs().sum().item())
 
         # conv_down1
         x = x.unsqueeze(1)

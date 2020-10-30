@@ -13,8 +13,8 @@ def test(model_path, xdata, alpha, config, device):
     recon_type = config['recon_type']
     reg_types = config['reg_types'].strip('][').split(', ')
     reg_types = [s.strip('\'') for s in reg_types]
-    # range_restrict = True if config['range_restrict'] == 'True' else False
-    range_restrict = True
+    range_restrict = True if config['range_restrict'] == 'True' else False
+    # range_restrict = True
 
     mask = utils.get_mask(maskname)
     mask = torch.tensor(mask, requires_grad=False).float().to(device)
@@ -32,15 +32,19 @@ def test(model_path, xdata, alpha, config, device):
 def test_hqsnet(trained_model, xdata, device, hyperparams, mask, reg_types, range_restrict):
     recons = []
     losses = []
+    cap_regs = []
+    tvs = []
     for i in range(len(xdata)):
         y = torch.as_tensor(xdata[i:i+1]).to(device).float()
         zf = utils.ifft(y)
         y, zf = utils.scale(y, zf)
 
         pred, cap_reg = trained_model(zf, y, hyperparams)
-        loss, _ = losslayer.unsup_loss(pred, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
+        loss, _, tv = losslayer.unsup_loss(pred, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
         recons.append(pred.cpu().detach().numpy())
-        losses.append(cap_reg.item())
+        losses.append(loss.item())
+        cap_regs.append(cap_reg.item())
+        tvs.append(tv.item())
 
-    preds = np.array(recons).squeeze()
-    return preds, losses
+    preds = np.array(recons)[:,0,...]
+    return preds, losses, cap_regs, tvs

@@ -69,7 +69,7 @@ if __name__ == "__main__":
 
 
     ################### Filename #####################
-    local_name = '{prefix}_{recon_type}_{lr}_{batch_size}_{lmbda}_{K}_{reg_types}_{num_hidden}_{alpha_bound}_{beta_bound}_{topK}/{dataset}_{undersample_rate}'.format(
+    local_name = '{prefix}_{recon_type}_{lr}_{batch_size}_{lmbda}_{K}_{reg_types}_{num_hidden}_{alpha_bound}_{beta_bound}_{topK}_{range_restrict}/{dataset}_{undersample_rate}'.format(
         prefix=args.filename_prefix,
         dataset=args.dataset,
         undersample_rate=args.undersample_rate,

@@ -34,7 +34,7 @@ def trainer(xdata, gt_data, conf):
     optimizer = torch.optim.Adam(network.parameters(), lr=conf['lr'])
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50])
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100])
     # scheduler = None
     ##################################################
 
@@ -58,23 +58,32 @@ def trainer(xdata, gt_data, conf):
         checkpoint = torch.load(pretrain_path, map_location=torch.device('cpu'))
         network.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        if 'scheduler' in checkpoint and checkpoint['scheduler'] is not None:
-            scheduler.load_state_dict(checkpoint['scheduler'])
+        # if 'scheduler' in checkpoint and checkpoint['scheduler'] is not None:
+        #     scheduler.load_state_dict(checkpoint['scheduler'])
 
+    temp_val_list = list(np.load('/home/aw847/data/diff_hp_per_batch.npy'))
     # Training loop
     for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
         topK = conf['topK'] if epoch > 500 else None
-        print(type(conf['range_restrict']))
 
         network, optimizer, train_epoch_loss, prior_map = train(network, dataloaders['train'], optimizer, conf['mask'], \
                 conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
-        network, val_epoch_loss = test(network, dataloaders['val'], conf['mask'], \
-                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
-        scheduler.step()
+
+        hp1 = torch.tensor([0, 0.005]).view(1, -1).float().to(conf['device'])
+        hp2 = torch.tensor([0.01, 0.005]).view(1, -1).float().to(conf['device'])
+        print(hp1.shape, hp2.shape)
+        network, val_epoch_loss1 = test(network, dataloaders['val'], conf['mask'], \
+                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'], hp1)
+        # network, val_epoch_loss2 = test(network, dataloaders['val'], conf['mask'], \
+        #         conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'], hp2)
+        # temp_val_list.append(val_epoch_loss2)
+        # np.save('/home/aw847/data/diff_hp_per_batch.npy', temp_val_list)
+
+        # scheduler.step()
             
         # Optionally save checkpoints here, e.g.:
-        myutils.io.save_losses(epoch, train_epoch_loss, val_epoch_loss, conf['filename'])
-        myutils.io.save_checkpoint(epoch, network.state_dict(), optimizer.state_dict(), train_epoch_loss, val_epoch_loss, conf['filename'], conf['log_interval'], scheduler.state_dict())
+        myutils.io.save_losses(epoch, train_epoch_loss, val_epoch_loss1, conf['filename'])
+        myutils.io.save_checkpoint(epoch, network.state_dict(), optimizer.state_dict(), train_epoch_loss, val_epoch_loss1, conf['filename'], conf['log_interval'], scheduler)
 
         # Save prior maps
         priormaps_dir = os.path.join(conf['filename'], 'priormaps')
@@ -94,6 +103,8 @@ def train(network, dataloader, optimizer, mask, filename, device, alpha_bound, b
     epoch_loss = 0
     epoch_samples = 0
 
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = 1e-06
     for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
         y = y.float().to(device)
         gt = gt.float().to(device)
@@ -103,10 +114,11 @@ def train(network, dataloader, optimizer, mask, filename, device, alpha_bound, b
             zf = utils.ifft(y)
             y, zf = utils.scale(y, zf)
 
-            hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
+            hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound, fixed=0.).to(device)
+            print(hyperparams)
 
             x_hat, cap_reg = network(zf, y, hyperparams)
-            unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
+            unsup_losses, dc_losses,_ = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
                 
             if topK is not None:
                 _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
@@ -136,7 +148,7 @@ def train(network, dataloader, optimizer, mask, filename, device, alpha_bound, b
     epoch_loss /= epoch_samples
     return network, optimizer, epoch_loss, grid.T
 
-def test(network, dataloader, mask, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
+def test(network, dataloader, mask, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict, hparams_val=None):
     network.eval()
 
     epoch_loss = 0
@@ -150,10 +162,14 @@ def test(network, dataloader, mask, filename, device, alpha_bound, beta_bound, t
             zf = utils.ifft(y)
             y, zf = utils.scale(y, zf)
 
-            hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
+            if hparams_val is not None:
+                print('in val', hparams_val.shape)
+                hyperparams = hparams_val.expand(len(y), -1)
+            else:
+                hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
 
             x_hat, cap_reg = network(zf, y, hyperparams)
-            unsup_losses, dc_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
+            unsup_losses, dc_losses,_ = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
                 
             if topK is not None:
                 print('doing topK')
