@@ -64,13 +64,14 @@ def nextPowerOf2(n):
 
     return 1 << count;
 
-def unsup_loss(x_hat, y, mask, hyperparams, device, cap_reg):
+def unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict=True):
     '''
-    Loss = (1-alpha) * DC + alpha * Reg
+    Loss = (1-alpha) * DC + alpha * Reg1
     Loss = (alpha*beta) * DC + (1-alpha)*beta * Reg1 + (1-alpha)*(1-beta) * Reg2
     hyperparams: matrix of hyperparams (batch_size, num_hyperparams)
     '''
-    print('using cap reg')
+    assert len(reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'
+    
     l1 = torch.nn.L1Loss(reduction='none')
     l2 = torch.nn.MSELoss(reduction='none')
  
@@ -82,28 +83,40 @@ def unsup_loss(x_hat, y, mask, hyperparams, device, cap_reg):
     dc = torch.sum(l2(UFx_hat, y), dim=(1, 2, 3))
 
     # Regularization
+    regs = {}
+    regs['cap'] = cap_reg
+    print(cap_reg.requires_grad)
+
     x_hat = x_hat.permute(0, 3, 1, 2)
     tv = get_tv(x_hat)
+    regs['tv'] = tv
+
     wavelets = get_wavelets(x_hat, device)
     l1_wavelet = torch.sum(l1(wavelets, torch.zeros_like(wavelets)), dim=(1, 2, 3)) 
+    regs['w'] = l1_wavelet
  
-    if hyperparams.shape[1] == 2:
-        w_coeff = hyperparams[:, 0]
-        tv_coeff = hyperparams[:, 1]
-        print('doing range-restricted loss')
-        loss = (w_coeff*tv_coeff) * dc + (1-w_coeff)*tv_coeff * cap_reg + (1-w_coeff)*(1-tv_coeff) * tv
-        # print('w_tv non-range-restricted loss')
-        # loss = dc + w_coeff * l1_wavelet + tv_coeff * tv
-        # print('cap_reg non-range-restricted loss')
-        # loss = dc + w_coeff * cap_reg + tv_coeff * tv
-    else:
-        tv_coeff = hyperparams[:, 0]
-        print('just tv')
-        loss = (1-tv_coeff)*dc + tv_coeff*tv
-        # print('non range restricted just cap reg')
-        # loss = dc + tv_coeff*cap_reg
+    if len(reg_types) == 1:
+        alpha = hyperparams[:, 0]
+        if range_restrict:
+            print('range-restricted loss on %s' % reg_types[0])
+            loss = (1-alpha)*dc + alpha*regs[reg_types[0]]
+        else:
+            print('non-range-restricted loss on %s' % reg_types[0])
+            loss = dc + alpha*regs[reg_types[0]]
 
-    return loss, dc
+    elif len(reg_types) == 2:
+        alpha = hyperparams[:, 0]
+        beta = hyperparams[:, 1]
+        if range_restrict:
+            print('range-restricted loss on %s and %s' % (reg_types[0], reg_types[1]))
+            loss = (alpha*beta) * dc + (1-alpha)*beta * regs[reg_types[0]] + (1-alpha)*(1-beta) * regs[reg_types[1]]
+        else:
+            print('non-range-restricted loss on %s and %s' % (reg_types[0], reg_types[1]))
+            loss = dc + alpha * regs[reg_types[0]] + beta * regs[reg_types[1]]
+    else:
+        raise NameError('Bad loss')
+
+    return loss, dc, tv
 
 def unsup_loss_single_batch(x_hat, y, mask, hyperparams, device):
     '''

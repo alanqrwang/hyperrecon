@@ -1,6 +1,14 @@
 import torch
 import numpy as np
 import myutils
+# import parse
+
+def path2config(path):
+    parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{recon_type}_{lr}_{batch_size}_{lmbda}_{K}_{reg_types}_{n_hidden}_{alpha_bound}_{beta_bound}_{topK}_{range_restrict}/{dataset}_{maskname}/{filename}'
+            
+    config = parse.parse(parse_format, path)
+    assert (config is not None), '\n parse_format is %s \n path is %s' % (parse_format, path)
+    return config
 
 def add_bool_arg(parser, name, default=True):
     group = parser.add_mutually_exclusive_group(required=False)
@@ -109,34 +117,38 @@ def get_train_xdata(dataset, maskname):
 
     data = get_data(data_path.format(maskname=maskname))
     return data
-'''
-0 w.p. 0.25
-logunif(1e-5, 1) w.p. 0.75
-'''
-def sample_alpha(batch_size, r1=0, r2=1, fixed=False):
-    # if fixed:
+
+
+def sample_hyperparams(batch_size, num_hyperparams, alpha_bound, beta_bound, fixed=None):
+    if num_hyperparams == 2:
+        alpha = sample_alpha(batch_size, alpha_bound, fixed)
+        beta = sample_alpha(batch_size, beta_bound, fixed)
+
+        hyperparams = torch.cat([alpha, beta], dim=1)
+    else:
+        hyperparams = sample_alpha(batch_size, alpha_bound, fixed)
+    return hyperparams
+
+def sample_alpha(batch_size, bound, fixed):
+    r1 = float(bound[0])
+    r2 = float(bound[1])
+    # if fixed is not None:
     #     if torch.rand(()) < 0.1:
-    #         sample = torch.tensor(1.)
+    #         sample = torch.tensor(fixed).float()
     #     else:
-    #         sample = ((r1 - r2) * torch.rand(()) + r2)
-    # Uniform
+    #         sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
     # else:
-    #     sample = ((r1 - r2) * torch.rand(()) + r2)
+    #     sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
+
+    # samples = torch.empty(batch_size, 1).fill_(0.5)
+    # sample = torch.bernoulli(samples)
+    # sample[sample==0] = r1
+    # sample[sample==1] = r2
     sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
 
-    # sample = sample.view(1)
-
-    # Log uniform
-    # rvs = loguniform.rvs(low, high)
-    # sample = torch.tensor(rvs)
-    # print(sample.shape)
-
-    # Normal
-    # sample = torch.normal(0.001, 0.001, size=())
-    # print(sample)
-    # sample_max = torch.clamp(sample, min=0)
-    # print('sample', sample, 'max', sample_max)
-
+    # print('doing single hp per batch')
+    # single = ((r1 - r2) * torch.rand(()) + r2)
+    # sample = torch.empty(batch_size, 1).fill_(single)
     return sample
 
 def count_parameters(model):
