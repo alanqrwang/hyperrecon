@@ -64,20 +64,20 @@ def trainer(xdata, gt_data, conf):
     temp_val_list = list(np.load('/home/aw847/data/diff_hp_per_batch.npy'))
     # Training loop
     for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
+        if conf['force_lr'] is not None:
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = conf['force_lr']
+
         topK = conf['topK'] if epoch > 500 else None
 
         network, optimizer, train_epoch_loss, prior_map = train(network, dataloaders['train'], optimizer, conf['mask'], \
-                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
+                conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
 
-        hp1 = torch.tensor([0, 0.005]).view(1, -1).float().to(conf['device'])
-        hp2 = torch.tensor([0.01, 0.005]).view(1, -1).float().to(conf['device'])
-        print(hp1.shape, hp2.shape)
-        network, val_epoch_loss1 = test(network, dataloaders['val'], conf['mask'], \
-                conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'], hp1)
-        # network, val_epoch_loss2 = test(network, dataloaders['val'], conf['mask'], \
-        #         conf['filename'], conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'], hp2)
-        # temp_val_list.append(val_epoch_loss2)
-        # np.save('/home/aw847/data/diff_hp_per_batch.npy', temp_val_list)
+        # hp1 = torch.tensor([0]).view(1, -1).float().to(conf['device'])
+        # hp1 = torch.tensor([0, 0.005]).view(1, -1).float().to(conf['device'])
+        # hp2 = torch.tensor([0.01, 0.005]).view(1, -1).float().to(conf['device'])
+        network, val_epoch_loss1 = validate(network, dataloaders['val'], conf['mask'], \
+                conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
 
         # scheduler.step()
             
@@ -92,7 +92,7 @@ def trainer(xdata, gt_data, conf):
         np.save(os.path.join(priormaps_dir, '{epoch:04d}'.format(epoch=epoch)), prior_map)
 
 
-def train(network, dataloader, optimizer, mask, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
+def train(network, dataloader, optimizer, mask, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
     samples = 100
     grid = np.zeros((samples+1, samples+1))
     grid_offset = np.array([alpha_bound[0], beta_bound[0]])
@@ -103,8 +103,6 @@ def train(network, dataloader, optimizer, mask, filename, device, alpha_bound, b
     epoch_loss = 0
     epoch_samples = 0
 
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = 1e-06
     for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
         y = y.float().to(device)
         gt = gt.float().to(device)
@@ -114,7 +112,7 @@ def train(network, dataloader, optimizer, mask, filename, device, alpha_bound, b
             zf = utils.ifft(y)
             y, zf = utils.scale(y, zf)
 
-            hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound, fixed=0.).to(device)
+            hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound, fixed=False).to(device)
             print(hyperparams)
 
             x_hat, cap_reg = network(zf, y, hyperparams)
@@ -148,7 +146,7 @@ def train(network, dataloader, optimizer, mask, filename, device, alpha_bound, b
     epoch_loss /= epoch_samples
     return network, optimizer, epoch_loss, grid.T
 
-def test(network, dataloader, mask, filename, device, alpha_bound, beta_bound, topK, reg_types, range_restrict, hparams_val=None):
+def validate(network, dataloader, mask, device, alpha_bound, beta_bound, topK, reg_types, range_restrict, hparams_val=None):
     network.eval()
 
     epoch_loss = 0
@@ -169,7 +167,7 @@ def test(network, dataloader, mask, filename, device, alpha_bound, beta_bound, t
                 hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
 
             x_hat, cap_reg = network(zf, y, hyperparams)
-            unsup_losses, dc_losses,_ = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
+            unsup_losses, dc_losses, tv_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
                 
             if topK is not None:
                 print('doing topK')
@@ -185,3 +183,28 @@ def test(network, dataloader, mask, filename, device, alpha_bound, beta_bound, t
         epoch_samples += len(y)
     epoch_loss /= epoch_samples
     return network, epoch_loss
+
+def test(network, dataloader, mask, device, alpha_bound, beta_bound, topK, reg_types, range_restrict, hyperparams):
+    network.eval()
+
+    recons = []
+    losses = []
+    dcs = []
+    cap_regs = []
+    tvs = []
+    for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        y = y.float().to(device)
+        gt = gt.float().to(device)
+        with torch.set_grad_enabled(False):
+            zf = utils.ifft(y)
+            y, zf = utils.scale(y, zf)
+
+            pred, cap_reg = network(zf, y, hyperparams)
+            loss, dc, tv = losslayer.unsup_loss(pred, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
+            recons.append(pred.cpu().detach().numpy())
+            losses.append(loss.item())
+            cap_regs.append(cap_reg.item())
+            tvs.append(tv.item())
+
+    preds = np.array(recons)[:,0,...]
+    return preds, losses, dcs, cap_regs, tvs

@@ -129,22 +129,29 @@ def sample_hyperparams(batch_size, num_hyperparams, alpha_bound, beta_bound, fix
         hyperparams = sample_alpha(batch_size, alpha_bound, fixed)
     return hyperparams
 
-def sample_alpha(batch_size, bound, fixed):
+def sample_alpha(batch_size, bound, fixed=False):
     r1 = float(bound[0])
     r2 = float(bound[1])
-    # if fixed is not None:
-    #     if torch.rand(()) < 0.1:
-    #         sample = torch.tensor(fixed).float()
-    #     else:
-    #         sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
-    # else:
-    #     sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
 
+    sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
+    
+    if fixed is True:
+        multinomial_p = torch.tensor([1/3, 1/3, 1/3])
+        sample = torch.multinomial(multinomial_p, batch_size, replacement=True).float()
+        print(sample)
+        sample[sample==0] = ((r1 - r2) * torch.rand(()) + r2)
+        sample[sample==1] = r1
+        sample[sample==2] = r2
+        sample = sample.view(batch_size, 1)
+    else:
+        sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
+
+
+    # Bernoulli
     # samples = torch.empty(batch_size, 1).fill_(0.5)
     # sample = torch.bernoulli(samples)
     # sample[sample==0] = r1
     # sample[sample==1] = r2
-    sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
 
     # print('doing single hp per batch')
     # single = ((r1 - r2) * torch.rand(()) + r2)

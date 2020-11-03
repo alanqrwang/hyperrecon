@@ -84,8 +84,8 @@ def unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_re
 
     # Regularization
     regs = {}
+
     regs['cap'] = cap_reg
-    print(cap_reg.requires_grad)
 
     x_hat = x_hat.permute(0, 3, 1, 2)
     tv = get_tv(x_hat)

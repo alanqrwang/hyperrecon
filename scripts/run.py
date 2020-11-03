@@ -16,6 +16,7 @@ if __name__ == "__main__":
     parser.add_argument('--models_dir', default='/nfs02/users/aw847/models/HyperHQSNet/', type=str, help='directory to save models')
     
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--force_lr', type=float, default=None, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
     parser.add_argument('--lmbda', type=float, default=0, help='gpu id to train on')
     parser.add_argument('--num_epochs', type=int, default=100)
@@ -63,6 +64,9 @@ if __name__ == "__main__":
 
     xdata = utils.get_data(data_path.format(maskname=args.undersample_rate))
     gt_data = utils.get_data(gt_path)
+    # xdata = np.resize(xdata[0:1], (1000, 256, 256, 2))
+    # gt_data = np.resize(gt_data[0:1], (1000, 256, 256, 1))
+    print('new shapes', xdata.shape, gt_data.shape)
     if gt_data.shape[-1] == 1:
         print('Appending complex dimension into gt...')
         gt_data = np.concatenate((gt_data, np.zeros(gt_data.shape)), axis=3)
