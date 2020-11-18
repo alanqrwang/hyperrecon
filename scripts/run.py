@@ -35,6 +35,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden', type=int, default=64)
     parser.add_argument('--K', type=int, default=5)
     parser.add_argument('--topK', type=int, default=None)
+    parser.add_argument('--n_hyp_layers', type=int, default=2, help='Batch size')
     
     args = parser.parse_args()
     if torch.cuda.is_available():
@@ -64,8 +65,6 @@ if __name__ == "__main__":
 
     xdata = utils.get_data(data_path.format(maskname=args.undersample_rate))
     gt_data = utils.get_data(gt_path)
-    # xdata = np.resize(xdata[0:1], (1000, 256, 256, 2))
-    # gt_data = np.resize(gt_data[0:1], (1000, 256, 256, 1))
     print('new shapes', xdata.shape, gt_data.shape)
     if gt_data.shape[-1] == 1:
         print('Appending complex dimension into gt...')

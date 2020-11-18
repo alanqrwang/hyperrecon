@@ -64,10 +64,10 @@ def nextPowerOf2(n):
 
     return 1 << count;
 
-def unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict=True):
+def unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict=True, epoch=None):
     '''
     Loss = (1-alpha) * DC + alpha * Reg1
-    Loss = (alpha*beta) * DC + (1-alpha)*beta * Reg1 + (1-alpha)*(1-beta) * Reg2
+    Loss = alpha * DC + (1-alpha)*beta * Reg1 + (1-alpha)*(1-beta) * Reg2
     hyperparams: matrix of hyperparams (batch_size, num_hyperparams)
     '''
     assert len(reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'
@@ -109,14 +109,19 @@ def unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_re
         beta = hyperparams[:, 1]
         if range_restrict:
             print('range-restricted loss on %s and %s' % (reg_types[0], reg_types[1]))
-            loss = (alpha*beta) * dc + (1-alpha)*beta * regs[reg_types[0]] + (1-alpha)*(1-beta) * regs[reg_types[1]]
+            if epoch is not None and epoch < 100:
+                print('just tv for first 100')
+                loss = alpha * dc + (1-alpha) * regs[reg_types[1]]
+            else:
+                print('both regs for rest')
+                loss = alpha * dc + (1-alpha)*beta * regs[reg_types[0]] + (1-alpha)*(1-beta) * regs[reg_types[1]]
         else:
             print('non-range-restricted loss on %s and %s' % (reg_types[0], reg_types[1]))
             loss = dc + alpha * regs[reg_types[0]] + beta * regs[reg_types[1]]
     else:
         raise NameError('Bad loss')
 
-    return loss, dc, tv
+    return loss, dc, l1_wavelet, tv
 
 def unsup_loss_single_batch(x_hat, y, mask, hyperparams, device):
     '''

@@ -6,7 +6,7 @@ import torch.nn as nn
 import sys
 
 class HyperNetwork(nn.Module):
-    def __init__(self, conv_layers, n_hyp_layers, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
+    def __init__(self, conv_layers, n_hyp_layers, alpha_bound, beta_bound, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
         super(HyperNetwork, self).__init__()
         self.n_hyp_layers = n_hyp_layers
 
@@ -20,74 +20,78 @@ class HyperNetwork(nn.Module):
 
         # Compute output dimension from conv layer dimensions
         out_dim = (torch.sum(torch.prod(self.weight_shapes, dim=1))+torch.sum(torch.prod(self.bias_shapes, dim=1))).item()
-        print('out dimension', out_dim)
-        print('hypernet layers', n_hyp_layers)
+        # print('out dimension', out_dim)
+        # print('hypernet layers', n_hyp_layers)
 
         # Compute weight and bias indices for flattened array
         self.wind = torch.cumsum(torch.prod(self.weight_shapes, dim=1), dim=0)
         self.bind = torch.cumsum(torch.prod(self.bias_shapes, dim=1), dim=0) + torch.sum(torch.prod(self.weight_shapes, dim=1))
 
-        # Network layers
-        self.lin1 = nn.Linear(in_dim, 100)
-        self.lin2 = nn.Linear(100, 1000)
-        self.lin3 = nn.Linear(1000, 10000)
-        if n_hyp_layers == 4:
-            self.lin4 = nn.Linear(10000,10000)
-        elif n_hyp_layers == 5:
-            self.lin4 = nn.Linear(10000,10000)
-            self.lin5 = nn.Linear(10000,10000)
-        self.lin_out = nn.Linear(10000, out_dim)
-
+        # Initalize weights
+        constant_scale = f_size*f_size*unet_nh
+        init_std = lambda d_i : (2 / (d_i * constant_scale))**0.5
 
         # Network layers
-        # self.lin1 = nn.Linear(in_dim, h_dim)
-        # self.lin2 = nn.Linear(h_dim, h_dim)
-        # self.lin_out = nn.Linear(h_dim, out_dim)
+        if n_hyp_layers == 1:
+            self.lin1 = nn.Linear(in_dim, 8)
+            self.lin2 = nn.Linear(8, 32)
+            self.lin3 = nn.Linear(32, 32)
+            self.lin4 = nn.Linear(32, 32)
+            self.lin_out = nn.Linear(32, out_dim)
 
+            self.batchnorm1 = nn.BatchNorm1d(8)
+            self.batchnorm2 = nn.BatchNorm1d(32)
+            self.batchnorm3 = nn.BatchNorm1d(32)
+            self.batchnorm4 = nn.BatchNorm1d(32)
+
+            self.lin1.weight.data.normal_(std=init_std(in_dim))
+            self.lin1.bias.data.fill_(0)
+            self.lin2.weight.data.normal_(std=init_std(8))
+            self.lin2.bias.data.fill_(0)
+            self.lin3.weight.data.normal_(std=init_std(32))
+            self.lin3.bias.data.fill_(0)
+            self.lin4.weight.data.normal_(std=init_std(32))
+            self.lin4.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(32))
+            self.lin_out.bias.data.fill_(0)
+
+        if n_hyp_layers == 2:
+            self.lin1 = nn.Linear(in_dim, 8)
+            self.lin2 = nn.Linear(8, 16)
+            self.lin_out = nn.Linear(16, out_dim)
+
+            self.batchnorm1 = nn.BatchNorm1d(8)
+            self.batchnorm2 = nn.BatchNorm1d(16)
+
+            self.lin1.weight.data.normal_(std=init_std(in_dim))
+            self.lin1.bias.data.fill_(0)
+            self.lin2.weight.data.normal_(std=init_std(8))
+            self.lin2.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(16))
+            self.lin_out.bias.data.fill_(0)
+            
         # Activations
         self.relu = nn.LeakyReLU(inplace=True)
-        self.batchnorm1 = nn.BatchNorm1d(100)
-        self.batchnorm2 = nn.BatchNorm1d(1000)
-        self.batchnorm3 = nn.BatchNorm1d(10000)
-        if n_hyp_layers == 4:
-            self.batchnorm4 = nn.BatchNorm1d(10000)
-        elif n_hyp_layers == 5:
-            self.batchnorm4 = nn.BatchNorm1d(10000)
-            self.batchnorm5 = nn.BatchNorm1d(10000)
 
-        # Initalize weights
-        self.lin1.weight.data.normal_(std=1/(in_dim*unet_nh)**(1/2))
-        self.lin1.bias.data.normal_(std=1/(in_dim*unet_nh)**(1/2))
-        self.lin2.weight.data.normal_(std=1/(100*unet_nh)**(1/2))
-        self.lin2.bias.data.normal_(std=1/(100*unet_nh)**(1/2))
-        self.lin3.weight.data.normal_(std=1/(1000*unet_nh)**(1/2))
-        self.lin3.bias.data.normal_(std=1/(1000*unet_nh)**(1/2))
-        if n_hyp_layers == 4:
-            self.lin4.weight.data.normal_(std=1/(10000*unet_nh)**(1/2))
-            self.lin4.bias.data.normal_(std=1/(10000*unet_nh)**(1/2))
-        elif n_hyp_layers == 5:
-            self.lin4.weight.data.normal_(std=1/(10000*unet_nh)**(1/2))
-            self.lin4.bias.data.normal_(std=1/(10000*unet_nh)**(1/2))
-            self.lin5.weight.data.normal_(std=1/(10000*unet_nh)**(1/2))
-            self.lin5.bias.data.normal_(std=1/(10000*unet_nh)**(1/2))
-        self.lin_out.weight.data.normal_(std=1/(10000*unet_nh)**(1/2))
-        self.lin_out.bias.data.normal_(std=1/(10000*unet_nh)**(1/2))
+
 
     def forward(self, x):
-        x = self.relu(self.lin1(x))
-        x = self.batchnorm1(x)
-        x = self.relu(self.lin2(x))
-        x = self.batchnorm2(x)
-        x = self.relu(self.lin3(x))
-        x = self.batchnorm3(x)
-        if self.n_hyp_layers == 4:
+        if self.n_hyp_layers == 1:
+            x = self.relu(self.lin1(x))
+            x = self.batchnorm1(x)
+            x = self.relu(self.lin2(x))
+            x = self.batchnorm2(x)
+            x = self.relu(self.lin3(x))
+            x = self.batchnorm3(x)
             x = self.relu(self.lin4(x))
             x = self.batchnorm4(x)
-        if self.n_hyp_layers == 5:
-            x = self.relu(self.lin4(x))
-            x = self.batchnorm4(x)
-            x = self.relu(self.lin5(x))
-            x = self.batchnorm5(x)
+
+        elif self.n_hyp_layers == 2:
+            x = self.relu(self.lin1(x))
+            x = self.batchnorm1(x)
+            x = self.relu(self.lin2(x))
+            x = self.batchnorm2(x)
+
         weights = self.lin_out(x)
 
         # Reorganize weight vector into weight and bias shapes
@@ -102,7 +106,7 @@ class HyperNetwork(nn.Module):
         return wl, bl 
 
 class Unet(nn.Module):
-    def __init__(self, device, num_hyperparams, n_hyp_layers, nh=64, residual=True):
+    def __init__(self, device, num_hyperparams, n_hyp_layers, alpha_bound, beta_bound, nh=64, residual=True):
         super(Unet, self).__init__()
 
         self.residual = residual
@@ -134,7 +138,7 @@ class Unet(nn.Module):
         self.convs['last14'] = layers.BatchConv2DLayer(nh, 2, ks=1)
 
         # HyperNetwork
-        self.hnet = HyperNetwork(self.convs, n_hyp_layers, in_dim=num_hyperparams, unet_nh=nh)
+        self.hnet = HyperNetwork(self.convs, n_hyp_layers, alpha_bound, beta_bound, in_dim=num_hyperparams, unet_nh=nh)
         
     def get_parameters(self, hyperparams):
         wl, bl = self.hnet(hyperparams)
@@ -146,7 +150,7 @@ class Unet(nn.Module):
 
         wl, bl = self.get_parameters(hyperparams)
 
-        cap_reg = torch.zeros(len(y)).to(self.device)
+        cap_reg = torch.zeros(len(y), requires_grad=True).to(self.device)
         for w, b in zip(wl, bl):
             w_flat = w.view(len(y), -1)
             b_flat = b.view(len(y), -1)
@@ -208,6 +212,8 @@ class Unet(nn.Module):
         # last
         x = self.convs['last14'](x, wl[14], bias=bl[14])
         x = x[:,0,...]
+        # print('unet', x.var())
+        # sys.exit()
 
         x = x.permute(0, 2, 3, 1)
         if self.residual:

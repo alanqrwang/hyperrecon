@@ -119,33 +119,21 @@ def get_train_xdata(dataset, maskname):
     return data
 
 
-def sample_hyperparams(batch_size, num_hyperparams, alpha_bound, beta_bound, fixed=None):
+def sample_hyperparams(batch_size, num_hyperparams, alpha_bound, beta_bound):
     if num_hyperparams == 2:
-        alpha = sample_alpha(batch_size, alpha_bound, fixed)
-        beta = sample_alpha(batch_size, beta_bound, fixed)
+        alpha = sample_alpha(batch_size, alpha_bound)
+        beta = sample_alpha(batch_size, beta_bound)
 
         hyperparams = torch.cat([alpha, beta], dim=1)
     else:
-        hyperparams = sample_alpha(batch_size, alpha_bound, fixed)
+        hyperparams = sample_alpha(batch_size, alpha_bound)
     return hyperparams
 
-def sample_alpha(batch_size, bound, fixed=False):
+def sample_alpha(batch_size, bound):
     r1 = float(bound[0])
     r2 = float(bound[1])
 
     sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
-    
-    if fixed is True:
-        multinomial_p = torch.tensor([1/3, 1/3, 1/3])
-        sample = torch.multinomial(multinomial_p, batch_size, replacement=True).float()
-        print(sample)
-        sample[sample==0] = ((r1 - r2) * torch.rand(()) + r2)
-        sample[sample==1] = r1
-        sample[sample==2] = r2
-        sample = sample.view(batch_size, 1)
-    else:
-        sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
-
 
     # Bernoulli
     # samples = torch.empty(batch_size, 1).fill_(0.5)
@@ -157,6 +145,23 @@ def sample_alpha(batch_size, bound, fixed=False):
     # single = ((r1 - r2) * torch.rand(()) + r2)
     # sample = torch.empty(batch_size, 1).fill_(single)
     return sample
+
+def map_based_sampling(psnr_map, batch_size, psnr_cutoff=-2):
+    samples = np.sqrt(len(psnr_map))
+
+    psnr_map = [1 if i > psnr_cutoff else 0 for i in psnr_map] # Threshold
+    psnr_map_prob = psnr_map / np.sum(psnr_map) # Make into uniform distribution
+
+    x_jitter = np.random.uniform(-1/2, 1/2, batch_size)
+    y_jitter = np.random.uniform(-1/2, 1/2, batch_size)
+    rand_point = np.random.choice(len(psnr_map_prob), batch_size, p=psnr_map_prob)
+    rand_x = rand_point % samples + x_jitter
+    rand_y = rand_point // samples + y_jitter
+
+    alpha_scaled = torch.tensor(np.interp(rand_x, [-1/2,(samples-1)+1/2], [0, 1]).reshape(-1,1))
+    beta_scaled = torch.tensor(np.interp(rand_y, [-1/2,(samples-1)+1/2], [0, 1]).reshape(-1,1))
+    hyperparams = torch.cat([alpha_scaled, beta_scaled], dim=1)
+    return hyperparams
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)

@@ -29,7 +29,8 @@ def trainer(xdata, gt_data, conf):
     if conf['recon_type'] == 'unroll':
         network = model.HQSNet(conf['K'], conf['mask'], conf['lmbda'], conf['learn_reg_coeff'], conf['device'], n_hidden=conf['num_hidden']).to(conf['device'])
     elif conf['recon_type'] == 'unet':
-        network = model.Unet(conf['device'], num_hyperparams=len(conf['reg_types']), nh=conf['num_hidden']).to(conf['device'])
+        network = model.Unet(conf['device'], num_hyperparams=len(conf['reg_types']), n_hyp_layers=conf['n_hyp_layers'], \
+                alpha_bound=conf['alpha_bound'], beta_bound=conf['beta_bound'], nh=conf['num_hidden']).to(conf['device'])
 
     optimizer = torch.optim.Adam(network.parameters(), lr=conf['lr'])
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
@@ -54,6 +55,9 @@ def trainer(xdata, gt_data, conf):
             pass
         else:
             sys.exit()
+
+        pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/deeper-new-loss-fn_unet_5e-05_32_0_5_[\'cap\', \'tv\']_64_[0.0, 1.0]_[0.0, 1.0]_None_True/t1_4p2/model.5000.h5' 
+                
         print('loading from checkpoint', pretrain_path)
         checkpoint = torch.load(pretrain_path, map_location=torch.device('cpu'))
         network.load_state_dict(checkpoint['state_dict'])
@@ -61,27 +65,28 @@ def trainer(xdata, gt_data, conf):
         # if 'scheduler' in checkpoint and checkpoint['scheduler'] is not None:
         #     scheduler.load_state_dict(checkpoint['scheduler'])
 
-    temp_val_list = list(np.load('/home/aw847/data/diff_hp_per_batch.npy'))
+    loaded_map = np.load('/nfs02/users/aw847/data/hypernet/deep_cap_tv_t1_single_100_100.npy')
+    loaded_map = np.load('/nfs02/users/aw847/data/hypernet/deep_cap_tv_knee_single_100_100.npy')
+    # loaded_map = None
+
     # Training loop
     for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
         if conf['force_lr'] is not None:
             for param_group in optimizer.param_groups:
                 param_group['lr'] = conf['force_lr']
 
-        topK = conf['topK'] if epoch > 500 else None
+        psnr_map = loaded_map if epoch > -1 else None
+        topK = conf['topK'] if epoch > 200 else None
 
         network, optimizer, train_epoch_loss, prior_map = train(network, dataloaders['train'], optimizer, conf['mask'], \
-                conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
+                conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'], psnr_map, epoch=None)
 
-        # hp1 = torch.tensor([0]).view(1, -1).float().to(conf['device'])
-        # hp1 = torch.tensor([0, 0.005]).view(1, -1).float().to(conf['device'])
-        # hp2 = torch.tensor([0.01, 0.005]).view(1, -1).float().to(conf['device'])
         network, val_epoch_loss1 = validate(network, dataloaders['val'], conf['mask'], \
-                conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'])
+                conf['device'], conf['alpha_bound'], conf['beta_bound'], topK, conf['reg_types'], conf['range_restrict'], psnr_map, epoch=None)
 
         # scheduler.step()
             
-        # Optionally save checkpoints here, e.g.:
+        # Save checkpoints 
         myutils.io.save_losses(epoch, train_epoch_loss, val_epoch_loss1, conf['filename'])
         myutils.io.save_checkpoint(epoch, network.state_dict(), optimizer.state_dict(), train_epoch_loss, val_epoch_loss1, conf['filename'], conf['log_interval'], scheduler)
 
@@ -92,7 +97,7 @@ def trainer(xdata, gt_data, conf):
         np.save(os.path.join(priormaps_dir, '{epoch:04d}'.format(epoch=epoch)), prior_map)
 
 
-def train(network, dataloader, optimizer, mask, device, alpha_bound, beta_bound, topK, reg_types, range_restrict):
+def train(network, dataloader, optimizer, mask, device, alpha_bound, beta_bound, topK, reg_types, range_restrict, psnr_map, epoch):
     samples = 100
     grid = np.zeros((samples+1, samples+1))
     grid_offset = np.array([alpha_bound[0], beta_bound[0]])
@@ -112,19 +117,25 @@ def train(network, dataloader, optimizer, mask, device, alpha_bound, beta_bound,
             zf = utils.ifft(y)
             y, zf = utils.scale(y, zf)
 
-            hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound, fixed=False).to(device)
-            print(hyperparams)
+            if psnr_map is not None:
+                print('sampling from map')
+                hyperparams = utils.map_based_sampling(psnr_map, len(y)).float().to(device)
+            else:
+                print('sampling vanilla')
+                hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
 
             x_hat, cap_reg = network(zf, y, hyperparams)
-            unsup_losses, dc_losses,_ = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
+            unsup_losses, dc_losses,_,_ = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict, epoch)
                 
             if topK is not None:
+                print('doing topK')
                 _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
                 sort_losses = unsup_losses[perm] # Reorder total losses by lowest to highest DC loss
                 sort_hyperparams = hyperparams[perm]
 
                 loss = torch.sum(sort_losses[:topK]) # Take only the losses with lowest DC
             else:
+                print('not topK')
                 loss = torch.sum(unsup_losses)
                 sort_hyperparams = hyperparams
 
@@ -132,13 +143,13 @@ def train(network, dataloader, optimizer, mask, device, alpha_bound, beta_bound,
             optimizer.step()
 
             # Find nearest discrete grid points
-            # if topK is not None:
-            #     gpoints = np.rint((sort_hyperparams[:topK].cpu().detach().numpy() - grid_offset) / grid_spacing)
-            # else:
-            #     gpoints = np.rint((sort_hyperparams.cpu().detach().numpy() - grid_offset) / grid_spacing)
-            # for gp in gpoints:
-            #     gp = gp.astype(int)
-            #     grid[tuple(gp)] += 1
+            if topK is not None:
+                gpoints = np.rint((sort_hyperparams[:topK].cpu().detach().numpy() - grid_offset) / grid_spacing)
+            else:
+                gpoints = np.rint((sort_hyperparams.cpu().detach().numpy() - grid_offset) / grid_spacing)
+            for gp in gpoints:
+                gp = gp.astype(int)
+                grid[tuple(gp)] += 1
 
 
             epoch_loss += loss.data.cpu().numpy()
@@ -146,7 +157,7 @@ def train(network, dataloader, optimizer, mask, device, alpha_bound, beta_bound,
     epoch_loss /= epoch_samples
     return network, optimizer, epoch_loss, grid.T
 
-def validate(network, dataloader, mask, device, alpha_bound, beta_bound, topK, reg_types, range_restrict, hparams_val=None):
+def validate(network, dataloader, mask, device, alpha_bound, beta_bound, topK, reg_types, range_restrict, psnr_map, epoch, hparams_val=None):
     network.eval()
 
     epoch_loss = 0
@@ -163,11 +174,13 @@ def validate(network, dataloader, mask, device, alpha_bound, beta_bound, topK, r
             if hparams_val is not None:
                 print('in val', hparams_val.shape)
                 hyperparams = hparams_val.expand(len(y), -1)
+            elif psnr_map is not None:
+                hyperparams = utils.map_based_sampling(psnr_map, len(y)).float().to(device)
             else:
                 hyperparams = utils.sample_hyperparams(len(y), len(reg_types), alpha_bound, beta_bound).to(device)
 
             x_hat, cap_reg = network(zf, y, hyperparams)
-            unsup_losses, dc_losses, tv_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict)
+            unsup_losses, dc_losses,_, tv_losses = losslayer.unsup_loss(x_hat, y, mask, hyperparams, device, reg_types, cap_reg, range_restrict, epoch)
                 
             if topK is not None:
                 print('doing topK')
