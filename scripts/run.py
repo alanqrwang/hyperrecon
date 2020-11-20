@@ -30,12 +30,15 @@ if __name__ == "__main__":
     parser.add_argument('--alpha_bound', nargs='+', type=float, help='<Required> Set flag', required=True)
     parser.add_argument('--beta_bound', nargs='+', type=float, help='<Required> Set flag', required=True)
     parser.add_argument('--reg_types', nargs='+', type=str, help='<Required> Set flag', required=True)
+    parser.add_argument('--sampling', choices=['uniform', 'bestdc', 'bestsup'], type=str, help='dataset', required=True)
+    parser.add_argument('--loss_schedule', type=int, default=100)
+    parser.add_argument('--sample_schedule', type=int, default=200)
     utils.add_bool_arg(parser, 'range_restrict')
 
     parser.add_argument('--num_hidden', type=int, default=64)
     parser.add_argument('--K', type=int, default=5)
     parser.add_argument('--topK', type=int, default=None)
-    parser.add_argument('--n_hyp_layers', type=int, default=2, help='Batch size')
+    parser.add_argument('--n_hyp_layers', type=int, default=2)
     
     args = parser.parse_args()
     if torch.cuda.is_available():
@@ -53,22 +56,19 @@ if __name__ == "__main__":
     ##################################################
 
     ############### Dataset ##########################
-    if args.dataset == 't1':
-        data_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_{maskname}.npy'
-        gt_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
-    elif args.dataset == 't2':
-        data_path = '/nfs02/users/aw847/data/brain/IXI-T2/IXI-T2_train_normalized_{maskname}.npy'
-        gt_path = '/nfs02/users/aw847/data/brain/IXI-T2/IXI-T2_train_normalized.npy'
-    elif args.dataset == 'knee':
-        data_path = '/nfs02/users/aw847/data/knee/knee_train_normalized_{maskname}.npy'
-        gt_path = '/nfs02/users/aw847/data/knee/knee_train_normalized.npy'
+    xdata = utils.get_train_data(args.dataset, args.undersample_rate)
+    gt_data = utils.get_train_gt(args.dataset)
 
-    xdata = utils.get_data(data_path.format(maskname=args.undersample_rate))
-    gt_data = utils.get_data(gt_path)
-    print('new shapes', xdata.shape, gt_data.shape)
+    test_data = utils.get_test_data(args.dataset, args.undersample_rate)
+    test_data = test_data[3:13]
+    test_gt = utils.get_test_gt(args.dataset)
+    test_gt = test_gt[3:13]
     if gt_data.shape[-1] == 1:
         print('Appending complex dimension into gt...')
         gt_data = np.concatenate((gt_data, np.zeros(gt_data.shape)), axis=3)
+    if test_gt.shape[-1] == 1:
+        print('Appending complex dimension into gt...')
+        test_gt = np.concatenate((test_gt, np.zeros(test_gt.shape)), axis=3)
 
 
     ################### Filename #####################
@@ -93,4 +93,4 @@ if __name__ == "__main__":
         os.makedirs(model_folder)
     args.filename = model_folder
 
-    train.trainer(xdata, gt_data, vars(args))
+    train.trainer(xdata, gt_data, test_data, test_gt, vars(args))

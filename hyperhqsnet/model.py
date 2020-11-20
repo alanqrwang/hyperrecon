@@ -32,7 +32,37 @@ class HyperNetwork(nn.Module):
         init_std = lambda d_i : (2 / (d_i * constant_scale))**0.5
 
         # Network layers
+        if n_hyp_layers == 0:
+            self.lin1 = nn.Linear(in_dim, 2)
+            self.lin2 = nn.Linear(2, 4)
+            self.lin_out = nn.Linear(4, out_dim)
+
+            self.batchnorm1 = nn.BatchNorm1d(2)
+            self.batchnorm2 = nn.BatchNorm1d(4)
+
+            self.lin1.weight.data.normal_(std=init_std(in_dim))
+            self.lin1.bias.data.fill_(0)
+            self.lin2.weight.data.normal_(std=init_std(2))
+            self.lin2.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(4))
+            self.lin_out.bias.data.fill_(0)
+
         if n_hyp_layers == 1:
+            self.lin1 = nn.Linear(in_dim, 8)
+            self.lin2 = nn.Linear(8, 16)
+            self.lin_out = nn.Linear(16, out_dim)
+
+            self.batchnorm1 = nn.BatchNorm1d(8)
+            self.batchnorm2 = nn.BatchNorm1d(16)
+
+            self.lin1.weight.data.normal_(std=init_std(in_dim))
+            self.lin1.bias.data.fill_(0)
+            self.lin2.weight.data.normal_(std=init_std(8))
+            self.lin2.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(16))
+            self.lin_out.bias.data.fill_(0)
+            
+        if n_hyp_layers == 2:
             self.lin1 = nn.Linear(in_dim, 8)
             self.lin2 = nn.Linear(8, 32)
             self.lin3 = nn.Linear(32, 32)
@@ -55,28 +85,34 @@ class HyperNetwork(nn.Module):
             self.lin_out.weight.data.normal_(std=init_std(32))
             self.lin_out.bias.data.fill_(0)
 
-        if n_hyp_layers == 2:
-            self.lin1 = nn.Linear(in_dim, 8)
-            self.lin2 = nn.Linear(8, 16)
-            self.lin_out = nn.Linear(16, out_dim)
+        if n_hyp_layers == 3:
+            self.lin1 = nn.Linear(in_dim, 16)
+            self.lin2 = nn.Linear(16, 64)
+            self.lin3 = nn.Linear(64, 64)
+            self.lin4 = nn.Linear(64, 64)
+            self.lin_out = nn.Linear(64, out_dim)
 
-            self.batchnorm1 = nn.BatchNorm1d(8)
-            self.batchnorm2 = nn.BatchNorm1d(16)
+            self.batchnorm1 = nn.BatchNorm1d(16)
+            self.batchnorm2 = nn.BatchNorm1d(64)
+            self.batchnorm3 = nn.BatchNorm1d(64)
+            self.batchnorm4 = nn.BatchNorm1d(64)
 
             self.lin1.weight.data.normal_(std=init_std(in_dim))
             self.lin1.bias.data.fill_(0)
-            self.lin2.weight.data.normal_(std=init_std(8))
+            self.lin2.weight.data.normal_(std=init_std(16))
             self.lin2.bias.data.fill_(0)
-            self.lin_out.weight.data.normal_(std=init_std(16))
+            self.lin3.weight.data.normal_(std=init_std(64))
+            self.lin3.bias.data.fill_(0)
+            self.lin4.weight.data.normal_(std=init_std(64))
+            self.lin4.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(64))
             self.lin_out.bias.data.fill_(0)
             
         # Activations
         self.relu = nn.LeakyReLU(inplace=True)
 
-
-
     def forward(self, x):
-        if self.n_hyp_layers == 1:
+        if self.n_hyp_layers == 1 or self.n_hyp_layers == 3:
             x = self.relu(self.lin1(x))
             x = self.batchnorm1(x)
             x = self.relu(self.lin2(x))
@@ -86,7 +122,7 @@ class HyperNetwork(nn.Module):
             x = self.relu(self.lin4(x))
             x = self.batchnorm4(x)
 
-        elif self.n_hyp_layers == 2:
+        elif self.n_hyp_layers == 2 or self.n_hyp_layers == 0:
             x = self.relu(self.lin1(x))
             x = self.batchnorm1(x)
             x = self.relu(self.lin2(x))
@@ -156,8 +192,8 @@ class Unet(nn.Module):
             b_flat = b.view(len(y), -1)
             cap_reg += torch.sum(torch.abs(w_flat), dim=1)
             cap_reg += torch.sum(torch.abs(b_flat), dim=1)
-        print(hyperparams)
-        print(cap_reg)
+        # print(hyperparams)
+        # print(cap_reg)
 
         # conv_down1
         x = x.unsqueeze(1)
@@ -212,8 +248,6 @@ class Unet(nn.Module):
         # last
         x = self.convs['last14'](x, wl[14], bias=bl[14])
         x = x[:,0,...]
-        # print('unet', x.var())
-        # sys.exit()
 
         x = x.permute(0, 2, 3, 1)
         if self.residual:

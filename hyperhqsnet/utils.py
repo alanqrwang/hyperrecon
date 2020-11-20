@@ -47,7 +47,7 @@ def get_lmbda():
 def get_K():
     return 5
 
-def get_data(data_path, N=None):
+def get_data(data_path):
     print('Loading from', data_path)
     xdata = np.load(data_path)
     assert len(xdata.shape) == 4
@@ -79,7 +79,7 @@ def get_test_gt(dataset):
     gt = get_data(gt_path)
     return gt
 
-def get_test_xdata(dataset, maskname):
+def get_test_data(dataset, maskname):
     if dataset == 't1':
         data_path = '/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_{maskname}.npy'
     elif dataset == 't2':
@@ -105,7 +105,7 @@ def get_train_gt(dataset):
     gt = get_data(gt_path)
     return gt
 
-def get_train_xdata(dataset, maskname):
+def get_train_data(dataset, maskname):
     if dataset == 't1':
         data_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_{maskname}.npy'
     elif dataset == 't2':
@@ -119,49 +119,37 @@ def get_train_xdata(dataset, maskname):
     return data
 
 
-def sample_hyperparams(batch_size, num_hyperparams, alpha_bound, beta_bound):
-    if num_hyperparams == 2:
-        alpha = sample_alpha(batch_size, alpha_bound)
-        beta = sample_alpha(batch_size, beta_bound)
-
-        hyperparams = torch.cat([alpha, beta], dim=1)
-    else:
-        hyperparams = sample_alpha(batch_size, alpha_bound)
-    return hyperparams
-
-def sample_alpha(batch_size, bound):
-    r1 = float(bound[0])
-    r2 = float(bound[1])
-
-    sample = ((r1 - r2) * torch.rand((batch_size, 1)) + r2)
-
-    # Bernoulli
-    # samples = torch.empty(batch_size, 1).fill_(0.5)
-    # sample = torch.bernoulli(samples)
-    # sample[sample==0] = r1
-    # sample[sample==1] = r2
-
-    # print('doing single hp per batch')
-    # single = ((r1 - r2) * torch.rand(()) + r2)
-    # sample = torch.empty(batch_size, 1).fill_(single)
-    return sample
-
-def map_based_sampling(psnr_map, batch_size, psnr_cutoff=-2):
-    samples = np.sqrt(len(psnr_map))
-
-    psnr_map = [1 if i > psnr_cutoff else 0 for i in psnr_map] # Threshold
-    psnr_map_prob = psnr_map / np.sum(psnr_map) # Make into uniform distribution
-
-    x_jitter = np.random.uniform(-1/2, 1/2, batch_size)
-    y_jitter = np.random.uniform(-1/2, 1/2, batch_size)
-    rand_point = np.random.choice(len(psnr_map_prob), batch_size, p=psnr_map_prob)
-    rand_x = rand_point % samples + x_jitter
-    rand_y = rand_point // samples + y_jitter
-
-    alpha_scaled = torch.tensor(np.interp(rand_x, [-1/2,(samples-1)+1/2], [0, 1]).reshape(-1,1))
-    beta_scaled = torch.tensor(np.interp(rand_y, [-1/2,(samples-1)+1/2], [0, 1]).reshape(-1,1))
-    hyperparams = torch.cat([alpha_scaled, beta_scaled], dim=1)
-    return hyperparams
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+def area_vs_threshold(xs, psnr_map):
+    areas = []
+    for psnr in xs:
+        thres = [1 if i > psnr else 0 for i in psnr_map]
+        area = np.sum(thres)
+        areas.append(area)
+
+    return areas
+
+def range_vs_threshold(xs, psnr_map, recons):
+    ranges = []
+    for psnr in xs:
+        thres = [1 if i > psnr else 0 for i in psnr_map]
+
+        recons_above_thres = None
+        for i, t in enumerate(thres):
+            if t == 1:
+                if recons_above_thres is None:
+                    recons_above_thres = recons[i]
+                else:
+                    recons_above_thres = np.concatenate((recons_above_thres, recons[i]), axis=0)
+
+#         print(recons_above_thres.shape) 
+
+        if recons_above_thres is None:
+            r = 0
+        else:
+            r = np.sum(np.ptp(recons_above_thres, axis=0))
+        ranges.append(r)
+    return ranges

@@ -17,3 +17,21 @@ class Dataset(data.Dataset):
         x = self.data[index]
         y = self.labels[index]
         return x, y
+
+class TestDataset(data.Dataset):
+    def __init__(self, data, labels, hyperparams):
+        self.data = data
+        self.labels = labels
+        self.hyperparams = hyperparams
+
+    def __len__(self):
+        'Denotes the total number of samples'
+        return len(self.data)
+
+    def __getitem__(self, index):
+        'Generates one sample of data'
+        # Load data and get label
+        x = self.data[index]
+        y = self.labels[index]
+        h = self.hyperparams[index]
+        return x, y, h
