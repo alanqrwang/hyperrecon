@@ -59,7 +59,6 @@ def test(trained_model, dataloader, conf, hps, topK, criterion=None, \
     all_psnrs = []
 
     for h in hps:
-        print(conf['device'])
         h = torch.tensor(h).to(conf['device']).float().reshape([-1, 2])
         for i, (y, gt) in enumerate(dataloader): 
             h = h.expand(len(y), -1)
