@@ -83,6 +83,7 @@ class AmortizedLoss(nn.Module):
 
     def process_losses(self, unsup_losses, dc_losses, topK, hyperparams):
         if topK is not None:
+            print('in topK')
             assert self.sampling_method == 'bestdc'
             _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
             sort_losses = unsup_losses[perm] # Reorder total losses by lowest to highest DC loss
