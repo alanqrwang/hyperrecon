@@ -1,6 +1,10 @@
 import torch
 import numpy as np
 import myutils
+from myutils.array import make_imshowable as mims
+import matplotlib.pyplot as plt
+from scipy.spatial.distance import pdist, squareform
+from . import test
 # import parse
 
 def path2config(path):
@@ -118,38 +122,6 @@ def get_train_data(dataset, maskname):
     data = get_data(data_path.format(maskname=maskname))
     return data
 
-
-
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-def area_vs_threshold(xs, psnr_map):
-    areas = []
-    for psnr in xs:
-        thres = [1 if i > psnr else 0 for i in psnr_map]
-        area = np.sum(thres)
-        areas.append(area)
-
-    return areas
-
-def range_vs_threshold(xs, psnr_map, recons):
-    ranges = []
-    for psnr in xs:
-        thres = [1 if i > psnr else 0 for i in psnr_map]
-
-        recons_above_thres = None
-        for i, t in enumerate(thres):
-            if t == 1:
-                if recons_above_thres is None:
-                    recons_above_thres = recons[i]
-                else:
-                    recons_above_thres = np.concatenate((recons_above_thres, recons[i]), axis=0)
-
-#         print(recons_above_thres.shape) 
-
-        if recons_above_thres is None:
-            r = 0
-        else:
-            r = np.sum(np.ptp(recons_above_thres, axis=0))
-        ranges.append(r)
-    return ranges

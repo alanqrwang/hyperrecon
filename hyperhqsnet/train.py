@@ -65,7 +65,12 @@ def trainer(xdata, gt_data, test_data, test_gt_data, conf):
             pass
         else:
             sys.exit()
-        # pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/deeper-new-loss-fn_unet_5e-05_32_0_5_[\'cap\', \'tv\']_64_[0.0, 1.0]_[0.0, 1.0]_None_True/t1_4p2/model.5000.h5' 
+        # pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/deeper_unet_1e-05_32_0_5_[\'cap\', \'tv\']_64_[0.0, 1.0]_[0.0, 1.0]_None_True/t1_4p2/model.7000.h5' 
+        # pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/perfectmodels/1-2-4_unet_1e-05_32_0_5_[\'cap\', \'tv\']_64_[0.0, 1.0]_[0.0, 1.0]_None_True/t1_4p2/model.5000.h5'
+        # pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/perfectmodels/1-8-32-32-32_unet_5e-05_32_0_5_[\'cap\', \'tv\']_64_[0.0, 1.0]_[0.0, 1.0]_None_True/t1_4p2/model.5000.h5'
+        # pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/perfectmodels/1-8-32-32-32_unet_5e-05_32_0_5_[\'cap\', \'tv\']_64_[0.0, 1.0]_[0.0, 1.0]_None_True/t1_4p2/model.9900.h5'
+        # pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/redoing-deeper-unif_unet_1e-05_32_0_5_[\'cap\', \'tv\']_64_[0.0, 1.0]_[0.0, 1.0]_None_True/t1_4p2/model.14800.h5'
+        pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/redoing-deeper-bestdc-cp12000-lr5e-4_unet_5e-05_48_0_5_[\'cap\', \'tv\']_64_[0.0, 1.0]_[0.0, 1.0]_12_True/t1_4p2/model.1300.h5'
                 
         print('loading from checkpoint', pretrain_path)
         checkpoint = torch.load(pretrain_path, map_location=torch.device('cpu'))
@@ -79,7 +84,7 @@ def trainer(xdata, gt_data, test_data, test_gt_data, conf):
 
         # Setting hyperparameter sampling parameters.
         # topK is number in mini-batch to backprop. If None, then uniform
-        # psnr_map is supervised map. If none, then uniform
+        # psnr_map is supervised map. If None, then uniform
         if conf['sampling'] == 'bestsup' and epoch > conf['sample_schedule']:
             topK = None
 
@@ -90,10 +95,8 @@ def trainer(xdata, gt_data, test_data, test_gt_data, conf):
             alphas = np.linspace(alpha_bound[0], alpha_bound[1], n_samples)
             betas = np.linspace(beta_bound[0], beta_bound[1], n_samples)
             hps = np.stack(np.meshgrid(alphas, betas), -1).reshape(-1,2)
-            print(hps.shape)
             test_results = test.test(network, dataloaders['test'], conf, hps, topK, give_metrics=True)
             psnr_map = test_results['rpsnr']
-            print(psnr_map.shape)
             priormaps_dir = os.path.join(conf['filename'], 'priormaps')
             if not os.path.isdir(priormaps_dir):   
                 os.makedirs(priormaps_dir)

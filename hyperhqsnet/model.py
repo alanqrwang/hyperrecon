@@ -62,7 +62,7 @@ class HyperNetwork(nn.Module):
             self.lin_out.weight.data.normal_(std=init_std(16))
             self.lin_out.bias.data.fill_(0)
             
-        if n_hyp_layers == 2:
+        if n_hyp_layers == 2 or n_hyp_layers == 10:
             self.lin1 = nn.Linear(in_dim, 8)
             self.lin2 = nn.Linear(8, 32)
             self.lin3 = nn.Linear(32, 32)
@@ -108,11 +108,30 @@ class HyperNetwork(nn.Module):
             self.lin_out.weight.data.normal_(std=init_std(64))
             self.lin_out.bias.data.fill_(0)
             
+        if n_hyp_layers == 4:
+            self.lin1 = nn.Linear(in_dim, 8)
+            self.lin2 = nn.Linear(8, 32)
+            self.lin3 = nn.Linear(32, 32)
+            self.lin_out = nn.Linear(32, out_dim)
+
+            self.batchnorm1 = nn.BatchNorm1d(8)
+            self.batchnorm2 = nn.BatchNorm1d(32)
+            self.batchnorm3 = nn.BatchNorm1d(32)
+
+            self.lin1.weight.data.normal_(std=init_std(in_dim))
+            self.lin1.bias.data.fill_(0)
+            self.lin2.weight.data.normal_(std=init_std(8))
+            self.lin2.bias.data.fill_(0)
+            self.lin3.weight.data.normal_(std=init_std(32))
+            self.lin3.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(32))
+            self.lin_out.bias.data.fill_(0)
+
         # Activations
         self.relu = nn.LeakyReLU(inplace=True)
 
     def forward(self, x):
-        if self.n_hyp_layers == 1 or self.n_hyp_layers == 3:
+        if self.n_hyp_layers == 2 or self.n_hyp_layers == 3:
             x = self.relu(self.lin1(x))
             x = self.batchnorm1(x)
             x = self.relu(self.lin2(x))
@@ -122,11 +141,19 @@ class HyperNetwork(nn.Module):
             x = self.relu(self.lin4(x))
             x = self.batchnorm4(x)
 
-        elif self.n_hyp_layers == 2 or self.n_hyp_layers == 0:
+        elif self.n_hyp_layers == 0 or self.n_hyp_layers == 1 or self.n_hyp_layers == 10:
             x = self.relu(self.lin1(x))
             x = self.batchnorm1(x)
             x = self.relu(self.lin2(x))
             x = self.batchnorm2(x)
+
+        elif self.n_hyp_layers == 4:
+            x = self.relu(self.lin1(x))
+            x = self.batchnorm1(x)
+            x = self.relu(self.lin2(x))
+            x = self.batchnorm2(x)
+            x = self.relu(self.lin3(x))
+            x = self.batchnorm3(x)
 
         weights = self.lin_out(x)
 

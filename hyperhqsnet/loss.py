@@ -4,12 +4,13 @@ from pytorch_wavelets import DWTForward, DWTInverse
 from . import utils
 
 class AmortizedLoss(nn.Module):
-    def __init__(self, reg_types, range_restrict, mask, sampling_method):
+    def __init__(self, reg_types, range_restrict, mask, sampling_method, evaluate=False):
         super(AmortizedLoss, self).__init__()
         self.reg_types = reg_types
         self.range_restrict = range_restrict
         self.mask = mask
         self.sampling_method = sampling_method
+        self.evaluate = evaluate
 
     def get_tv(self, x):
         x = x.permute(0, 3, 1, 2)
@@ -74,8 +75,11 @@ class AmortizedLoss(nn.Module):
         else:
             raise NameError('Bad loss')
 
-        loss, sort_hyperparams = self.process_losses(loss, dc, topK, hyperparams)
-        return loss, regs, sort_hyperparams
+        if self.evaluate:
+            return loss, regs, hyperparams
+        else:
+            loss, sort_hyperparams = self.process_losses(loss, dc, topK, hyperparams)
+            return loss, regs, sort_hyperparams
 
     def process_losses(self, unsup_losses, dc_losses, topK, hyperparams):
         if topK is not None:

@@ -59,9 +59,10 @@ if __name__ == "__main__":
     xdata = utils.get_train_data(args.dataset, args.undersample_rate)
     gt_data = utils.get_train_gt(args.dataset)
 
-    test_data = utils.get_test_data(args.dataset, args.undersample_rate)
+    test_name = 'knee'
+    test_data = utils.get_test_data(test_name, args.undersample_rate)
     test_data = test_data[3:13]
-    test_gt = utils.get_test_gt(args.dataset)
+    test_gt = utils.get_test_gt(test_name)
     test_gt = test_gt[3:13]
     if gt_data.shape[-1] == 1:
         print('Appending complex dimension into gt...')
