@@ -68,25 +68,7 @@ def trainer(xdata, gt_data, conf):
     ############ Checkpoint Loading ##################
     if conf['load_checkpoint'] != 0:
         pretrain_path = os.path.join(conf['filename'], 'model.{epoch:04d}.h5'.format(epoch=conf['load_checkpoint']))
-
-        pretrain_temp = os.path.join(conf['filename'], 'model.*.h5')
-        pretrain_temp = pretrain_temp.replace("[", "(") 
-        pretrain_temp = pretrain_temp.replace("]", "[]]")
-        pretrain_temp = pretrain_temp.replace("(", "[[]")
-
-        pretrained_models = glob.glob(pretrain_temp)
-        print('total models in %s:\n ' % pretrain_temp, len(pretrained_models))
-        print('loading', pretrain_path)
-        cont = input('continue?')
-        if cont == 'y':
-            pass
-        else:
-            sys.exit()
-                
-        print('loading from checkpoint', pretrain_path)
-        checkpoint = torch.load(pretrain_path, map_location=torch.device('cpu'))
-        network.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        network, optimizer = load_checkpoint(network, optimizer, pretrain_path)
     ##################################################
 
     ############## Training loop #####################
@@ -118,6 +100,10 @@ def trainer(xdata, gt_data, conf):
         # Validate
         network, val_epoch_loss = validate(network, dataloaders['val'], criterion, hpsampler, conf, \
                 topK, schedule)
+        # Save checkpoints
+        utils.save_checkpoint(epoch, network.state_dict(), optimizer.state_dict(), \
+                train_epoch_loss, val_epoch_loss, conf['filename'], conf['log_interval'])
+        utils.save_loss(epoch, train_epoch_loss, val_epoch_loss, conf['filename'])
 
 def train(network, dataloader, criterion, optimizer, hpsampler, conf, topK, epoch):
     """Train for one epoch
@@ -213,7 +199,7 @@ def validate(network, dataloader, criterion, hpsampler, conf, topK, epoch):
             zf = utils.ifft(y)
             y, zf = utils.scale(y, zf)
 
-            hyperparams = hpsampler.sample(len(y))
+            hyperparams = hpsampler.sample(len(y)).to(conf['device'])
 
             recon, cap_reg = network(zf, y, hyperparams)
             loss, _, _ = criterion(recon, y, hyperparams, cap_reg, topK, epoch)

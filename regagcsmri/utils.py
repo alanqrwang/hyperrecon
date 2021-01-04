@@ -6,6 +6,8 @@ For more details, please read:
 """
 import torch
 import numpy as np
+import os
+import pickle
 
 def add_bool_arg(parser, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -74,6 +76,7 @@ def count_parameters(model):
     """Count total parameters in model"""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+######### Loading data #####################
 def get_mask(centered=False):
     mask = np.load('/nfs02/users/aw847/data/Masks/poisson_disk_4p2_256_256.npy')
     if not centered:
@@ -85,7 +88,7 @@ def get_data(data_path):
     print('Loading from', data_path)
     xdata = np.load(data_path)
     assert len(xdata.shape) == 4
-    print('data shapes:', xdata.shape)
+    print('Shape:', xdata.shape)
     return xdata
 
 def get_test_gt():
@@ -99,13 +102,62 @@ def get_test_data():
     return data
 
 def get_train_gt():
-    gt_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
+    gt_path = 'data/example_x.npy'
     gt = get_data(gt_path)
     return gt
 
 def get_train_data():
-    data_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_4p2.npy'
+    data_path = 'data/example_y.npy'
     data = get_data(data_path)
     return data
 
+######### Saving/Loading checkpoints ############
+def load_checkpoint(model, optimizer, path):
+    print('Loading checkpoint from', path)
+    checkpoint = torch.load(path, map_location=torch.device('cpu'))
+    model.load_state_dict(checkpoint['state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    return model, optimizer
 
+def save_checkpoint(epoch, model_state, optimizer_state, loss, val_loss, model_folder, log_interval, scheduler=None):
+    if epoch % log_interval == 0:
+        state = {
+            'epoch': epoch,
+            'state_dict': model_state,
+            'optimizer' : optimizer_state,
+            'loss': loss,
+            'val_loss': val_loss
+        }
+        if scheduler is not None:
+            state['scheduler'] = scheduler.state_dict(),
+
+        filename = os.path.join(model_folder, 'model.{epoch:04d}.h5')
+        torch.save(state, filename.format(epoch=epoch))
+        print('Saved checkpoint to', filename.format(epoch=epoch))
+
+def save_loss(epoch, loss, val_loss, model_path):
+    pkl_path = os.path.join(model_path, 'losses.pkl')
+    if os.path.exists(pkl_path):
+        f = open(pkl_path, 'rb') 
+        losses = pickle.load(f)
+        train_loss_list = losses['loss']
+        val_loss_list = losses['val_loss']
+
+        if epoch-1 < len(train_loss_list):
+            train_loss_list[epoch-1] = loss
+            val_loss_list[epoch-1] = val_loss
+        else:
+            train_loss_list.append(loss)
+            val_loss_list.append(val_loss)
+
+    else:
+        train_loss_list = []
+        val_loss_list = []
+        train_loss_list.append(loss)
+        val_loss_list.append(val_loss)
+
+    loss_dict = {'loss' : train_loss_list, 'val_loss' : val_loss_list}
+    f = open(pkl_path,"wb")
+    pickle.dump(loss_dict,f)
+    f.close()
+    print('Saved loss to', pkl_path) 

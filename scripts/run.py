@@ -9,7 +9,7 @@ if __name__ == "__main__":
     ############### Argument Parsing #################
     parser = argparse.ArgumentParser()
     parser.add_argument('-fp', '--filename_prefix', type=str, help='filename prefix', required=True)
-    parser.add_argument('--models_dir', default='/nfs02/users/aw847/models/HyperHQSNet/', type=str, help='directory to save models')
+    parser.add_argument('--models_dir', default='out/', type=str, help='directory to save models')
     
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--force_lr', type=float, default=None, help='Force learning rate')
@@ -50,5 +50,21 @@ if __name__ == "__main__":
     if gt_data.shape[-1] == 1:
         print('Appending complex dimension into gt...')
         gt_data = np.concatenate((gt_data, np.zeros(gt_data.shape)), axis=3)
+
+    ################### Filename #####################
+    local_name = '{prefix}_{lr}_{batch_size}_{reg_types}_{unet_hidden}_{bounds}_{topK}_{range_restrict}'.format(
+        prefix=args.filename_prefix,
+        lr=args.lr,
+        batch_size=args.batch_size,
+        reg_types=args.reg_types,
+        unet_hidden=args.unet_hidden,
+        bounds=args.bounds,
+        range_restrict=args.range_restrict,
+        topK=args.topK,
+        )
+    model_folder = os.path.join(args.models_dir, local_name)
+    if not os.path.isdir(model_folder):   
+        os.makedirs(model_folder)
+    args.filename = model_folder
 
     train.trainer(xdata, gt_data, vars(args))

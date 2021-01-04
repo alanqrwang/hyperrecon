@@ -16,11 +16,12 @@ The code was tested on:
 - tqdm 4.41.1
 
 ## Usage
-Uniform hyperparameter sampling, medium hypernetwork 
+By default, model checkpoints and losses are saved to `out/`.
+1. Uniform hyperparameter sampling, medium hypernetwork 
 
     python scripts/run.py -fp example --reg_types cap tv --bounds 0 1 0 1 --hyparch large --sampling uhs
 
-Data-driven hyperparameter sampling, large hypernetwork 
+2. Data-driven hyperparameter sampling, large hypernetwork 
 
     python scripts/run.py -fp example --reg_types cap tv --bounds 0 1 0 1 --hyparch medium --sampling dhs --topK 8
 
