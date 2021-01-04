@@ -1,4 +1,5 @@
 # Regularization-Agnostic Compressed Sensing MRI Reconstruction with Hypernetworks
+![Network architecture](figs/Hypernet_Arch_v5.pdf "Philadelphia's Magic Gardens")
 ![link to paper to be updated]()
 
 ## Abstract
