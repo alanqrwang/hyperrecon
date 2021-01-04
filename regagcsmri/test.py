@@ -1,3 +1,10 @@
+"""
+Test/inference functions for RegAgnosticCSMRI
+For more details, please read:
+    Alan Q. Wang, Adrian V. Dalca, and Mert R. Sabuncu. 
+    "Regularization-Agnostic Compressed Sensing MRI with Hypernetworks" 
+
+"""
 import torch
 from . import utils, model, train, dataset
 from . import loss as losslayer
@@ -5,31 +12,25 @@ import numpy as np
 import myutils
 import sys
 
-def tester(model_path, xdata, gt_data, conf, device, n_hyp_layers, take_avg, n_grid=20):
+def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=20):
+    """Driver code for test-time inference.
+
+    Performs inference for a given model.
+    Model parameters are parsed from the model path.
+    """
     batch_size = len(xdata)
 
-    ### Change later!!!
     conf['sampling'] = 'uniform'
 
-    maskname = conf['maskname']
-    n_hidden = int(conf['n_hidden'])
-    lmbda = float(conf['lmbda'])
-    K = int(conf['K'])
-    recon_type = conf['recon_type']
+    n_hidden = int(conf['unet_hidden'])
     reg_types = conf['reg_types'].strip('][').split(', ')
     reg_types = [s.strip('\'') for s in reg_types]
     range_restrict = True if conf['range_restrict'] == 'True' else False
-    alpha_bound = [float(i) for i in conf['alpha_bound'].strip('][').split(', ')]
-    beta_bound = [float(i) for i in conf['beta_bound'].strip('][').split(', ')]
+    bounds = [float(i) for i in conf['bounds'].strip('][').split(', ')]
     topK = None if conf['topK'] == 'None' else int(conf['topK'])
 
-    # if take_avg:
-    if True:
-        alphas = np.linspace(alpha_bound[0], alpha_bound[1], n_grid)
-        betas = np.linspace(beta_bound[0], beta_bound[1], n_grid)
-    else:
-        alphas = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.85,0.9,0.93,0.95,0.98, 0.99,0.995,0.999,1.0]
-        betas =  [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.85,0.9,0.93,0.95,0.98, 0.99,0.995,0.999,1.0]
+    alphas = np.linspace(bounds[0], bounds[1], n_grid)
+    betas = np.linspace(bounds[2], bounds[3], n_grid)
     hps = np.stack(np.meshgrid(alphas, betas), -1).reshape(-1,2)
 
     valset = dataset.Dataset(xdata, gt_data)
@@ -38,25 +39,24 @@ def tester(model_path, xdata, gt_data, conf, device, n_hyp_layers, take_avg, n_g
          'num_workers': 0}
     dataloader = torch.utils.data.DataLoader(valset, **params)
 
-    mask = utils.get_mask(maskname)
+    mask = utils.get_mask(conf['maskname'])
     mask = torch.tensor(mask, requires_grad=False).float().to(device)
 
-    if recon_type == 'unroll':
-        network = model.HQSNet(K, mask, lmbda, len(reg_types), device, n_hidden).to(device) 
-    else:
-        network = model.Unet(device, len(reg_types), n_hyp_layers, alpha_bound, beta_bound, nh=n_hidden).to(device) 
+    network = model.Unet(device, len(reg_types), hyparch, nh=n_hidden).to(device) 
 
-    network = myutils.io.load_checkpoint(network, model_path)
+    network = utils.load_checkpoint(network, model_path)
     criterion = losslayer.AmortizedLoss(reg_types, range_restrict, mask, conf['sampling'], evaluate=True)
 
-    # gr = False if take_avg else True
     gr = False
-    # gl = False if take_avg else True
     gl = True
     return test(network, dataloader, conf, hps, topK, take_avg, criterion=criterion, give_recons=gr, give_loss=gl, give_metrics=True)
 
 def test(trained_model, dataloader, conf, hps, topK, take_avg, criterion=None, \
         give_recons=False, give_loss=False, give_metrics=False):
+    """Testing for a fixed set of hyperparameter setting.
+
+    Returns recons, losses, and metrics (if specified)
+    """
     trained_model.eval()
 
     res = {}
@@ -96,14 +96,17 @@ def test(trained_model, dataloader, conf, hps, topK, take_avg, criterion=None, \
     if give_recons:
         res['recons'] = np.array(recons)
     if give_loss:
-        res['loss'] = np.array(losses).mean(axis=1)
-        # res['dc'] = np.array(dcs).mean(axis=1)
+        res['loss'] = np.array(losses)
         res['dc'] = np.array(dcs)
-        res['cap'] = np.array(cap_regs).mean(axis=1)
-        # res['w'] = np.array(ws).mean(axis=1)
-        res['tv'] = np.array(tvs).mean(axis=1)
+        res['cap'] = np.array(cap_regs)
+        res['tv'] = np.array(tvs)
+        if take_avg:
+            res['loss'] = res['loss'].mean(axis=1)
+            res['dc'] = res['dc'].mean(axis=1)
+            res['cap'] = res['cap'].mean(axis=1)
+            res['tv'] = res['tv'].mean(axis=1)
+
     if give_metrics:
-        # res['rpsnr'] = np.array(all_psnrs).mean(axis=1)
         res['rpsnr'] = np.array(all_psnrs)
         if take_avg:
             res['rpsnr'] = res['rpsnr'].mean(axis=1)
@@ -124,6 +127,4 @@ def get_metrics(y, gt, recons, metric_type, take_avg, normalized=True):
     for i in range(len(recons)):
         metric = myutils.metrics.get_metric(recons_pro[i], gt_pro[i], metric_type, zero_filled=zf_pro[i])
         metrics.append(metric)
-    # if take_avg:
-    #     metrics = np.mean(metrics)
     return np.array(metrics)
