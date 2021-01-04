@@ -9,14 +9,17 @@ At test time, for a given under-sampled image, our model can rapidly compute rec
 
 ## Requirements
 The code was tested on:
-- python 3.6
-- pytorch 1.1
-- torchvision 0.3.0
-- scikit-image 0.15.0
-- scikit-learn 0.19.1
-- matplotlib 3.0.2
-- numpy 1.15.4
-- tqdm 4.38.0
+- python 3.7.5
+- pytorch 1.3.1
+- matplotlib 3.1.2
+- numpy 1.17.4
+- tqdm 4.41.1
+
+## Usage
+Uniform hyperparameter sampling, medium hypernetwork 
+    python scripts/run.py -fp example --reg_types cap tv --bounds 0 1 0 1 --hyparch large --sampling uhs
+Data-driven hyperparameter sampling, large hypernetwork 
+    python scripts/run.py -fp example --reg_types cap tv --bounds 0 1 0 1 --hyparch medium --sampling dhs --topK 8
 
 ## Contact
 Feel free to open an issue in github for any problems or questions.

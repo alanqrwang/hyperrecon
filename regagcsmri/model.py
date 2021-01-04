@@ -15,14 +15,14 @@ class HyperNetwork(nn.Module):
 
     Takes hyperparameters and outputs weights of main U-Net
     """
-    def __init__(self, conv_layers, n_hyp_layers, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
+    def __init__(self, conv_layers, hyparch, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
         """
         Parameters
         ----------
         conv_layers : dict
             Dictionary of convolutional layers in main U-Net
-        n_hyp_layers : int
-            Hypernetwork architecture
+        hyparch : str
+            Hypernetwork architecture [small, medium, large]
         f_size : int 
             Kernel size
         in_dim : int
@@ -33,7 +33,7 @@ class HyperNetwork(nn.Module):
             Hidden dimension of main U-Net
         """
         super(HyperNetwork, self).__init__()
-        self.n_hyp_layers = n_hyp_layers
+        self.hyparch = hyparch
 
         weight_shapes = []
         bias_shapes = []
@@ -55,7 +55,8 @@ class HyperNetwork(nn.Module):
         init_std = lambda d_i : (2 / (d_i * constant_scale))**0.5
 
         # Network layers
-        if n_hyp_layers == 0:
+        if hyparch == 'small':
+            print('Small Hypernetwork')
             self.lin1 = nn.Linear(in_dim, 2)
             self.lin2 = nn.Linear(2, 4)
             self.lin_out = nn.Linear(4, out_dim)
@@ -70,8 +71,24 @@ class HyperNetwork(nn.Module):
             self.lin_out.weight.data.normal_(std=init_std(4))
             self.lin_out.bias.data.fill_(0)
 
+        elif hyparch == 'medium':
+            print('Medium Hypernetwork')
+            self.lin1 = nn.Linear(in_dim, 8)
+            self.lin2 = nn.Linear(8, 32)
+            self.lin_out = nn.Linear(32, out_dim)
+
+            self.batchnorm1 = nn.BatchNorm1d(8)
+            self.batchnorm2 = nn.BatchNorm1d(32)
+
+            self.lin1.weight.data.normal_(std=init_std(in_dim))
+            self.lin1.bias.data.fill_(0)
+            self.lin2.weight.data.normal_(std=init_std(8))
+            self.lin2.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(32))
+            self.lin_out.bias.data.fill_(0)
             
-        if n_hyp_layers == 2 or n_hyp_layers == 10:
+        elif hyparch =='large':
+            print('Large Hypernetwork')
             self.lin1 = nn.Linear(in_dim, 8)
             self.lin2 = nn.Linear(8, 32)
             self.lin3 = nn.Linear(32, 32)
@@ -94,29 +111,6 @@ class HyperNetwork(nn.Module):
             self.lin_out.weight.data.normal_(std=init_std(32))
             self.lin_out.bias.data.fill_(0)
 
-        if n_hyp_layers == 3:
-            self.lin1 = nn.Linear(in_dim, 16)
-            self.lin2 = nn.Linear(16, 64)
-            self.lin3 = nn.Linear(64, 64)
-            self.lin4 = nn.Linear(64, 64)
-            self.lin_out = nn.Linear(64, out_dim)
-
-            self.batchnorm1 = nn.BatchNorm1d(16)
-            self.batchnorm2 = nn.BatchNorm1d(64)
-            self.batchnorm3 = nn.BatchNorm1d(64)
-            self.batchnorm4 = nn.BatchNorm1d(64)
-
-            self.lin1.weight.data.normal_(std=init_std(in_dim))
-            self.lin1.bias.data.fill_(0)
-            self.lin2.weight.data.normal_(std=init_std(16))
-            self.lin2.bias.data.fill_(0)
-            self.lin3.weight.data.normal_(std=init_std(64))
-            self.lin3.bias.data.fill_(0)
-            self.lin4.weight.data.normal_(std=init_std(64))
-            self.lin4.bias.data.fill_(0)
-            self.lin_out.weight.data.normal_(std=init_std(64))
-            self.lin_out.bias.data.fill_(0)
-
         # Activations
         self.relu = nn.LeakyReLU(inplace=True)
 
@@ -134,21 +128,15 @@ class HyperNetwork(nn.Module):
         bl : list 
             Biases indexed by layer
         """
-        if self.n_hyp_layers == 2 or self.n_hyp_layers == 3:
-            x = self.relu(self.lin1(x))
-            x = self.batchnorm1(x)
-            x = self.relu(self.lin2(x))
-            x = self.batchnorm2(x)
-            x = self.relu(self.lin3(x))
-            x = self.batchnorm3(x)
-            x = self.relu(self.lin4(x))
-            x = self.batchnorm4(x)
+        if self.hyparch == 'small' or self.hyparch == 'medium':
+            x = self.batchnorm1(self.relu(self.lin1(x)))
+            x = self.batchnorm2(self.relu(self.lin2(x)))
 
-        elif self.n_hyp_layers == 0 or self.n_hyp_layers == 10:
-            x = self.relu(self.lin1(x))
-            x = self.batchnorm1(x)
-            x = self.relu(self.lin2(x))
-            x = self.batchnorm2(x)
+        elif self.hyparch == 'large':
+            x = self.batchnorm1(self.relu(self.lin1(x)))
+            x = self.batchnorm2(self.relu(self.lin2(x)))
+            x = self.batchnorm3(self.relu(self.lin3(x)))
+            x = self.batchnorm4(self.relu(self.lin4(x)))
 
         weights = self.lin_out(x)
 
@@ -165,7 +153,7 @@ class HyperNetwork(nn.Module):
 
 class Unet(nn.Module):
     """Main U-Net for image reconstruction"""
-    def __init__(self, device, num_hyperparams, n_hyp_layers, nh=64, residual=True):
+    def __init__(self, device, num_hyperparams, hyparch, nh=64, residual=True):
         """
         Parameters
         ----------
@@ -209,7 +197,7 @@ class Unet(nn.Module):
         self.convs['last14'] = layers.BatchConv2DLayer(nh, 2, ks=1)
 
         # HyperNetwork
-        self.hnet = HyperNetwork(self.convs, n_hyp_layers, in_dim=num_hyperparams, unet_nh=nh)
+        self.hnet = HyperNetwork(self.convs, hyparch, in_dim=num_hyperparams, unet_nh=nh)
 
     def forward(self, zf, y, hyperparams):
         """

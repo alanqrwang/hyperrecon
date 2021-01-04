@@ -5,13 +5,10 @@ For more details, please read:
     "Regularization-Agnostic Compressed Sensing MRI with Hypernetworks" 
 """
 from . import loss as losslayer
-from . import utils, model, dataset, sampler, test
+from . import utils, model, dataset, sampler
 import torch
-import torch.nn as nn
 from tqdm import tqdm
-import math
 import numpy as np
-import matplotlib.pyplot as plt
 import sys
 import glob
 import os
@@ -55,8 +52,8 @@ def trainer(xdata, gt_data, conf):
     ##################################################
 
     ##### Model, Optimizer, Sampler, Loss ############
-    network = model.Unet(conf['device'], num_hyperparams=len(conf['reg_types']), n_hyp_layers=conf['n_hyp_layers'], \
-                nh=conf['num_hidden']).to(conf['device'])
+    network = model.Unet(conf['device'], num_hyperparams=len(conf['reg_types']), hyparch=conf['hyparch'], \
+                nh=conf['unet_hidden']).to(conf['device'])
 
     optimizer = torch.optim.Adam(network.parameters(), lr=conf['lr'])
     if conf['force_lr'] is not None:
