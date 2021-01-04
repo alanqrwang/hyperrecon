@@ -17,7 +17,7 @@ The code was tested on:
 - tqdm 4.41.1
 
 ## Usage
-By default, model checkpoints and losses are saved to `out/`.
+Before running, run `mkdir out/` to create default location for model checkpoints and losses.
 ### Uniform hyperparameter sampling, medium hypernetwork 
 
     python scripts/run.py -fp example --reg_types cap tv --bounds 0 1 0 1 --hyparch large --sampling uhs
