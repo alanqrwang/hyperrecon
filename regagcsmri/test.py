@@ -50,7 +50,7 @@ def tester(model_path, xdata, gt_data, conf, device, n_hyp_layers, take_avg, n_g
     criterion = losslayer.AmortizedLoss(reg_types, range_restrict, mask, conf['sampling'], evaluate=True)
 
     # gr = False if take_avg else True
-    gr = True
+    gr = False
     # gl = False if take_avg else True
     gl = True
     return test(network, dataloader, conf, hps, topK, take_avg, criterion=criterion, give_recons=gr, give_loss=gl, give_metrics=True)
@@ -83,11 +83,9 @@ def test(trained_model, dataloader, conf, hps, topK, take_avg, criterion=None, \
             if give_loss:
                 assert criterion is not None, 'loss must be provided'
                 loss, regs, _ = criterion(pred, y, h, cap_reg, topK, schedule=True)
-                # print(loss.shape)
                 losses.append(loss.cpu().detach().numpy())
                 dcs.append(regs['dc'].cpu().detach().numpy())
                 cap_regs.append(regs['cap'].cpu().detach().numpy())
-                # ws.append(regs['w'].cpu().detach().numpy())
                 tvs.append(regs['tv'].cpu().detach().numpy())
             if give_metrics:
                 psnrs = get_metrics(y, gt, pred, metric_type='relative psnr', take_avg=take_avg)

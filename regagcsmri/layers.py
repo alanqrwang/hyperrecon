@@ -1,8 +1,15 @@
+"""
+Layers for RegAgnosticCSMRI
+For more details, please read:
+    Alan Q. Wang, Adrian V. Dalca, and Mert R. Sabuncu. 
+    "Regularization-Agnostic Compressed Sensing MRI with Hypernetworks" 
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 class Upsample(nn.Module):
+    """Upsample a multi-channel input image"""
     def __init__(self, scale_factor, mode, align_corners):
         super(Upsample, self).__init__()
         self.scale_factor = scale_factor
@@ -12,6 +19,11 @@ class Upsample(nn.Module):
         return F.interpolate(x, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
 
 class BatchConv2DLayer(nn.Module):
+    """
+    Conv2D for a batch of images and weights
+    For batch size B of images and weights, convolutions are computed between
+    images[0] and weights[0], images[1] and weights[1], ..., images[B-1] and weights[B-1]
+    """
     def __init__(self, in_channels, out_channels, stride=1,
                  padding=0, dilation=1, ks=3):
         super(BatchConv2DLayer, self).__init__()
@@ -31,6 +43,7 @@ class BatchConv2DLayer(nn.Module):
             assert x.shape[0] == weight.shape[0] and bias.shape[0] == weight.shape[
                 0], "dim=0 of bias must be equal in size to dim=0 of weight"
 
+        x = x.unsqueeze(1)
         b_i, b_j, c, h, w = x.shape
         b_i, out_channels, in_channels, kernel_height_size, kernel_width_size = weight.shape
         assert out_channels == self.out_channels, 'Invalid out_channels in weights'
@@ -51,6 +64,7 @@ class BatchConv2DLayer(nn.Module):
         if bias is not None:
             out = out + bias.unsqueeze(1).unsqueeze(3).unsqueeze(3)
 
+        out = out[:,0,...]
         return out
 
     def get_weight_shape(self):
