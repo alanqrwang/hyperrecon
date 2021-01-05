@@ -78,7 +78,7 @@ def count_parameters(model):
 
 ######### Loading data #####################
 def get_mask(centered=False):
-    mask = np.load('/nfs02/users/aw847/data/Masks/poisson_disk_4p2_256_256.npy')
+    mask = np.load('data/mask.npy')
     if not centered:
         return np.fft.fftshift(mask)
     else:
@@ -90,16 +90,6 @@ def get_data(data_path):
     assert len(xdata.shape) == 4
     print('Shape:', xdata.shape)
     return xdata
-
-def get_test_gt():
-    gt_path = '/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
-    gt = get_data(gt_path)
-    return gt
-
-def get_test_data():
-    data_path = '/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_4p2.npy'
-    data = get_data(data_path)
-    return data
 
 def get_train_gt():
     gt_path = 'data/example_x.npy'
