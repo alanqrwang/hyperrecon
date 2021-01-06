@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from regagcsmri import utils, train, dataset, model
+from hyperrecon import utils, train, dataset, model
 import argparse
 import os
 
