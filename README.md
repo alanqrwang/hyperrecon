@@ -1,6 +1,6 @@
 # Regularization-Agnostic Compressed Sensing MRI Reconstruction with Hypernetworks
 ![Network architecture](figs/Hypernet_Arch_v5.png)
-![link to paper to be updated]()
+![link to paper](https://arxiv.org/abs/2101.02194)
 
 ## Abstract
 Reconstructing under-sampled k-space measurements in Compressed Sensing MRI (CS-MRI) is classically solved with regularized least-squares. Recently, deep learning has been used to amortize this optimization by training reconstruction networks on a dataset of under-sampled measurements. 
