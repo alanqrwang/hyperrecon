@@ -9,7 +9,8 @@ if __name__ == "__main__":
     ############### Argument Parsing #################
     parser = argparse.ArgumentParser()
     parser.add_argument('-fp', '--filename_prefix', type=str, help='filename prefix', required=True)
-    parser.add_argument('--models_dir', default='out/', type=str, help='directory to save models')
+    # parser.add_argument('--models_dir', default='out/', type=str, help='directory to save models')
+    parser.add_argument('--models_dir', default='/nfs02/users/aw847/models/HyperHQSNet/', type=str, help='directory to save models')
     
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--force_lr', type=float, default=None, help='Force learning rate')
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     parser.add_argument('--bounds', nargs='+', type=float, help='<Required> Set flag', required=True)
     parser.add_argument('--reg_types', nargs='+', type=str, help='<Required> Set flag', required=True)
     parser.add_argument('--sampling', choices=['uhs', 'dhs'], type=str, help='Sampling method', required=True)
-    parser.add_argument('--hyparch', choices=['small', 'medium', 'large'], type=str, help='Hypernetwork architecture', required=True)
+    parser.add_argument('--hyparch', choices=['small', 'medium', 'large', 'huge'], type=str, help='Hypernetwork architecture', required=True)
 
     
     args = parser.parse_args()

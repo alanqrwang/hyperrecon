@@ -8,6 +8,7 @@ import torch
 import numpy as np
 import os
 import pickle
+import parse
 
 def add_bool_arg(parser, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -78,7 +79,8 @@ def count_parameters(model):
 
 ######### Loading data #####################
 def get_mask(centered=False):
-    mask = np.load('data/mask.npy')
+    # mask = np.load('data/mask.npy')
+    mask = np.load('/nfs02/users/aw847/data/masks/poisson_disk_4p2_256_256.npy')
     if not centered:
         return np.fft.fftshift(mask)
     else:
@@ -92,22 +94,38 @@ def get_data(data_path):
     return xdata
 
 def get_train_gt():
-    gt_path = 'data/example_x.npy'
+    # gt_path = 'data/example_x.npy'
+    gt_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
     gt = get_data(gt_path)
     return gt
 
 def get_train_data():
-    data_path = 'data/example_y.npy'
+    # data_path = 'data/example_y.npy'
+    data_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_4p2.npy'
+    data = get_data(data_path)
+    return data
+
+
+def get_test_gt():
+    gt_path = '/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
+    gt = get_data(gt_path)
+    return gt
+
+def get_test_data():
+    data_path = '/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_4p2.npy'
     data = get_data(data_path)
     return data
 
 ######### Saving/Loading checkpoints ############
-def load_checkpoint(model, optimizer, path):
+def load_checkpoint(model, path, optimizer=None):
     print('Loading checkpoint from', path)
     checkpoint = torch.load(path, map_location=torch.device('cpu'))
     model.load_state_dict(checkpoint['state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer'])
-    return model, optimizer
+    if optimizer is not None:
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        return model, optimizer
+    else:
+        return model
 
 def save_checkpoint(epoch, model_state, optimizer_state, loss, val_loss, model_folder, log_interval, scheduler=None):
     if epoch % log_interval == 0:
@@ -151,3 +169,17 @@ def save_loss(epoch, loss, val_loss, model_path):
     pickle.dump(loss_dict,f)
     f.close()
     print('Saved loss to', pkl_path) 
+
+def path2config(path, new_parse, device):
+    '''
+    Converts model path name to dictionary of parameters
+    '''
+    if new_parse:
+        parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{lr}_{batch_size}_{reg_types}_{unet_hidden}_{bounds}_{topK}_{range_restrict}/{filename}'
+    else:
+        parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{recon_type}_{lr}_{batch_size}_{lmbda}_{K}_{reg_types}_{unet_hidden}_{alpha_bound}_{beta_bound}_{topK}_{range_restrict}/{dataset}_{maskname}/{filename}'
+    config = parse.parse(parse_format, path)
+    assert (config is not None), '\n parse_format is %s \n path is %s' % (parse_format, path)
+    config = config.named
+    config['device'] = device
+    return config

@@ -111,6 +111,30 @@ class HyperNetwork(nn.Module):
             self.lin_out.weight.data.normal_(std=init_std(32))
             self.lin_out.bias.data.fill_(0)
 
+        elif hyparch =='huge':
+            print('Huge Hypernetwork')
+            self.lin1 = nn.Linear(in_dim, 16)
+            self.lin2 = nn.Linear(16, 64)
+            self.lin3 = nn.Linear(64, 64)
+            self.lin4 = nn.Linear(64, 64)
+            self.lin_out = nn.Linear(64, out_dim)
+
+            self.batchnorm1 = nn.BatchNorm1d(16)
+            self.batchnorm2 = nn.BatchNorm1d(64)
+            self.batchnorm3 = nn.BatchNorm1d(64)
+            self.batchnorm4 = nn.BatchNorm1d(64)
+
+            self.lin1.weight.data.normal_(std=init_std(in_dim))
+            self.lin1.bias.data.fill_(0)
+            self.lin2.weight.data.normal_(std=init_std(16))
+            self.lin2.bias.data.fill_(0)
+            self.lin3.weight.data.normal_(std=init_std(64))
+            self.lin3.bias.data.fill_(0)
+            self.lin4.weight.data.normal_(std=init_std(64))
+            self.lin4.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(64))
+            self.lin_out.bias.data.fill_(0)
+            
         # Activations
         self.relu = nn.LeakyReLU(inplace=True)
 
@@ -132,7 +156,7 @@ class HyperNetwork(nn.Module):
             x = self.batchnorm1(self.relu(self.lin1(x)))
             x = self.batchnorm2(self.relu(self.lin2(x)))
 
-        elif self.hyparch == 'large':
+        elif self.hyparch == 'large' or self.hyparch == 'huge':
             x = self.batchnorm1(self.relu(self.lin1(x)))
             x = self.batchnorm2(self.relu(self.lin2(x)))
             x = self.batchnorm3(self.relu(self.lin3(x)))

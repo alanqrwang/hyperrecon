@@ -12,7 +12,7 @@ import numpy as np
 import myutils
 import sys
 
-def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=20):
+def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=20, new_parse=False):
     """Driver code for test-time inference.
 
     Performs inference for a given model.
@@ -26,11 +26,17 @@ def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=2
     reg_types = conf['reg_types'].strip('][').split(', ')
     reg_types = [s.strip('\'') for s in reg_types]
     range_restrict = True if conf['range_restrict'] == 'True' else False
-    bounds = [float(i) for i in conf['bounds'].strip('][').split(', ')]
     topK = None if conf['topK'] == 'None' else int(conf['topK'])
+    if new_parse:
+        bounds = [float(i) for i in conf['bounds'].strip('][').split(', ')]
+        alphas = np.linspace(bounds[0], bounds[1], n_grid)
+        betas = np.linspace(bounds[2], bounds[3], n_grid)
+    else:
+        alpha_bound = [float(i) for i in conf['alpha_bound'].strip('][').split(', ')]
+        beta_bound = [float(i) for i in conf['beta_bound'].strip('][').split(', ')]
+        alphas = np.linspace(alpha_bound[0], alpha_bound[1], n_grid)
+        betas = np.linspace(beta_bound[0], beta_bound[1], n_grid)
 
-    alphas = np.linspace(bounds[0], bounds[1], n_grid)
-    betas = np.linspace(bounds[2], bounds[3], n_grid)
     hps = np.stack(np.meshgrid(alphas, betas), -1).reshape(-1,2)
 
     valset = dataset.Dataset(xdata, gt_data)
@@ -39,7 +45,7 @@ def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=2
          'num_workers': 0}
     dataloader = torch.utils.data.DataLoader(valset, **params)
 
-    mask = utils.get_mask(conf['maskname'])
+    mask = utils.get_mask()
     mask = torch.tensor(mask, requires_grad=False).float().to(device)
 
     network = model.Unet(device, len(reg_types), hyparch, nh=n_hidden).to(device) 
