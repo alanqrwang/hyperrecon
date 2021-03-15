@@ -9,6 +9,9 @@ import numpy as np
 import os
 import pickle
 import parse
+import glob
+from . import test, dataset
+from hqsnet import test as hqstest
 
 def add_bool_arg(parser, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -37,7 +40,6 @@ def absval(arr):
     else:
         arr = np.linalg.norm(arr, axis=-1)
 
-    assert len(arr.shape) == 3
     return arr
 
 def scale(y, zf):
@@ -47,6 +49,19 @@ def scale(y, zf):
     y = y / max_val_per_batch.view(len(y), 1, 1, 1)
     zf = zf / max_val_per_batch.view(len(y), 1, 1, 1)
     return y, zf
+
+def nextPowerOf2(n):
+    """Get next power of 2"""
+    count = 0;
+
+    if (n and not(n & (n - 1))):
+        return n
+
+    while( n != 0):
+        n >>= 1
+        count += 1
+
+    return 1 << count;
 
 def _normalize(arr):
     """Normalizes a batch of images into range [0, 1]"""
@@ -76,45 +91,6 @@ def normalize_recons(recons):
 def count_parameters(model):
     """Count total parameters in model"""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-######### Loading data #####################
-def get_mask(centered=False):
-    # mask = np.load('data/mask.npy')
-    mask = np.load('/nfs02/users/aw847/data/masks/poisson_disk_4p2_256_256.npy')
-    if not centered:
-        return np.fft.fftshift(mask)
-    else:
-        return mask
-
-def get_data(data_path):
-    print('Loading from', data_path)
-    xdata = np.load(data_path)
-    assert len(xdata.shape) == 4
-    print('Shape:', xdata.shape)
-    return xdata
-
-def get_train_gt():
-    # gt_path = 'data/example_x.npy'
-    gt_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
-    gt = get_data(gt_path)
-    return gt
-
-def get_train_data():
-    # data_path = 'data/example_y.npy'
-    data_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_4p2.npy'
-    data = get_data(data_path)
-    return data
-
-
-def get_test_gt():
-    gt_path = '/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
-    gt = get_data(gt_path)
-    return gt
-
-def get_test_data():
-    data_path = '/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_4p2.npy'
-    data = get_data(data_path)
-    return data
 
 ######### Saving/Loading checkpoints ############
 def load_checkpoint(model, path, optimizer=None):
@@ -176,10 +152,104 @@ def path2config(path, new_parse, device):
     '''
     if new_parse:
         parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{lr}_{batch_size}_{reg_types}_{unet_hidden}_{bounds}_{topK}_{range_restrict}/{filename}'
+        # parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{lr}_{batch_size}_{reg_types}_{unet_hidden}_{topK}_{range_restrict}/{filename}'
     else:
         parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{recon_type}_{lr}_{batch_size}_{lmbda}_{K}_{reg_types}_{unet_hidden}_{alpha_bound}_{beta_bound}_{topK}_{range_restrict}/{dataset}_{maskname}/{filename}'
+        # parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{lr}_{batch_size}_{reg_types}_{unet_hidden}_{topK}_{range_restrict}/{filename}'
     config = parse.parse(parse_format, path)
     assert (config is not None), '\n parse_format is %s \n path is %s' % (parse_format, path)
     config = config.named
     config['device'] = device
     return config
+
+def path2configlegacy(path):
+    parse_format = '/nfs02/users/aw847/models/HQSplitting/{prefix}_{w_coeff}_{tv_coeff}_{recon_type}_{lr}_{lmbda}_{K}_{learn_reg_coeff}_{n_hidden}/{dataset}_{maskname}_{strategy}/{filename}'
+#     parse_format = '/nfs02/users/aw847/models/HQSplitting/{prefix}_{tv_coeff}_{lr}_{lmbda}_{K}_{learn_reg_coeff}_{n_hidden}/{dataset}_{maskname}_{strategy}/{filename}'
+    
+    config = parse.parse(parse_format, path)
+    assert (config is not None), '\n parse_format is %s \n path is %s' % (parse_format, path)
+    return config
+
+def get_everything(path, device, take_avg=True, recons_only=False, \
+                   hypernet=True, metric_type='relative psnr', \
+                   hyparch='small', cp=None, n_grid=20, new_parse=False, \
+                   gt_data=None, xdata=None, test_data=True):
+    mask = torch.tensor(dataset.get_mask(4)).to(device).float()
+    
+    # Forward through latest available model
+    if cp is None:
+        model_paths = sorted(glob.glob(os.path.join(path, 'model.*.h5')))
+        model_path = model_paths[-1]
+    # Or forward through specified epoch
+    else:
+        path = path.replace('[[]', '[').replace('[]]', ']')
+        model_path = os.path.join(path, 'model.{epoch:04d}.h5'.format(epoch=cp))
+        
+    if gt_data is None:
+        N=10
+        if test_data:
+            gt_data = dataset.get_test_gt(old=True)
+            xdata = dataset.get_test_data(old=True)
+        else:
+            gt_data = dataset.get_train_gt(old=True)
+            xdata = datset.get_train_data(old=True)
+
+        gt_data = gt_data[3:3+N]
+        xdata = xdata[3:3+N]
+    if hypernet:
+        config = path2config(model_path, new_parse, device)
+        result_dict = test.tester(model_path, xdata, gt_data, config, device, hyparch, take_avg, n_grid, new_parse)
+    else:
+        config = path2configlegacy(model_path)
+        result_dict = test.baseline_test(model_path, xdata, gt_data, config, device, take_avg)
+
+    return result_dict
+
+def gather_baselines(device):
+    base_psnrs = []
+    base_dcs = []
+    base_recons = []
+    alphas = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.85,0.9,0.93,0.95,0.98, 0.99,0.995,0.999,1.0]
+    betas =  [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.85,0.9,0.93,0.95,0.98, 0.99,0.995,0.999,1.0]
+    baseline_temp = '/nfs02/users/aw847/models/HQSplitting/hypernet-baselines/hp-baseline_{beta:01}_{alpha:01}_unet_0.0001_0_5_0_64/t1_4p2_unsup/'
+
+    N=10
+    gt_data = dataset.get_test_gt(old=True)
+    gt_data = gt_data[3:3+N]
+    xdata = dataset.get_test_data(old=True)
+    xdata = xdata[3:3+N]
+    hps = []
+    for beta in betas:
+        for alpha in alphas:
+            hps.append([alpha, beta])
+            baseline_path = baseline_temp.format(alpha=np.round(alpha, 3), beta=np.round(beta, 3))
+            base = get_everything(baseline_path, device, hypernet=False, metric_type='relative ssim', take_avg=False, gt_data=gt_data, xdata=xdata)
+            print(base['recons'].shape)
+            print(base['rpsnr'].shape)
+            print(base['dc'].shape)
+            base_recons.append(base['recons'])
+            base_psnrs.append(base['rpsnr'])
+            base_dcs.append(base['dc'])
+
+    return np.array(hps), np.array(base_psnrs), np.array(base_dcs), np.array(base_recons)
+
+def oldloss2newloss(old_hps):
+    '''Convert old loss hps to new loss hps
+    
+    old_hps: (N, num_hyperparams)
+    '''
+    a0 = old_hps[:, 0]
+    a1 = (1-old_hps[:, 0])*old_hps[:,1]
+    a2 = (1-old_hps[:, 0])*(1-old_hps[:,1])
+#     a3 = torch.zeros_like(old_hps[:, 0])
+    return torch.stack((a0, a1, a2), dim=1)
+
+def get_reference_hps(device):
+    old_hps = torch.tensor([[0.9, 0.1],
+     [0.995, 0.6],
+     [0.9, 0.2],
+     [0.995, 0.5],
+     [0.9, 0],
+     [0.99, 0.7]]).to(device).float()
+    return oldloss2newloss(old_hps)
+

@@ -12,7 +12,7 @@ import numpy as np
 import myutils
 import sys
 
-def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=20, new_parse=False):
+def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=20, new_parse=False, baselines=False):
     """Driver code for test-time inference.
 
     Performs inference for a given model.
@@ -22,22 +22,24 @@ def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=2
 
     conf['sampling'] = 'uniform'
 
-    n_hidden = int(conf['unet_hidden'])
+    n_hidden = 64#int(conf['unet_hidden'])
     reg_types = conf['reg_types'].strip('][').split(', ')
     reg_types = [s.strip('\'') for s in reg_types]
     range_restrict = True if conf['range_restrict'] == 'True' else False
     topK = None if conf['topK'] == 'None' else int(conf['topK'])
-    if new_parse:
-        bounds = [float(i) for i in conf['bounds'].strip('][').split(', ')]
-        alphas = np.linspace(bounds[0], bounds[1], n_grid)
-        betas = np.linspace(bounds[2], bounds[3], n_grid)
-    else:
-        alpha_bound = [float(i) for i in conf['alpha_bound'].strip('][').split(', ')]
-        beta_bound = [float(i) for i in conf['beta_bound'].strip('][').split(', ')]
-        alphas = np.linspace(alpha_bound[0], alpha_bound[1], n_grid)
-        betas = np.linspace(beta_bound[0], beta_bound[1], n_grid)
+    # if new_parse:
+    #     bounds = [float(i) for i in conf['bounds'].strip('][').split(', ')]
+    #     alphas = np.linspace(bounds[0], bounds[1], n_grid)
+    #     betas = np.linspace(bounds[2], bounds[3], n_grid)
+    # else:
+    #     alpha_bound = [float(i) for i in conf['alpha_bound'].strip('][').split(', ')]
+    #     beta_bound = [float(i) for i in conf['beta_bound'].strip('][').split(', ')]
+    #     alphas = np.linspace(alpha_bound[0], alpha_bound[1], n_grid)
+    #     betas = np.linspace(beta_bound[0], beta_bound[1], n_grid)
+    alphas = np.linspace(0, 1, n_grid)
+    betas = np.linspace(0, 1, n_grid)
 
-    hps = np.stack(np.meshgrid(alphas, betas), -1).reshape(-1,2)
+    hps = torch.tensor(np.stack(np.meshgrid(alphas, betas), -1).reshape(-1,2)).float().to(device)
 
     valset = dataset.Dataset(xdata, gt_data)
     params = {'batch_size': batch_size,
@@ -45,15 +47,17 @@ def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=2
          'num_workers': 0}
     dataloader = torch.utils.data.DataLoader(valset, **params)
 
-    mask = utils.get_mask()
+    mask = dataset.get_mask(4)
     mask = torch.tensor(mask, requires_grad=False).float().to(device)
 
-    network = model.Unet(device, len(reg_types), hyparch, nh=n_hidden).to(device) 
+    num_hyperparams = len(reg_types) + 1 if len(reg_types) > 2 else len(reg_types)
+    print(num_hyperparams)
+    network = model.Unet(device, num_hyperparams, hyparch, nh=n_hidden).to(device) 
 
     network = utils.load_checkpoint(network, model_path)
-    criterion = losslayer.AmortizedLoss(reg_types, range_restrict, mask, conf['sampling'], evaluate=True)
+    criterion = losslayer.AmortizedLoss(reg_types, range_restrict, conf['sampling'], device, mask, evaluate=True)
 
-    gr = False
+    gr = True
     gl = True
     return test(network, dataloader, conf, hps, topK, take_avg, criterion=criterion, give_recons=gr, give_loss=gl, give_metrics=True)
 
@@ -62,6 +66,8 @@ def test(trained_model, dataloader, conf, hps, topK, take_avg, criterion=None, \
     """Testing for a fixed set of hyperparameter setting.
 
     Returns recons, losses, and metrics (if specified)
+    For every sample in the dataloader, evaluates with all hyperparameters in hps.
+    Batch size must match size of dataset (TODO change this)
     """
     trained_model.eval()
 
@@ -75,26 +81,26 @@ def test(trained_model, dataloader, conf, hps, topK, take_avg, criterion=None, \
     all_psnrs = []
 
     for h in hps:
-        h = torch.tensor(h).to(conf['device']).float().reshape([-1, 2])
+        # h = torch.tensor(h).to(conf['device']).float().reshape([-1, 5])
         for i, (y, gt) in enumerate(dataloader): 
-            h = h.expand(len(y), -1)
+            batch_h = h.expand(len(y), -1)
             y = y.float().to(conf['device'])
             gt = gt.float().to(conf['device'])
             zf = utils.ifft(y)
             y, zf = utils.scale(y, zf)
 
-            pred, cap_reg = trained_model(zf, y, h)
+            pred, cap_reg = trained_model(zf, y, batch_h)
             if give_recons:
                 recons.append(pred.cpu().detach().numpy())
             if give_loss:
                 assert criterion is not None, 'loss must be provided'
-                loss, regs, _ = criterion(pred, y, h, cap_reg, topK, schedule=True)
+                loss, regs, _ = criterion(pred, y, batch_h, cap_reg, topK, schedule=True)
                 losses.append(loss.cpu().detach().numpy())
                 dcs.append(regs['dc'].cpu().detach().numpy())
                 cap_regs.append(regs['cap'].cpu().detach().numpy())
                 tvs.append(regs['tv'].cpu().detach().numpy())
             if give_metrics:
-                psnrs = get_metrics(y, gt, pred, metric_type='relative psnr', take_avg=take_avg)
+                psnrs = get_metrics(y, gt, pred, metric_type='relative ssim', take_avg=take_avg)
                 all_psnrs.append(psnrs)
 
 
@@ -131,6 +137,71 @@ def get_metrics(y, gt, recons, metric_type, take_avg, normalized=True):
         gt_pro = myutils.array.make_imshowable(gt)
         zf_pro = myutils.array.make_imshowable(zf)
     for i in range(len(recons)):
-        metric = myutils.metrics.get_metric(recons_pro[i], gt_pro[i], metric_type, zero_filled=zf_pro[i])
+        metric = myutils.metrics.get_metric(recons_pro[i].cpu().detach().numpy(), gt_pro[i].cpu().detach().numpy(), metric_type, zero_filled=zf_pro[i].cpu().detach().numpy())
         metrics.append(metric)
     return np.array(metrics)
+
+
+def baseline_test(model_path, xdata, gt_data, conf, device, take_avg, give_recons=True, give_loss=True, give_metrics=True):
+    """Baselines test function"""
+    network = model.BaseUnet().to(device) 
+    network = utils.load_checkpoint(network, model_path)
+    network.eval()
+
+    mask = dataset.get_mask(4)
+    mask = torch.tensor(mask, requires_grad=False).float().to(device)
+
+    criterion = losslayer.AmortizedLoss(['cap', 'tv'], True, 'uhs', device, mask, evaluate=True)
+
+    res = {}
+    recons = []
+    losses = []
+    dcs = []
+    cap_regs = []
+    ws = []
+    tvs = []
+    all_psnrs = []
+
+    h = torch.tensor([[0.,0.]]).to(device)
+    cap_reg=torch.tensor(0.).to(device)
+    for i in range(len(xdata)): 
+        y = torch.tensor(xdata[i:i+1]).float().to(device)
+        gt = torch.tensor(gt_data[i:i+1]).float().to(device)
+        zf = utils.ifft(y)
+        y, zf = utils.scale(y, zf)
+
+        pred = network(zf)
+        if give_recons:
+            recons.append(pred.cpu().detach().numpy()[0])
+        if give_loss:
+            assert criterion is not None, 'loss must be provided'
+            loss, regs, _ = criterion(pred, y, h, cap_reg, None, schedule=True)
+            losses.append(loss.cpu().detach().numpy()[0])
+            dcs.append(regs['dc'].cpu().detach().numpy()[0])
+            # cap_regs.append(regs['cap'].cpu().detach().numpy()[0])
+            tvs.append(regs['tv'].cpu().detach().numpy()[0])
+        if give_metrics:
+            psnrs = get_metrics(y, gt, pred, metric_type='relative ssim', take_avg=take_avg)
+            all_psnrs.append(psnrs[0])
+
+
+
+    if give_recons:
+        res['recons'] = np.array(recons)
+    if give_loss:
+        res['loss'] = np.array(losses)
+        res['dc'] = np.array(dcs)
+        res['cap'] = np.array(cap_regs)
+        res['tv'] = np.array(tvs)
+        if take_avg:
+            res['loss'] = res['loss'].mean(axis=1)
+            res['dc'] = res['dc'].mean(axis=1)
+            res['cap'] = res['cap'].mean(axis=1)
+            res['tv'] = res['tv'].mean(axis=1)
+
+    if give_metrics:
+        res['rpsnr'] = np.array(all_psnrs)
+        if take_avg:
+            res['rpsnr'] = res['rpsnr'].mean(axis=1)
+
+    return res

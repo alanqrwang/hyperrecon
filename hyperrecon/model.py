@@ -9,6 +9,69 @@ from . import loss as losslayer
 from . import layers
 import torch
 import torch.nn as nn
+import sys
+
+class BaseUnet(nn.Module):
+    def __init__(self, residual=True):
+        super(BaseUnet, self).__init__()
+                
+        self.residual = residual
+        self.dconv_down1 = self.double_conv(2, 64)
+        self.dconv_down2 = self.double_conv(64, 64)
+        self.dconv_down3 = self.double_conv(64, 64)
+        self.dconv_down4 = self.double_conv(64, 64)        
+
+        self.maxpool = nn.MaxPool2d(2)
+        self.upsample = layers.Upsample(scale_factor=2, mode='bilinear', align_corners=True)        
+        
+        self.dconv_up3 = self.double_conv(128, 64)
+        self.dconv_up2 = self.double_conv(128, 64)
+        self.dconv_up1 = self.double_conv(128, 64)
+        
+        self.conv_last = nn.Conv2d(64, 2, 1)
+        
+    def double_conv(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True)
+        )   
+        
+    def forward(self, zf):
+        x = zf
+        x = x.permute(0, 3, 1, 2)
+
+        conv1 = self.dconv_down1(x)
+        x = self.maxpool(conv1)
+
+        conv2 = self.dconv_down2(x)
+        x = self.maxpool(conv2)
+        
+        conv3 = self.dconv_down3(x)
+        x = self.maxpool(conv3)   
+        
+        x = self.dconv_down4(x)
+        
+        x = self.upsample(x)        
+        x = torch.cat([x, conv3], dim=1)
+        
+        x = self.dconv_up3(x)
+        x = self.upsample(x)        
+        x = torch.cat([x, conv2], dim=1)       
+
+        x = self.dconv_up2(x)
+        x = self.upsample(x)        
+        x = torch.cat([x, conv1], dim=1)   
+        
+        x = self.dconv_up1(x)
+        
+        out = self.conv_last(x)
+        out = out.permute(0, 2, 3, 1)
+        if self.residual:
+            out = zf + out 
+        
+        return out
 
 class HyperNetwork(nn.Module):
     """Hypernetwork architecture and forward pass
@@ -75,10 +138,14 @@ class HyperNetwork(nn.Module):
             print('Medium Hypernetwork')
             self.lin1 = nn.Linear(in_dim, 8)
             self.lin2 = nn.Linear(8, 32)
+            self.lin3 = nn.Linear(32, 32)
+            self.lin4 = nn.Linear(32, 32)
             self.lin_out = nn.Linear(32, out_dim)
 
             self.batchnorm1 = nn.BatchNorm1d(8)
             self.batchnorm2 = nn.BatchNorm1d(32)
+            self.batchnorm3 = nn.BatchNorm1d(32)
+            self.batchnorm4 = nn.BatchNorm1d(32)
 
             self.lin1.weight.data.normal_(std=init_std(in_dim))
             self.lin1.bias.data.fill_(0)
@@ -87,7 +154,7 @@ class HyperNetwork(nn.Module):
             self.lin_out.weight.data.normal_(std=init_std(32))
             self.lin_out.bias.data.fill_(0)
             
-        elif hyparch =='large':
+        elif hyparch == 'large':
             print('Large Hypernetwork')
             self.lin1 = nn.Linear(in_dim, 8)
             self.lin2 = nn.Linear(8, 32)
@@ -134,6 +201,54 @@ class HyperNetwork(nn.Module):
             self.lin4.bias.data.fill_(0)
             self.lin_out.weight.data.normal_(std=init_std(64))
             self.lin_out.bias.data.fill_(0)
+
+        elif hyparch == 'massive':
+            print('Massive Hypernetwork')
+            self.lin1 = nn.Linear(in_dim, 32)
+            self.lin2 = nn.Linear(32, 128)
+            self.lin3 = nn.Linear(128, 128)
+            self.lin4 = nn.Linear(128, 128)
+            self.lin_out = nn.Linear(128, out_dim)
+
+            self.batchnorm1 = nn.BatchNorm1d(32)
+            self.batchnorm2 = nn.BatchNorm1d(128)
+            self.batchnorm3 = nn.BatchNorm1d(128)
+            self.batchnorm4 = nn.BatchNorm1d(128)
+
+            self.lin1.weight.data.normal_(std=init_std(in_dim))
+            self.lin1.bias.data.fill_(0)
+            self.lin2.weight.data.normal_(std=init_std(32))
+            self.lin2.bias.data.fill_(0)
+            self.lin3.weight.data.normal_(std=init_std(128))
+            self.lin3.bias.data.fill_(0)
+            self.lin4.weight.data.normal_(std=init_std(128))
+            self.lin4.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(128))
+            self.lin_out.bias.data.fill_(0)
+
+        elif hyparch == 'gigantic':
+            print('Gigantic Hypernetwork')
+            self.lin1 = nn.Linear(in_dim, 64)
+            self.lin2 = nn.Linear(64, 256)
+            self.lin3 = nn.Linear(256, 256)
+            self.lin4 = nn.Linear(256, 256)
+            self.lin_out = nn.Linear(256, out_dim)
+
+            self.batchnorm1 = nn.BatchNorm1d(64)
+            self.batchnorm2 = nn.BatchNorm1d(256)
+            self.batchnorm3 = nn.BatchNorm1d(256)
+            self.batchnorm4 = nn.BatchNorm1d(256)
+
+            self.lin1.weight.data.normal_(std=init_std(in_dim))
+            self.lin1.bias.data.fill_(0)
+            self.lin2.weight.data.normal_(std=init_std(256))
+            self.lin2.bias.data.fill_(0)
+            self.lin3.weight.data.normal_(std=init_std(256))
+            self.lin3.bias.data.fill_(0)
+            self.lin4.weight.data.normal_(std=init_std(256))
+            self.lin4.bias.data.fill_(0)
+            self.lin_out.weight.data.normal_(std=init_std(256))
+            self.lin_out.bias.data.fill_(0)
             
         # Activations
         self.relu = nn.LeakyReLU(inplace=True)
@@ -156,11 +271,13 @@ class HyperNetwork(nn.Module):
             x = self.batchnorm1(self.relu(self.lin1(x)))
             x = self.batchnorm2(self.relu(self.lin2(x)))
 
-        elif self.hyparch == 'large' or self.hyparch == 'huge':
+        elif self.hyparch in ['large', 'huge', 'massive', 'gigantic']:
             x = self.batchnorm1(self.relu(self.lin1(x)))
             x = self.batchnorm2(self.relu(self.lin2(x)))
             x = self.batchnorm3(self.relu(self.lin3(x)))
             x = self.batchnorm4(self.relu(self.lin4(x)))
+        else:
+            sys.exit('Error with hypernet forward pass')
 
         weights = self.lin_out(x)
 
@@ -289,3 +406,33 @@ class Unet(nn.Module):
         if self.residual:
             x = zf + x
         return x, cap_reg
+
+class TrajNet(nn.Module):
+    '''
+    dim_bounds is out_dim by 2 array, each row contains bounds for that dimension
+    '''
+    def __init__(self, in_dim=1, h_dim=8, out_dim=2):
+        super(TrajNet, self).__init__()
+
+        self.out_dim = out_dim
+        # self.lin1 = nn.Linear(in_dim, h_dim)
+#         self.lin1 = nn.Linear(in_dim, out_dim)
+        # self.lin2 = nn.Linear(h_dim, h_dim)
+        # self.lin3 = nn.Linear(h_dim, out_dim)
+        self.lin = nn.Linear(in_dim, out_dim)
+        # self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        # x = self.lin1(x)
+        # x = self.relu(x)
+        # x = self.lin2(x)
+        # x = self.relu(x)
+        # x = self.lin3(x)
+        # dc, regs = torch.split(x, [1, self.out_dim-1], dim=1)
+        # dc = self.dc_lower_bound + (1 - self.dc_lower_bound) / (1 + torch.exp(-dc))
+        # regs = self.sigmoid(regs)
+        # out = torch.cat((dc, regs), dim=1)
+        x = self.lin(x)
+        out = self.sigmoid(x)
+        return out

@@ -6,12 +6,19 @@ For more details, please read:
 """
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from pytorch_wavelets import DWTForward, DWTInverse
-from . import utils
+import sys
+sys.path.append('/home/aw847/PerceptualSimilarity/src/')
+sys.path.append('/home/aw847/torch-radon/')
+from torch_radon.shearlet import ShearletTransform
+from . import utils, dataset
+import matplotlib.pyplot as plt
+# from perceptualloss.loss_provider import LossProvider
 
 class AmortizedLoss(nn.Module):
     """Loss function for model"""
-    def __init__(self, reg_types, range_restrict, mask, sampling_method, evaluate=False):
+    def __init__(self, reg_types, range_restrict, sampling_method, device, mask, evaluate=False):
         """
         Parameters
         ----------
@@ -36,9 +43,19 @@ class AmortizedLoss(nn.Module):
         super(AmortizedLoss, self).__init__()
         self.reg_types = reg_types
         self.range_restrict = range_restrict
-        self.mask = mask
         self.sampling_method = sampling_method
         self.evaluate = evaluate
+        self.device = device
+        self.mask = torch.tensor(mask, requires_grad=False).float().to(device)
+
+        self.l1 = torch.nn.L1Loss(reduction='none')
+        self.l2 = torch.nn.MSELoss(reduction='none')
+
+        if 'w' in reg_types:
+            self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(self.device) # Accepts all wave types available to PyWavelets
+        if 'sh' in reg_types:
+            scales = [0.5] * 2
+            self.shearlet = ShearletTransform(*mask.shape, scales)#, cache='/home/aw847/shear_cache/')
 
     def get_tv(self, x):
         """Total variation loss
@@ -57,6 +74,44 @@ class AmortizedLoss(nn.Module):
         tv_y = torch.sum((x[:, 0, :-1, :] - x[:, 0, 1:, :]).abs() + (x[:, 1, :-1, :] - x[:, 1, 1:, :]).abs(), dim=(1, 2))
         return tv_x + tv_y
         
+    def get_wavelets(self, x):
+        """L1-penalty on wavelets
+
+        Parameters
+        ----------
+        x : torch.Tensor (batch_size, img_height, img_width, 2)
+            Input image
+
+        Returns
+        ----------
+        l1_wave : wavelets loss
+        """
+        Yl, Yh = self.xfm(x)
+
+        batch_size = x.shape[0]
+        channels = x.shape[1]
+        rows = utils.nextPowerOf2(Yh[0].shape[-2]*2)
+        cols = utils.nextPowerOf2(Yh[0].shape[-1]*2)
+        wavelets = torch.zeros(batch_size, channels, rows, cols).to(self.device)
+        # Yl is LL coefficients, Yh is list of higher bands with finest frequency in the beginning.
+        for i, band in enumerate(Yh):
+            irow = rows // 2**(i+1)
+            icol = cols // 2**(i+1)
+            wavelets[:, :, 0:(band[:,:,0,:,:].shape[-2]), icol:(icol+band[:,:,0,:,:].shape[-1])] = band[:,:,0,:,:]
+            wavelets[:, :, irow:(irow+band[:,:,0,:,:].shape[-2]), 0:(band[:,:,0,:,:].shape[-1])] = band[:,:,1,:,:]
+            wavelets[:, :, irow:(irow+band[:,:,0,:,:].shape[-2]), icol:(icol+band[:,:,0,:,:].shape[-1])] = band[:,:,2,:,:]
+
+        wavelets[:,:,:Yl.shape[-2],:Yl.shape[-1]] = Yl # Put in LL coefficients
+
+        l1_wave = torch.sum(self.l1(wavelets, torch.zeros_like(wavelets)), dim=(1, 2, 3))
+        return l1_wave
+
+    def get_shearlets(self, x):
+        x = utils.absval(x)
+        shears = self.shearlet.forward(x)
+        l1_shear = torch.sum(self.l1(shears, torch.zeros_like(shears)), dim=(1, 2, 3))
+        return l1_shear
+
     def forward(self, x_hat, y, hyperparams, cap_reg, topK, schedule):
         '''
         Parameters
@@ -83,42 +138,44 @@ class AmortizedLoss(nn.Module):
         hyperparams : torch.Tensor
             Hyperparmeters used
         '''
-        assert len(self.reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'
         
         mask_expand = self.mask.unsqueeze(2)
         loss_dict = {}
 
         # Data consistency term
-        l2 = torch.nn.MSELoss(reduction='none')
         Fx_hat = utils.fft(x_hat)
         UFx_hat = Fx_hat * mask_expand
-        dc = torch.sum(l2(UFx_hat, y), dim=(1, 2, 3))
+        dc = torch.sum(self.l2(UFx_hat, y), dim=(1, 2, 3))
         loss_dict['dc'] = dc
 
         # Regularization
         loss_dict['cap'] = cap_reg
-        tv = self.get_tv(x_hat)
-        loss_dict['tv'] = tv
+        loss_dict['tv'] = self.get_tv(x_hat)
+        if 'w' in self.reg_types:
+            loss_dict['w'] = self.get_wavelets(x_hat)
+        if 'sh' in self.reg_types:
+            loss_dict['sh'] = self.get_shearlets(x_hat)
 
-        if len(self.reg_types) == 1:
+        if self.range_restrict and len(self.reg_types) == 1:
+            assert len(self.reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'
             alpha = hyperparams[:, 0]
-            if self.range_restrict:
-                loss = (1-alpha)*dc + alpha*loss_dict[self.reg_types[0]]
-            else:
-                loss = dc + alpha*loss_dict[self.reg_types[0]]
+            loss = (1-alpha)*dc + alpha*loss_dict[self.reg_types[0]]
 
-        elif len(self.reg_types) == 2:
+        elif self.range_restrict and len(self.reg_types) == 2:
+            assert len(self.reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'
             alpha = hyperparams[:, 0]
             beta = hyperparams[:, 1]
-            if self.range_restrict:
-                if schedule:
-                    loss = alpha * dc + (1-alpha)*beta * loss_dict[self.reg_types[0]] + (1-alpha)*(1-beta) * loss_dict[self.reg_types[1]]
-                else:
-                    loss = alpha * dc + (1-alpha) * loss_dict[self.reg_types[1]]
+            if schedule:
+                loss = alpha * dc + (1-alpha)*beta * loss_dict[self.reg_types[0]] + (1-alpha)*(1-beta) * loss_dict[self.reg_types[1]]
             else:
-                loss = dc + alpha * loss_dict[self.reg_types[0]] + beta * loss_dict[self.reg_types[1]]
+                loss = alpha * dc + (1-alpha) * loss_dict[self.reg_types[1]]
+
         else:
-            raise NameError('Bad loss')
+            assert len(self.reg_types) == hyperparams.shape[1] - 1, 'num_hyperparams and reg mismatch'
+            loss = hyperparams[:,0]*loss_dict['dc']
+            for i in range(schedule):
+                loss += hyperparams[:,i+1] * loss_dict[self.reg_types[i]]
+            loss = loss / torch.sum(hyperparams, dim=1)
 
         if self.evaluate:
             return loss, loss_dict, hyperparams
@@ -159,3 +216,36 @@ class AmortizedLoss(nn.Module):
             sort_hyperparams = hyperparams
 
         return loss, sort_hyperparams
+
+def trajloss(recons, dc_losses, lmbda, device, loss_type):
+    '''Trajectory Net Loss
+
+    recons: (batch_size, num_points, n1, n2, 2)
+    recons: (batch_size, num_points, n1, n2, 2)
+    Loss = (1-lmbda)*dist_loss + lmbda*dc_loss
+    '''
+    provider = LossProvider()
+    loss_function = provider.get_loss_function('Watson-DFT', colorspace='grey', pretrained=True, reduction='sum').to(device)
+
+    batch_size, num_points = recons.shape[0], recons.shape[1]
+    dist_loss = 0
+    reg_loss = 0
+    for b in range(batch_size):
+        if loss_type == 'perceptual':
+            for i in range(num_points-1):
+                for j in range(i+1, num_points):
+                    img1 = utils.absval(recons[b, i:i+1, ...]).unsqueeze(1)
+                    img2 = utils.absval(recons[b, j:j+1, ...]).unsqueeze(1)
+                    dist_loss = dist_loss + loss_function(img1, img2)
+
+        elif loss_type == 'l2':
+            dist_loss = dist_loss - torch.sum(F.pdist(recons[b].reshape(num_points, -1)))
+        else:
+            raise Exception()
+
+        reg_loss = reg_loss + torch.sum(dc_losses[b])
+
+    print('loss', lmbda)
+    loss = (1-lmbda)*dist_loss + lmbda*reg_loss
+    
+    return loss
