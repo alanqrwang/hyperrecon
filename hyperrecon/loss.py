@@ -6,7 +6,6 @@ For more details, please read:
 """
 import torch
 import torch.nn as nn
-from pytorch_wavelets import DWTForward, DWTInverse
 from . import utils
 
 class AmortizedLoss(nn.Module):
