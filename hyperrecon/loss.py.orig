@@ -6,6 +6,7 @@ For more details, please read:
 """
 import torch
 import torch.nn as nn
+<<<<<<< HEAD
 import torch.nn.functional as F
 from pytorch_wavelets import DWTForward, DWTInverse
 import sys
@@ -15,7 +16,9 @@ from torch_radon.shearlet import ShearletTransform
 from . import utils, dataset
 import matplotlib.pyplot as plt
 # from perceptualloss.loss_provider import LossProvider
+=======
 from . import utils
+>>>>>>> 6875dd7713c0c84d01c0f0a278d4ce0ae62f92fc
 
 class AmortizedLoss(nn.Module):
     """Loss function for model"""
