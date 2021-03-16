@@ -91,6 +91,8 @@ def normalize_recons(recons):
 
 def count_parameters(model):
     """Count total parameters in model"""
+    for name, val in model.named_parameters():
+        print(name)
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 ######### Saving/Loading checkpoints ############

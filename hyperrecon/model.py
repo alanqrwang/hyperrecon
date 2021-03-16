@@ -16,7 +16,7 @@ class HyperNetwork(nn.Module):
 
     Takes hyperparameters and outputs weights of main U-Net
     """
-    def __init__(self, conv_layers, hyparch, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
+    def __init__(self, hyparch, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
         """
         Parameters
         ----------
@@ -171,27 +171,26 @@ class Unet(nn.Module):
             raise Exception()
 
         # UNet
-        self.convs = {}
-        self.convs['down0'] = layers.BatchConv2DLayer(2, nh, hyp_out_units, device, padding=1)
-        self.convs['down1'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.convs['down2'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.convs['down3'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.convs['down4'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.convs['down5'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.convs['down6'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.convs['down7'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_down0 = layers.BatchConv2DLayer(2, nh, hyp_out_units, device, padding=1)
+        self.conv_down1 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_down2 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_down3 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_down4 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_down5 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_down6 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_down7 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
 
-        self.convs['up8'] = layers.BatchConv2DLayer(nh+nh, nh, hyp_out_units, device, padding=1)
-        self.convs['up9'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.convs['up10'] = layers.BatchConv2DLayer(nh+nh, nh, hyp_out_units, device, padding=1)
-        self.convs['up11'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.convs['up12'] = layers.BatchConv2DLayer(nh+nh, nh, hyp_out_units, device, padding=1)
-        self.convs['up13'] = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_up8 = layers.BatchConv2DLayer(nh+nh, nh, hyp_out_units, device, padding=1)
+        self.conv_up9 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_up10 = layers.BatchConv2DLayer(nh+nh, nh, hyp_out_units, device, padding=1)
+        self.conv_up11 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_up12 = layers.BatchConv2DLayer(nh+nh, nh, hyp_out_units, device, padding=1)
+        self.conv_up13 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
 
-        self.convs['last14'] = layers.BatchConv2DLayer(nh, 2, hyp_out_units, device, ks=1)
+        self.conv_last14 = layers.BatchConv2DLayer(nh, 2, hyp_out_units, device, ks=1)
 
         # HyperNetwork
-        self.hnet = HyperNetwork(self.convs, hyparch, in_dim=num_hyperparams, unet_nh=nh)
+        self.hnet = HyperNetwork(hyparch, in_dim=num_hyperparams, unet_nh=nh)
 
     def forward(self, zf, y, hyperparams):
         """
@@ -215,37 +214,37 @@ class Unet(nn.Module):
         hyp_out = self.hnet(hyperparams)
 
         # conv_down1
-        x = self.relu(self.convs['down0'](x, hyp_out))
-        conv1 = self.relu(self.convs['down1'](x, hyp_out))
+        x = self.relu(self.conv_down0(x, hyp_out))
+        conv1 = self.relu(self.conv_down1(x, hyp_out))
         x = self.maxpool(conv1)
         # conv_down2
-        x = self.relu(self.convs['down2'](x, hyp_out))
-        conv2 = self.relu(self.convs['down3'](x, hyp_out))
+        x = self.relu(self.conv_down2(x, hyp_out))
+        conv2 = self.relu(self.conv_down3(x, hyp_out))
         x = self.maxpool(conv2)
         # conv_down3
-        x = self.relu(self.convs['down4'](x, hyp_out))
-        conv3 = self.relu(self.convs['down5'](x, hyp_out))
+        x = self.relu(self.conv_down4(x, hyp_out))
+        conv3 = self.relu(self.conv_down5(x, hyp_out))
         x = self.maxpool(conv3)   
         # conv_down4
-        x = self.relu(self.convs['down6'](x, hyp_out))
-        conv4 = self.relu(self.convs['down7'](x, hyp_out))
+        x = self.relu(self.conv_down6(x, hyp_out))
+        conv4 = self.relu(self.conv_down7(x, hyp_out))
         x = self.upsample(conv4)        
         x = torch.cat([x, conv3], dim=1)
         # conv_up3
-        x = self.relu(self.convs['up8'](x, hyp_out))
-        x = self.relu(self.convs['up9'](x, hyp_out))
+        x = self.relu(self.conv_up8(x, hyp_out))
+        x = self.relu(self.conv_up9(x, hyp_out))
         x = self.upsample(x)        
         x = torch.cat([x, conv2], dim=1)       
         # conv_up2
-        x = self.relu(self.convs['up10'](x, hyp_out))
-        x = self.relu(self.convs['up11'](x, hyp_out))
+        x = self.relu(self.conv_up10(x, hyp_out))
+        x = self.relu(self.conv_up11(x, hyp_out))
         x = self.upsample(x)        
         x = torch.cat([x, conv1], dim=1)   
         # conv_up1
-        x = self.relu(self.convs['up12'](x, hyp_out))
-        x = self.relu(self.convs['up13'](x, hyp_out))
+        x = self.relu(self.conv_up12(x, hyp_out))
+        x = self.relu(self.conv_up13(x, hyp_out))
         # last
-        x = self.convs['last14'](x, hyp_out)
+        x = self.conv_last14(x, hyp_out)
 
         x = x.permute(0, 2, 3, 1)
         if self.residual:
@@ -257,10 +256,38 @@ class Unet(nn.Module):
         # Compute layer-wise L1 capacity regularization
         kl = []
         bl = []
-        for l in self.convs.values():
-            assert l.kernel is not None and l.bias is not None, 'weights not computed'
-            kl.append(l.kernel)
-            bl.append(l.bias)
+        kl.append(self.conv_down0.kernel)
+        bl.append(self.conv_down0.bias)
+        kl.append(self.conv_down1.kernel)
+        bl.append(self.conv_down1.bias)
+        kl.append(self.conv_down2.kernel)
+        bl.append(self.conv_down2.bias)
+        kl.append(self.conv_down3.kernel)
+        bl.append(self.conv_down3.bias)
+        kl.append(self.conv_down4.kernel)
+        bl.append(self.conv_down4.bias)
+        kl.append(self.conv_down5.kernel)
+        bl.append(self.conv_down5.bias)
+        kl.append(self.conv_down6.kernel)
+        bl.append(self.conv_down6.bias)
+        kl.append(self.conv_down7.kernel)
+        bl.append(self.conv_down7.bias)
+
+        kl.append(self.conv_up8.kernel)
+        bl.append(self.conv_up8.bias)
+        kl.append(self.conv_up9.kernel)
+        bl.append(self.conv_up9.bias)
+        kl.append(self.conv_up10.kernel)
+        bl.append(self.conv_up10.bias)
+        kl.append(self.conv_up11.kernel)
+        bl.append(self.conv_up11.bias)
+        kl.append(self.conv_up12.kernel)
+        bl.append(self.conv_up12.bias)
+        kl.append(self.conv_up13.kernel)
+        bl.append(self.conv_up13.bias)
+
+        kl.append(self.conv_last14.kernel)
+        bl.append(self.conv_last14.bias)
 
         cap_reg = torch.zeros(num_examples, requires_grad=True).to(self.device)
         for k, b in zip(kl, bl):
@@ -270,7 +297,6 @@ class Unet(nn.Module):
             cap_reg += torch.norm(b_flat, dim=1)
 
         return cap_reg
-
 
 class TrajNet(nn.Module):
     '''
