@@ -111,15 +111,17 @@ def trainer(xdata, gt_data, conf):
 
 
         # Train
-        network, optimizer, train_epoch_loss = train(network, dataloaders['train'], \
+        network, optimizer, train_epoch_loss, train_epoch_psnr = train(network, dataloaders['train'], \
                 criterion, optimizer, hpsampler, conf, topK, schedule)
         # Validate
-        network, val_epoch_loss = validate(network, dataloaders['val'], criterion, hpsampler, conf, \
+        network, val_epoch_loss, val_epoch_psnr = validate(network, dataloaders['val'], criterion, hpsampler, conf, \
                 topK, schedule)
         # Save checkpoints
         utils.save_checkpoint(epoch, network.state_dict(), optimizer.state_dict(), \
                 train_epoch_loss, val_epoch_loss, conf['filename'], conf['log_interval'])
         utils.save_loss(epoch, train_epoch_loss, val_epoch_loss, conf['filename'])
+        print("Epoch {}: test loss: {:.6f}, test psnr: {:.6f}".format( \
+                            epoch, val_epoch_loss, val_epoch_psnr))
 
 def train(network, dataloader, criterion, optimizer, hpsampler, conf, topK, epoch):
     """Train for one epoch
@@ -154,6 +156,7 @@ def train(network, dataloader, criterion, optimizer, hpsampler, conf, topK, epoc
 
     epoch_loss = 0
     epoch_samples = 0
+    epoch_psnr = 0
 
     for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
         y = y.float().to(conf['device'])
@@ -173,9 +176,11 @@ def train(network, dataloader, criterion, optimizer, hpsampler, conf, topK, epoc
             optimizer.step()
 
             epoch_loss += loss.data.cpu().numpy()
+            epoch_psnr += np.sum(utils.get_metrics(gt.permute(0, 2, 3, 1), recon.permute(0, 2, 3, 1), 'psnr', False, normalized=True))
         epoch_samples += len(y)
     epoch_loss /= epoch_samples
-    return network, optimizer, epoch_loss
+    epoch_psnr /= epoch_samples
+    return network, optimizer, epoch_loss, epoch_psnr
 
 def validate(network, dataloader, criterion, hpsampler, conf, topK, epoch):
     """Validate for one epoch
@@ -206,6 +211,7 @@ def validate(network, dataloader, criterion, hpsampler, conf, topK, epoch):
 
     epoch_loss = 0
     epoch_samples = 0
+    epoch_psnr = 0
 
     for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
         y = y.float().to(conf['device'])
@@ -222,9 +228,11 @@ def validate(network, dataloader, criterion, hpsampler, conf, topK, epoch):
                 
 
             epoch_loss += loss.data.cpu().numpy()
+            epoch_psnr += np.sum(utils.get_metrics(gt.permute(0, 2, 3, 1), recon.permute(0, 2, 3, 1), 'psnr', False, normalized=True))
         epoch_samples += len(y)
     epoch_loss /= epoch_samples
-    return network, epoch_loss
+    epoch_psnr /= epoch_samples
+    return network, epoch_loss, epoch_psnr
 
 def trajtrain(network, dataloader, trained_reconnet, criterion, optimizer, conf, lmbda, psnr_map=None, dc_map=None):
     losses = []

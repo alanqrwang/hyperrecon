@@ -8,10 +8,11 @@ import torch
 import numpy as np
 import os
 import pickle
-import parse
+# import parse
 import glob
 from . import test, dataset
 from hqsnet import test as hqstest
+import myutils
 
 def add_bool_arg(parser, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -83,6 +84,25 @@ def _normalize(arr):
         else:
             return (arr - np.min(arr)) / np.ptp(arr)
 
+def normalize(arr):
+    """Normalizes a batch of images into range [0, 1]"""
+    if type(arr) is np.ndarray:
+        if len(arr.shape) > 2:
+            res = np.zeros(arr.shape)
+            for i in range(len(arr)):
+                res[i] = (arr[i] - np.min(arr[i])) / (np.max(arr[i]) - np.min(arr[i]))
+            return res
+        else:
+            return (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
+    else:
+        if len(arr.shape) > 2:
+            res = torch.zeros_like(arr)
+            for i in range(len(arr)):
+                res[i] = (arr[i] - torch.min(arr[i])) / (torch.max(arr[i]) - torch.min(arr[i]))
+            return res
+        else:
+            return (arr - torch.min(arr)) / (torch.max(arr) - torch.min(arr))
+
 def normalize_recons(recons):
     recons = absval(recons)
     recons = _normalize(recons)
@@ -145,6 +165,28 @@ def save_loss(epoch, loss, val_loss, model_path):
     pickle.dump(loss_dict,f)
     f.close()
     print('Saved loss to', pkl_path) 
+
+def get_metrics(gt, recons, metric_type, take_avg, normalized=True):
+    metrics = []
+    if normalized:
+        recons_pro = normalize(recons)
+        gt_pro = normalize(gt)
+    else:
+        recons_pro = myutils.array.make_imshowable(recons)
+        gt_pro = myutils.array.make_imshowable(gt)
+
+    if len(recons.shape) > 2:
+        for i in range(len(recons)):
+            metric = myutils.metrics.get_metric(recons_pro[i], gt_pro[i], metric_type)
+            metrics.append(metric)
+    else:
+        metric = myutils.metrics.get_metric(recons_pro, gt_pro, metric_type)
+        metrics.append(metric)
+
+    if take_avg:
+        return np.mean(np.array(metrics))
+    else:
+        return np.array(metrics)
 
 def path2config(path, new_parse, device):
     '''
