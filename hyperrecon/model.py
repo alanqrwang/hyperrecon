@@ -77,8 +77,8 @@ class HyperNetwork(nn.Module):
         # self.lin_out = nn.Linear(dim2, out_dim)
         self.lin_out = nn.Linear(dim2, dim2)
 
-        self.batchnorm1 = nn.BatchNorm1d(dim1)
-        self.batchnorm2 = nn.BatchNorm1d(dim2)
+        # self.batchnorm1 = nn.BatchNorm1d(dim1)
+        # self.batchnorm2 = nn.BatchNorm1d(dim2)
 
         self.lin1.weight.data.normal_(std=init_std(in_dim))
         self.lin1.bias.data.fill_(0)
@@ -90,8 +90,8 @@ class HyperNetwork(nn.Module):
         if hyparch is not 'small':
             self.lin3 = nn.Linear(dim2, dim2)
             self.lin4 = nn.Linear(dim2, dim2)
-            self.batchnorm3 = nn.BatchNorm1d(dim2)
-            self.batchnorm4 = nn.BatchNorm1d(dim2)
+            # self.batchnorm3 = nn.BatchNorm1d(dim2)
+            # self.batchnorm4 = nn.BatchNorm1d(dim2)
 
             self.lin3.weight.data.normal_(std=init_std(dim2))
             self.lin3.bias.data.fill_(0)
@@ -116,14 +116,20 @@ class HyperNetwork(nn.Module):
             Biases indexed by layer
         """
         if self.hyparch == 'small' or self.hyparch == 'medium':
-            x = self.batchnorm1(self.relu(self.lin1(x)))
-            x = self.batchnorm2(self.relu(self.lin2(x)))
+            # x = self.batchnorm1(self.relu(self.lin1(x)))
+            # x = self.batchnorm2(self.relu(self.lin2(x)))
+            x = self.relu(self.lin1(x))
+            x = self.relu(self.lin2(x))
 
         elif self.hyparch in ['large', 'huge', 'massive', 'gigantic']:
-            x = self.batchnorm1(self.relu(self.lin1(x)))
-            x = self.batchnorm2(self.relu(self.lin2(x)))
-            x = self.batchnorm3(self.relu(self.lin3(x)))
-            x = self.batchnorm4(self.relu(self.lin4(x)))
+            # x = self.batchnorm1(self.relu(self.lin1(x)))
+            # x = self.batchnorm2(self.relu(self.lin2(x)))
+            # x = self.batchnorm3(self.relu(self.lin3(x)))
+            # x = self.batchnorm4(self.relu(self.lin4(x)))
+            x = self.relu(self.lin1(x))
+            x = self.relu(self.lin2(x))
+            x = self.relu(self.lin3(x))
+            x = self.relu(self.lin4(x))
         else:
             sys.exit('Error with hypernet forward pass')
 

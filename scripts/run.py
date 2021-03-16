@@ -102,6 +102,8 @@ def trainer(xdata, gt_data, args):
     network = model.Unet(args['device'], num_hyperparams=num_hyperparams, hyparch=args['hyparch'], \
                 nh=args['unet_hidden']).to(args['device'])
 
+    print(utils.count_parameters(network))
+    sys.exit()
     optimizer = torch.optim.Adam(network.parameters(), lr=args['lr'])
     if args['force_lr'] is not None:
         for param_group in optimizer.param_groups:

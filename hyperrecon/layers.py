@@ -45,6 +45,7 @@ class BatchConv2DLayer(nn.Module):
         bias_units = np.prod(self.get_bias_shape())
         self.hyperkernel = nn.Linear(hyp_out_units, kernel_units).to(device)
         self.biaskernel = nn.Linear(hyp_out_units, bias_units).to(device)
+        self.tanh = nn.Tanh()
 
     def forward(self, x, hyp_out, include_bias=True):
         assert x.shape[0] == hyp_out.shape[0], "dim=0 of x must be equal in size to dim=0 of hypernet output"
@@ -54,7 +55,7 @@ class BatchConv2DLayer(nn.Module):
 
         # Reshape input and get weights from hyperkernel
         out = x.permute([1, 0, 2, 3, 4]).contiguous().view(b_j, b_i * c, h, w)
-        self.kernel = self.hyperkernel(hyp_out).view(b_i * self.out_channels, self.in_channels, self.ks, self.ks)
+        self.kernel = self.tanh(self.hyperkernel(hyp_out).view(b_i * self.out_channels, self.in_channels, self.ks, self.ks))
         # weight = weight.contiguous().view(b_i * out_channels, in_channels, kernel_height_size, kernel_width_size)
 
         out = F.conv2d(out, weight=self.kernel, bias=None, stride=self.stride, dilation=self.dilation, groups=b_i,
@@ -65,7 +66,7 @@ class BatchConv2DLayer(nn.Module):
 
         if include_bias:
             # Get weights from hyperbias
-            self.bias = self.biaskernel(hyp_out)
+            self.bias = self.tanh(self.biaskernel(hyp_out))
             out = out + self.bias.unsqueeze(1).unsqueeze(3).unsqueeze(3)
 
         out = out[:,0,...]
