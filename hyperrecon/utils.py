@@ -8,10 +8,11 @@ import torch
 import numpy as np
 import os
 import pickle
-import parse
+# import parse
 import glob
 from . import test, dataset
 from hqsnet import test as hqstest
+import myutils
 
 def add_bool_arg(parser, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -63,9 +64,18 @@ def nextPowerOf2(n):
 
     return 1 << count;
 
-def _normalize(arr):
+def normalize(arr):
     """Normalizes a batch of images into range [0, 1]"""
-    if torch.is_tensor(arr):
+    if type(arr) is np.ndarray:
+        if len(arr.shape) > 2:
+            res = np.zeros(arr.shape)
+            for i in range(len(arr)):
+                res[i] = (arr[i] - np.min(arr[i])) / (np.max(arr[i]) - np.min(arr[i]))
+            return res
+        else:
+            return (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
+
+    else:
         if len(arr.shape) > 2:
             res = torch.zeros_like(arr)
             for i in range(len(arr)):
@@ -73,15 +83,6 @@ def _normalize(arr):
             return res
         else:
             return (arr - torch.min(arr)) / (torch.max(arr) - torch.min(arr))
-
-    else:
-        if len(arr.shape) > 2:
-            res = np.zeros_like(arr)
-            for i in range(len(arr)):
-                res[i] = (arr[i] - np.min(arr[i])) / np.ptp(arr[i])
-            return res
-        else:
-            return (arr - np.min(arr)) / np.ptp(arr)
 
 def normalize_recons(recons):
     recons = absval(recons)
@@ -103,14 +104,14 @@ def load_checkpoint(model, path, optimizer=None):
     else:
         return model
 
-def save_checkpoint(epoch, model_state, optimizer_state, loss, val_loss, model_folder, log_interval, scheduler=None):
+def save_checkpoint(epoch, model_state, optimizer_state, logger, model_folder, log_interval, scheduler=None):
     if epoch % log_interval == 0:
         state = {
             'epoch': epoch,
             'state_dict': model_state,
             'optimizer' : optimizer_state,
-            'loss': loss,
-            'val_loss': val_loss
+            'loss': logger['loss_train'],
+            'val_loss': logger['loss_val']
         }
         if scheduler is not None:
             state['scheduler'] = scheduler.state_dict(),
@@ -119,32 +120,35 @@ def save_checkpoint(epoch, model_state, optimizer_state, loss, val_loss, model_f
         torch.save(state, filename.format(epoch=epoch))
         print('Saved checkpoint to', filename.format(epoch=epoch))
 
-def save_loss(epoch, loss, val_loss, model_path):
-    pkl_path = os.path.join(model_path, 'losses.pkl')
-    if os.path.exists(pkl_path):
-        f = open(pkl_path, 'rb') 
-        losses = pickle.load(f)
-        train_loss_list = losses['loss']
-        val_loss_list = losses['val_loss']
+def save_loss(save_dir, logger, *metrics):
+    """
+    metrics (list of strings): e.g. ['loss_d', 'loss_g', 'rmse_test', 'mae_train']
+    """
+    for metric in metrics:
+        metric_arr = logger[metric]
+        np.savetxt(save_dir + '/{}.txt'.format(metric), metric_arr)
 
-        if epoch-1 < len(train_loss_list):
-            train_loss_list[epoch-1] = loss
-            val_loss_list[epoch-1] = val_loss
-        else:
-            train_loss_list.append(loss)
-            val_loss_list.append(val_loss)
-
+def get_metrics(gt, recons, metric_type, take_avg, normalized=True):
+    metrics = []
+    if normalized:
+        recons_pro = normalize(recons)
+        gt_pro = normalize(gt)
     else:
-        train_loss_list = []
-        val_loss_list = []
-        train_loss_list.append(loss)
-        val_loss_list.append(val_loss)
+        recons_pro = myutils.array.make_imshowable(recons)
+        gt_pro = myutils.array.make_imshowable(gt)
 
-    loss_dict = {'loss' : train_loss_list, 'val_loss' : val_loss_list}
-    f = open(pkl_path,"wb")
-    pickle.dump(loss_dict,f)
-    f.close()
-    print('Saved loss to', pkl_path) 
+    if len(recons.shape) > 2:
+        for i in range(len(recons)):
+            metric = myutils.metrics.get_metric(recons_pro[i], gt_pro[i], metric_type)
+            metrics.append(metric)
+    else:
+        metric = myutils.metrics.get_metric(recons_pro, gt_pro, metric_type)
+        metrics.append(metric)
+
+    if take_avg:
+        return np.mean(np.array(metrics))
+    else:
+        return np.array(metrics)
 
 def path2config(path, new_parse, device):
     '''
