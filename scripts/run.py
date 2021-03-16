@@ -32,6 +32,7 @@ if __name__ == "__main__":
     parser.add_argument('--sampling', choices=['uhs', 'dhs'], type=str, help='Sampling method', required=True)
     parser.add_argument('--hyparch', choices=['small', 'medium', 'large', 'huge', 'massive', 'gigantic'], type=str, help='Hypernetwork architecture', required=True)
 
+    print('legacy code')
     
     args = parser.parse_args()
     if torch.cuda.is_available():
