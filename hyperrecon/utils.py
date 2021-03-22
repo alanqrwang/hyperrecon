@@ -13,6 +13,7 @@ import glob
 from . import test, dataset
 from hqsnet import test as hqstest
 import myutils
+import json
 
 def add_bool_arg(parser, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -86,7 +87,7 @@ def normalize(arr):
 
 def normalize_recons(recons):
     recons = absval(recons)
-    recons = _normalize(recons)
+    recons = normalize(recons)
     return recons
 
 def count_parameters(model):
@@ -129,6 +130,14 @@ def save_loss(save_dir, logger, *metrics):
     for metric in metrics:
         metric_arr = logger[metric]
         np.savetxt(save_dir + '/{}.txt'.format(metric), metric_arr)
+
+def get_args(path):
+    args_txtfile = os.path.join(path, 'args.txt')
+    print(args_txtfile)
+    if os.path.exists(args_txtfile):
+        with open(args_txtfile) as json_file:
+            config = json.load(json_file)
+    return config
 
 def get_metrics(gt, recons, metric_type, take_avg, normalized=True):
     metrics = []
@@ -184,11 +193,11 @@ def get_everything(path, device, take_avg=True, recons_only=False, \
     
     # Forward through latest available model
     if cp is None:
-        model_paths = sorted(glob.glob(os.path.join(path, 'model.*.h5')))
+        glob_path = path.replace('[', '[()').replace(']', '()]').replace('()', '[]')
+        model_paths = sorted(glob.glob(os.path.join(glob_path, 'checkpoints/model.*.h5')))
         model_path = model_paths[-1]
     # Or forward through specified epoch
     else:
-        path = path.replace('[[]', '[').replace('[]]', ']')
         model_path = os.path.join(path, 'model.{epoch:04d}.h5'.format(epoch=cp))
         
     if gt_data is None:
@@ -202,8 +211,18 @@ def get_everything(path, device, take_avg=True, recons_only=False, \
 
         gt_data = gt_data[3:3+N]
         xdata = xdata[3:3+N]
+
     if hypernet:
-        config = path2config(model_path, new_parse, device)
+        args_txtfile = os.path.join(path, 'args.txt')
+        print(args_txtfile)
+        if os.path.exists(args_txtfile):
+            with open(args_txtfile) as json_file:
+                config = json.load(json_file)
+
+        else: # Legacy
+            print('Couldn\'t find text file, reverting to legacy')
+            config = path2config(model_path, new_parse, device)
+
         result_dict = test.tester(model_path, xdata, gt_data, config, device, hyparch, take_avg, n_grid, new_parse)
     else:
         config = path2configlegacy(model_path)
@@ -250,12 +269,15 @@ def oldloss2newloss(old_hps):
 #     a3 = torch.zeros_like(old_hps[:, 0])
     return torch.stack((a0, a1, a2), dim=1)
 
-def get_reference_hps(device):
+def get_reference_hps(device, newloss=True):
     old_hps = torch.tensor([[0.9, 0.1],
      [0.995, 0.6],
      [0.9, 0.2],
      [0.995, 0.5],
      [0.9, 0],
      [0.99, 0.7]]).to(device).float()
-    return oldloss2newloss(old_hps)
+    if newloss:
+        return oldloss2newloss(old_hps)
+    else:
+        return old_hps
 

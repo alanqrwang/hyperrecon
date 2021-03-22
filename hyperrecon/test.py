@@ -23,19 +23,20 @@ def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=2
     conf['sampling'] = 'uniform'
 
     n_hidden = 64#int(conf['unet_hidden'])
-    reg_types = conf['reg_types'].strip('][').split(', ')
-    reg_types = [s.strip('\'') for s in reg_types]
-    range_restrict = True if conf['range_restrict'] == 'True' else False
-    topK = None if conf['topK'] == 'None' else int(conf['topK'])
-    # if new_parse:
-    #     bounds = [float(i) for i in conf['bounds'].strip('][').split(', ')]
-    #     alphas = np.linspace(bounds[0], bounds[1], n_grid)
-    #     betas = np.linspace(bounds[2], bounds[3], n_grid)
-    # else:
-    #     alpha_bound = [float(i) for i in conf['alpha_bound'].strip('][').split(', ')]
-    #     beta_bound = [float(i) for i in conf['beta_bound'].strip('][').split(', ')]
-    #     alphas = np.linspace(alpha_bound[0], alpha_bound[1], n_grid)
-    #     betas = np.linspace(beta_bound[0], beta_bound[1], n_grid)
+    if isinstance(conf['reg_types'], str):
+        reg_types = conf['reg_types'].strip('][').split(', ')
+        reg_types = [s.strip('\'') for s in reg_types]
+    else:
+        reg_types = conf['reg_types']
+    if isinstance(conf['range_restrict'], str):
+        range_restrict = True if conf['range_restrict'] == 'True' else False
+    else:
+        range_restrict = conf['range_restrict']
+    if isinstance(conf['topK'], str):
+        topK = None if conf['topK'] == 'None' else int(conf['topK'])
+    else:
+        topK = conf['topK']
+
     alphas = np.linspace(0, 1, n_grid)
     betas = np.linspace(0, 1, n_grid)
 
@@ -57,7 +58,8 @@ def tester(model_path, xdata, gt_data, conf, device, hyparch, take_avg, n_grid=2
     network = utils.load_checkpoint(network, model_path)
     criterion = losslayer.AmortizedLoss(reg_types, range_restrict, conf['sampling'], device, mask, evaluate=True)
 
-    gr = True
+    conf['device'] = device
+    gr = False
     gl = True
     return test(network, dataloader, conf, hps, topK, take_avg, criterion=criterion, give_recons=gr, give_loss=gl, give_metrics=True)
 
@@ -81,6 +83,7 @@ def test(trained_model, dataloader, conf, hps, topK, take_avg, criterion=None, \
     all_psnrs = []
 
     for h in hps:
+        # print(h)
         # h = torch.tensor(h).to(conf['device']).float().reshape([-1, 5])
         for i, (y, gt) in enumerate(dataloader): 
             batch_h = h.expand(len(y), -1)
@@ -89,7 +92,8 @@ def test(trained_model, dataloader, conf, hps, topK, take_avg, criterion=None, \
             zf = utils.ifft(y)
             y, zf = utils.scale(y, zf)
 
-            pred, cap_reg = trained_model(zf, y, batch_h)
+            pred = trained_model(zf, y, batch_h)
+            cap_reg = trained_model.get_l1_weight_penalty(len(y))
             if give_recons:
                 recons.append(pred.cpu().detach().numpy())
             if give_loss:
@@ -100,8 +104,10 @@ def test(trained_model, dataloader, conf, hps, topK, take_avg, criterion=None, \
                 cap_regs.append(regs['cap'].cpu().detach().numpy())
                 tvs.append(regs['tv'].cpu().detach().numpy())
             if give_metrics:
-                psnrs = get_metrics(y, gt, pred, metric_type='relative ssim', take_avg=take_avg)
+                psnrs = get_metrics(y, gt, pred, metric_type='relative psnr', take_avg=take_avg)
                 all_psnrs.append(psnrs)
+                if psnrs > 0:
+                    print(h, psnrs)
 
 
 

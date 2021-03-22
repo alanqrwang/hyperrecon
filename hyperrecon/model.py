@@ -36,21 +36,6 @@ class HyperNetwork(nn.Module):
         super(HyperNetwork, self).__init__()
         self.hyparch = hyparch
 
-        # weight_shapes = []
-        # bias_shapes = []
-        # for layer in conv_layers.values():
-        #     weight_shapes.append(layer.get_weight_shape())
-        #     bias_shapes.append(layer.get_bias_shape())
-        # self.weight_shapes = torch.tensor(weight_shapes)
-        # self.bias_shapes = torch.tensor(bias_shapes)
-
-        # # Compute output dimension from conv layer dimensions
-        # out_dim = (torch.sum(torch.prod(self.weight_shapes, dim=1))+torch.sum(torch.prod(self.bias_shapes, dim=1))).item()
-
-        # # Compute weight and bias indices for flattened array
-        # self.wind = torch.cumsum(torch.prod(self.weight_shapes, dim=1), dim=0)
-        # self.bind = torch.cumsum(torch.prod(self.bias_shapes, dim=1), dim=0) + torch.sum(torch.prod(self.weight_shapes, dim=1))
-
         # Initialize weights
         constant_scale = f_size*f_size*unet_nh
         init_std = lambda d_i : (2 / (d_i * constant_scale))**0.5
@@ -74,11 +59,7 @@ class HyperNetwork(nn.Module):
 
         self.lin1 = nn.Linear(in_dim, dim1)
         self.lin2 = nn.Linear(dim1, dim2)
-        # self.lin_out = nn.Linear(dim2, out_dim)
         self.lin_out = nn.Linear(dim2, dim2)
-
-        # self.batchnorm1 = nn.BatchNorm1d(dim1)
-        # self.batchnorm2 = nn.BatchNorm1d(dim2)
 
         self.lin1.weight.data.normal_(std=init_std(in_dim))
         self.lin1.bias.data.fill_(0)
@@ -90,8 +71,6 @@ class HyperNetwork(nn.Module):
         if hyparch is not 'small':
             self.lin3 = nn.Linear(dim2, dim2)
             self.lin4 = nn.Linear(dim2, dim2)
-            # self.batchnorm3 = nn.BatchNorm1d(dim2)
-            # self.batchnorm4 = nn.BatchNorm1d(dim2)
 
             self.lin3.weight.data.normal_(std=init_std(dim2))
             self.lin3.bias.data.fill_(0)
@@ -192,7 +171,7 @@ class Unet(nn.Module):
         # HyperNetwork
         self.hnet = HyperNetwork(hyparch, in_dim=num_hyperparams, unet_nh=nh)
 
-    def forward(self, zf, y, hyperparams):
+    def forward(self, zf, hyperparams):
         """
         Parameters
         ----------
@@ -299,32 +278,26 @@ class Unet(nn.Module):
         return cap_reg
 
 class TrajNet(nn.Module):
-    '''
-    dim_bounds is out_dim by 2 array, each row contains bounds for that dimension
-    '''
     def __init__(self, in_dim=1, h_dim=8, out_dim=2):
         super(TrajNet, self).__init__()
-
-        self.out_dim = out_dim
-        # self.lin1 = nn.Linear(in_dim, h_dim)
-#         self.lin1 = nn.Linear(in_dim, out_dim)
-        # self.lin2 = nn.Linear(h_dim, h_dim)
-        # self.lin3 = nn.Linear(h_dim, out_dim)
-        self.lin = nn.Linear(in_dim, out_dim)
-        # self.relu = nn.ReLU()
+        self.lin1 = nn.Linear(in_dim, h_dim)
+        self.lin2 = nn.Linear(h_dim, h_dim)
+        self.lin3 = nn.Linear(h_dim, h_dim)
+        self.lin4 = nn.Linear(h_dim, h_dim)
+        self.lin5 = nn.Linear(h_dim, out_dim)
+        self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        # x = self.lin1(x)
-        # x = self.relu(x)
-        # x = self.lin2(x)
-        # x = self.relu(x)
-        # x = self.lin3(x)
-        # dc, regs = torch.split(x, [1, self.out_dim-1], dim=1)
-        # dc = self.dc_lower_bound + (1 - self.dc_lower_bound) / (1 + torch.exp(-dc))
-        # regs = self.sigmoid(regs)
-        # out = torch.cat((dc, regs), dim=1)
-        x = self.lin(x)
+        x = self.lin1(x)
+        x = self.relu(x)
+        x = self.lin2(x)
+        x = self.relu(x)
+        x = self.lin3(x)
+        x = self.relu(x)
+        x = self.lin2(x)
+        x = self.relu(x)
+        x = self.lin5(x)
         out = self.sigmoid(x)
         return out
 

@@ -113,6 +113,7 @@ class AmortizedLoss(nn.Module):
         l1_shear = torch.sum(self.l1(shears, torch.zeros_like(shears)), dim=(1, 2, 3))
         return l1_shear
 
+
     def forward(self, x_hat, y, hyperparams, cap_reg, topK, schedule):
         '''
         Parameters
@@ -140,14 +141,8 @@ class AmortizedLoss(nn.Module):
             Hyperparmeters used
         '''
         
-        mask_expand = self.mask.unsqueeze(2)
         loss_dict = {}
-
-        # Data consistency term
-        Fx_hat = utils.fft(x_hat)
-        UFx_hat = Fx_hat * mask_expand
-        dc = torch.sum(self.l2(UFx_hat, y), dim=(1, 2, 3))
-        loss_dict['dc'] = dc
+        loss_dict['dc'] = get_dc_loss(x_hat, y, self.mask)
 
         # Regularization
         loss_dict['cap'] = cap_reg
@@ -218,15 +213,26 @@ class AmortizedLoss(nn.Module):
 
         return loss, sort_hyperparams
 
-def trajloss(recons, dc_losses, lmbda, device, loss_type):
+def get_dc_loss(x_hat, y, mask):
+    l2 = torch.nn.MSELoss(reduction='none')
+    mask_expand = mask.unsqueeze(2)
+    loss_dict = {}
+
+    # Data consistency term
+    Fx_hat = utils.fft(x_hat)
+    UFx_hat = Fx_hat * mask_expand
+    dc = torch.sum(l2(UFx_hat, y), dim=(1, 2, 3))
+    return dc
+
+def trajloss(recons, dc_losses, lmbda, device, loss_type, mse=None):
     '''Trajectory Net Loss
 
     recons: (batch_size, num_points, n1, n2, 2)
     recons: (batch_size, num_points, n1, n2, 2)
     Loss = (1-lmbda)*dist_loss + lmbda*dc_loss
     '''
-    provider = LossProvider()
-    loss_function = provider.get_loss_function('Watson-DFT', colorspace='grey', pretrained=True, reduction='sum').to(device)
+    # provider = LossProvider()
+    # loss_function = provider.get_loss_function('Watson-DFT', colorspace='grey', pretrained=True, reduction='sum').to(device)
 
     batch_size, num_points = recons.shape[0], recons.shape[1]
     dist_loss = 0
@@ -246,7 +252,11 @@ def trajloss(recons, dc_losses, lmbda, device, loss_type):
 
         reg_loss = reg_loss + torch.sum(dc_losses[b])
 
-    print('loss', lmbda)
-    loss = (1-lmbda)*dist_loss + lmbda*reg_loss
+    if mse is None:
+        print(lmbda)
+        loss = (1-lmbda)*dist_loss + lmbda*reg_loss
+    else:
+        print(lmbda)
+        loss = (1-lmbda)*dist_loss + lmbda*mse
     
     return loss

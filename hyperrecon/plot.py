@@ -34,11 +34,11 @@ def plot_over_hyperparams(vals, xticks, yticks=None, title=None, ax=None, vlim=N
         grid = vals.reshape(len(yticks), len(xticks))
         if contours:
             X, Y = np.meshgrid(np.arange(len(yticks)), np.arange(len(xticks)))
-            c1 = ax.contour(X, Y, grid, contours, colors=['darkgreen','limegreen','lime'], linewidths=1.5, linestyles='--') 
+            c1 = ax.contour(X, Y, grid, contours, colors=['cyan','fuchsia','lime'], linewidths=1.5, linestyles='--') 
 
         if annotate_max:
             ymax, xmax = np.unravel_index(grid.argmax(), grid.shape)
-            ax.scatter([xmax], [ymax+5], marker='*', s=100, color='black')
+            ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
 
         if vlim is not None:
             h = ax.imshow(grid, vmin=vlim[0], vmax=vlim[1], cmap=cm)
@@ -474,30 +474,9 @@ def get_indices_l2_dist(sorted_psnrs, sorted_recons):
     return np.unravel_index(np.argmax(dist_mat), (dist_dim, dist_dim))
     
 
-def plot_traj_cp(network, num_points, losses, lmbda, device, psnr_map, dc_map, dc_thres):
-    fig, axes = plt.subplots(1, 3, figsize=(12, 3))
-    if psnr_map is not None and dc_map is not None:
-        samples = int(np.sqrt(len(psnr_map)))
-        alpha_bound = [0., 1.]
-        beta_bound = [0., 1.]
-        xticks = np.linspace(alpha_bound[0], alpha_bound[1], samples)
-        yticks = np.linspace(beta_bound[0], beta_bound[1], samples)
-
-        network.eval()
-        traj = torch.linspace(0, 1, num_points).float().to(device).unsqueeze(1)
-        out = network(traj)
-        out_numpy = out.cpu().detach().numpy()
-        alpha_scaled = np.interp(out_numpy[:,0], alpha_bound, [0, samples-1])
-        beta_scaled = np.interp(out_numpy[:,1], beta_bound, [0, samples-1])
-
-        plot_over_hyperparams(psnr_map, xticks, yticks, ax=axes[0], colorbar=False, vlim=[-5, 5], contours=[2, 2.5, 3])
-        plot_over_hyperparams(dc_map, xticks, yticks, ax=axes[1], colorbar=False, vlim=[0, dc_thres], contours=[dc_thres])
-        axes[0].scatter(alpha_scaled, beta_scaled, color='lime')
-        axes[1].scatter(alpha_scaled, beta_scaled, color='lime')
-        if lmbda is not None:
-            axes[0].set_title('lmbda=' + str(np.round(lmbda, 3)))
-        axes[1].set_title('DC top 25%')
-    axes[2].plot(losses)
-    axes[2].grid()
-    axes[2].set_xlabel('iterations')
+def plot_traj_cp(network, num_points, losses, lmbda, device):
+    fig, axes = plt.subplots(1, 1, figsize=(4, 3))
+    axes.plot(losses)
+    axes.grid()
+    axes.set_xlabel('iterations')
     plt.show()
