@@ -17,6 +17,7 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('--models_dir', default='/nfs02/users/aw847/models/HyperRecon/', type=str, help='directory to save models')
         self.add_argument('--log_interval', type=int, default=100, help='Frequency of logs')
         self.add_argument('--load', type=str, default=None, help='Load checkpoint at .h5 path')
+        self.add_argument('--cont', type=int, default=None, help='Load checkpoint at .h5 path')
         self.add_argument('--gpu_id', type=int, default=0, help='gpu id to train on')
         
         # Machine learning parameters
@@ -111,8 +112,19 @@ def trainer(xdata, gt_data, args):
     ##################################################
 
     ############ Checkpoint Loading ##################
+    # Load from path
     if args.load:
         network, optimizer = utils.load_checkpoint(network, args.load, optimizer)
+    # Load from previous checkpoint
+    if args.cont:
+        load_file = os.path.join(args.run_dir, 'checkpoints', 'model.{epoch:04d}.h5'.format(epoch=args.cont))
+        network, optimizer = utils.load_checkpoint(network, load_file, optimizer)
+        logger['loss_train'] = list(np.loadtxt(os.path.join(args.run_dir, 'loss_train.txt'))[:args.cont])
+        logger['loss_val'] = list(np.loadtxt(os.path.join(args.run_dir, 'loss_val.txt'))[:args.cont])
+        logger['epoch_train_time'] = list(np.loadtxt(os.path.join(args.run_dir, 'epoch_train_time.txt'))[:args.cont])
+        logger['psnr_train'] = list(np.loadtxt(os.path.join(args.run_dir, 'psnr_train.txt'))[:args.cont])
+        logger['psnr_val'] = list(np.loadtxt(os.path.join(args.run_dir, 'psnr_val.txt'))[:args.cont])
+
     ##################################################
 
     ############## Training loop #####################

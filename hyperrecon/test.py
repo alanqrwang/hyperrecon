@@ -35,11 +35,17 @@ def tester(model_path, xdata, gt_data, conf, device, take_avg, n_grid=20, conver
     else:
         topK = conf['topK']
 
-    alphas = np.linspace(0, 1, n_grid)
-    betas = np.linspace(0, 1, n_grid)
-    hps = torch.tensor(np.stack(np.meshgrid(alphas, betas), -1).reshape(-1,2)).float().to(device)
-    if convert:
-        hps = utils.oldloss2newloss(hps)
+    if len(reg_types) == 2:
+        alphas = np.linspace(0, 1, n_grid)
+        betas = np.linspace(0, 1, n_grid)
+        hps = torch.tensor(np.stack(np.meshgrid(alphas, betas), -1).reshape(-1,2)).float().to(device)
+        if not range_restrict:
+            hps = utils.oldloss2newloss(hps)
+    elif len(reg_types) == 1:
+        hps = torch.linspace(0, 1, n_grid).view(-1, 1).float().to(device)
+        if not range_restrict:
+            hps = utils.oldloss2newloss(hps)
+    num_hyperparams = len(reg_types) if range_restrict else len(reg_types) + 1
 
     valset = dataset.Dataset(xdata, gt_data)
     params = {'batch_size': batch_size,
@@ -49,8 +55,6 @@ def tester(model_path, xdata, gt_data, conf, device, take_avg, n_grid=20, conver
 
     mask = dataset.get_mask(4).to(device)
 
-    num_hyperparams = len(reg_types) if conf['range_restrict'] else len(reg_types) + 1
-    assert num_hyperparams == hps.shape[1], 'num_hyperparams %d, hps shape %d' % (num_hyperparams, hps.shape[1])
     network = model.Unet(device, num_hyperparams, conf['hnet_hdim'], conf['unet_hdim']).to(device) 
 
     network = utils.load_checkpoint(network, model_path)
@@ -114,7 +118,6 @@ def test(trained_model, dataloader, device, hps, take_avg, criterion=None, \
         res['cap'] = np.array(cap_regs)
         res['tv'] = np.array(tvs)
         if take_avg:
-            print(res['loss'].shape)
             res['loss'] = res['loss'].mean(axis=1)
             res['dc'] = res['dc'].mean(axis=1)
             res['cap'] = res['cap'].mean(axis=1)

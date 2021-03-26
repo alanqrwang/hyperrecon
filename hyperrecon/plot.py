@@ -83,14 +83,16 @@ def plot_over_hyperparams(vals, xticks, yticks=None, title=None, ax=None, vlim=N
     else:
         if len(vals.shape) > 1:
             for i in range(len(vals)):
-                ax.plot(xticks, vals[i], '.--')
+                h = ax.plot(xticks, vals[i], '.--')
                 ax.legend()
         else:
-            ax.plot(xticks, vals, '.--')
+            h = ax.plot(xticks, vals, '.--')
 
         ax.set_xlabel('alpha', fontsize=16)
         ax.legend()
-        ax.legend(labels)
+        # ax.legend(labels)
+        if vlim:
+            ax.set_ylim(vlim)
         ax.grid()
 
     if title is not None:
