@@ -107,21 +107,18 @@ def load_checkpoint(model, path, optimizer=None):
     else:
         return model
 
-def save_checkpoint(epoch, model_state, optimizer_state, logger, model_folder, log_interval, scheduler=None):
-    if epoch % log_interval == 0:
-        state = {
-            'epoch': epoch,
-            'state_dict': model_state,
-            'optimizer' : optimizer_state,
-            'loss': logger['loss_train'],
-            'val_loss': logger['loss_val']
-        }
-        if scheduler is not None:
-            state['scheduler'] = scheduler.state_dict(),
+def save_checkpoint(epoch, model_state, optimizer_state, model_folder, scheduler=None):
+    state = {
+        'epoch': epoch,
+        'state_dict': model_state,
+        'optimizer' : optimizer_state
+    }
+    if scheduler is not None:
+        state['scheduler'] = scheduler.state_dict()
 
-        filename = os.path.join(model_folder, 'model.{epoch:04d}.h5')
-        torch.save(state, filename.format(epoch=epoch))
-        print('Saved checkpoint to', filename.format(epoch=epoch))
+    filename = os.path.join(model_folder, 'model.{epoch:04d}.h5')
+    torch.save(state, filename.format(epoch=epoch))
+    print('Saved checkpoint to', filename.format(epoch=epoch))
 
 def save_loss(save_dir, logger, *metrics):
     """
@@ -161,34 +158,10 @@ def get_metrics(gt, recons, metric_type, take_avg, normalized=True):
     else:
         return np.array(metrics)
 
-def path2config(path, new_parse, device):
-    '''
-    Converts model path name to dictionary of parameters
-    '''
-    if new_parse:
-        parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{lr}_{batch_size}_{reg_types}_{unet_hidden}_{bounds}_{topK}_{range_restrict}/{filename}'
-        # parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{lr}_{batch_size}_{reg_types}_{unet_hidden}_{topK}_{range_restrict}/{filename}'
-    else:
-        parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{recon_type}_{lr}_{batch_size}_{lmbda}_{K}_{reg_types}_{unet_hidden}_{alpha_bound}_{beta_bound}_{topK}_{range_restrict}/{dataset}_{maskname}/{filename}'
-        # parse_format = '/nfs02/users/aw847/models/HyperHQSNet/{prefix}_{lr}_{batch_size}_{reg_types}_{unet_hidden}_{topK}_{range_restrict}/{filename}'
-    config = parse.parse(parse_format, path)
-    assert (config is not None), '\n parse_format is %s \n path is %s' % (parse_format, path)
-    config = config.named
-    config['device'] = device
-    return config
-
-def path2configlegacy(path):
-    parse_format = '/nfs02/users/aw847/models/HQSplitting/{prefix}_{w_coeff}_{tv_coeff}_{recon_type}_{lr}_{lmbda}_{K}_{learn_reg_coeff}_{n_hidden}/{dataset}_{maskname}_{strategy}/{filename}'
-#     parse_format = '/nfs02/users/aw847/models/HQSplitting/{prefix}_{tv_coeff}_{lr}_{lmbda}_{K}_{learn_reg_coeff}_{n_hidden}/{dataset}_{maskname}_{strategy}/{filename}'
-    
-    config = parse.parse(parse_format, path)
-    assert (config is not None), '\n parse_format is %s \n path is %s' % (parse_format, path)
-    return config
-
 def get_everything(path, device, take_avg=True, recons_only=False, \
                    hypernet=True, metric_type='relative psnr', \
-                   hyparch='small', cp=None, n_grid=20, new_parse=False, \
-                   gt_data=None, xdata=None, test_data=True):
+                   cp=None, n_grid=20, \
+                   gt_data=None, xdata=None, test_data=True, convert=False):
     mask = torch.tensor(dataset.get_mask(4)).to(device).float()
     
     # Forward through latest available model
@@ -198,7 +171,7 @@ def get_everything(path, device, take_avg=True, recons_only=False, \
         model_path = model_paths[-1]
     # Or forward through specified epoch
     else:
-        model_path = os.path.join(path, 'model.{epoch:04d}.h5'.format(epoch=cp))
+        model_path = os.path.join(path, 'checkpoints/model.{epoch:04d}.h5'.format(epoch=cp))
         
     if gt_data is None:
         N=10
@@ -212,22 +185,15 @@ def get_everything(path, device, take_avg=True, recons_only=False, \
         gt_data = gt_data[3:3+N]
         xdata = xdata[3:3+N]
 
-    if hypernet:
-        args_txtfile = os.path.join(path, 'args.txt')
-        print(args_txtfile)
-        if os.path.exists(args_txtfile):
-            with open(args_txtfile) as json_file:
-                config = json.load(json_file)
-
-        else: # Legacy
-            print('Couldn\'t find text file, reverting to legacy')
-            config = path2config(model_path, new_parse, device)
-
-        result_dict = test.tester(model_path, xdata, gt_data, config, device, hyparch, take_avg, n_grid, new_parse)
+    args_txtfile = os.path.join(path, 'args.txt')
+    print(args_txtfile)
+    if os.path.exists(args_txtfile):
+        with open(args_txtfile) as json_file:
+            args = json.load(json_file)
     else:
-        config = path2configlegacy(model_path)
-        result_dict = test.baseline_test(model_path, xdata, gt_data, config, device, take_avg)
+        raise Exception('no args found')
 
+    result_dict = test.tester(model_path, xdata, gt_data, args, device, take_avg, n_grid, convert)
     return result_dict
 
 def gather_baselines(device):
@@ -263,21 +229,40 @@ def oldloss2newloss(old_hps):
     
     old_hps: (N, num_hyperparams)
     '''
-    a0 = old_hps[:, 0]
-    a1 = (1-old_hps[:, 0])*old_hps[:,1]
-    a2 = (1-old_hps[:, 0])*(1-old_hps[:,1])
-#     a3 = torch.zeros_like(old_hps[:, 0])
-    return torch.stack((a0, a1, a2), dim=1)
+    if old_hps.shape[1] == 1:
+        a0 = 1-old_hps[:, 0]
+        a1 = old_hps[:, 0]
+        new_hps = torch.stack((a0, a1), dim=1)
+    elif old_hps.shape[1] == 2:
+        a0 = old_hps[:, 0]
+        a1 = (1-old_hps[:, 0])*old_hps[:,1]
+        a2 = (1-old_hps[:, 0])*(1-old_hps[:,1])
+        new_hps = torch.stack((a0, a1, a2), dim=1)
+    else:
+        raise Exception('Unsupported num_hyperparams')
+    return new_hps 
 
-def get_reference_hps(device, newloss=True):
-    old_hps = torch.tensor([[0.9, 0.1],
+def get_reference_hps(num_hyperparams, range_restrict=True):
+    hps_2 = torch.tensor([[0.9, 0.1],
      [0.995, 0.6],
      [0.9, 0.2],
      [0.995, 0.5],
      [0.9, 0],
-     [0.99, 0.7]]).to(device).float()
-    if newloss:
-        return oldloss2newloss(old_hps)
+     [0.99, 0.7]]).float()
+    hps_1 = torch.tensor([[0.5],
+     [0.6],
+     [0.7],
+     [0.8],
+     [0.9],
+     [0.99]]).float()
+    if num_hyperparams == 2 and range_restrict:
+        return hps_2
+    elif num_hyperparams == 3 and not range_restrict:
+        return oldloss2newloss(hps_2)
+    elif num_hyperparams == 1 and range_restrict:
+        return hps_1
+    elif num_hyperparams == 2 and not range_restrict:
+        return oldloss2newloss(hps_1)
     else:
-        return old_hps
+        raise Exception('Error in num_hp and range_restrict combo')
 

@@ -14,7 +14,7 @@ import glob
 import os
 
 
-def train(network, dataloader, criterion, optimizer, hpsampler, args, topK, epoch):
+def train(network, dataloader, criterion, optimizer, hpsampler, device, epoch):
     """Train for one epoch
 
         Parameters
@@ -27,10 +27,6 @@ def train(network, dataloader, criterion, optimizer, hpsampler, args, topK, epoc
             Adam optimizer
         hpsampler : hyperrecon.HpSampler
             Hyperparameter sampler
-        args : dict
-            Miscellaneous parameters
-        topK : int or None
-            K for DHS sampling
         epoch : int
             Current training epoch
 
@@ -50,31 +46,32 @@ def train(network, dataloader, criterion, optimizer, hpsampler, args, topK, epoc
     epoch_psnr = 0
 
     for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
-        y = y.float().to(args['device'])
-        gt = gt.float().to(args['device'])
+        batch_size = len(y)
+        y = y.float().to(device)
+        gt = gt.float().to(device)
 
         optimizer.zero_grad()
         with torch.set_grad_enabled(True):
             zf = utils.ifft(y)
             y, zf = utils.scale(y, zf)
 
-            hyperparams = hpsampler.sample(len(y)).to(args['device'])
+            hyperparams = hpsampler.sample(batch_size).to(device)
 
-            recon = network(zf, y, hyperparams)
-            cap_reg = network.get_l1_weight_penalty(len(y))
-            loss, _, sort_hyperparams = criterion(recon, y, hyperparams, cap_reg, topK, epoch)
+            recon = network(zf, hyperparams)
+            cap_reg = network.get_l1_weight_penalty(batch_size)
+            loss, _, sort_hyperparams = criterion(recon, y, hyperparams, cap_reg, epoch)
 
             loss.backward()
             optimizer.step()
 
             epoch_loss += loss.data.cpu().numpy()
             epoch_psnr += np.sum(utils.get_metrics(gt.permute(0, 2, 3, 1), recon.permute(0, 2, 3, 1), 'psnr', False, normalized=True))
-        epoch_samples += len(y)
+        epoch_samples += batch_size
     epoch_loss /= epoch_samples
     epoch_psnr /= epoch_samples
     return network, optimizer, epoch_loss, epoch_psnr
 
-def validate(network, dataloader, criterion, hpsampler, args, topK, epoch):
+def validate(network, dataloader, criterion, hpsampler, device, epoch):
     """Validate for one epoch
 
         Parameters
@@ -85,10 +82,6 @@ def validate(network, dataloader, criterion, hpsampler, args, topK, epoch):
             Training set dataloader
         hpsampler : hyperrecon.HpSampler
             Hyperparameter sampler
-        args : dict
-            Miscellaneous parameters
-        topK : int or None
-            K for DHS sampling
         epoch : int
             Current training epoch
 
@@ -106,23 +99,24 @@ def validate(network, dataloader, criterion, hpsampler, args, topK, epoch):
     epoch_psnr = 0
 
     for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
-        y = y.float().to(args['device'])
-        gt = gt.float().to(args['device'])
+        batch_size = len(y)
+        y = y.float().to(device)
+        gt = gt.float().to(device)
 
         with torch.set_grad_enabled(False):
             zf = utils.ifft(y)
             y, zf = utils.scale(y, zf)
 
-            hyperparams = hpsampler.sample(len(y)).to(args['device'])
+            hyperparams = hpsampler.sample(batch_size, val=True).to(device)
 
-            recon = network(zf, y, hyperparams)
-            cap_reg = network.get_l1_weight_penalty(len(y))
-            loss, _, _ = criterion(recon, y, hyperparams, cap_reg, topK, epoch)
+            recon = network(zf, hyperparams)
+            cap_reg = network.get_l1_weight_penalty(batch_size)
+            loss, _, _ = criterion(recon, y, hyperparams, cap_reg, epoch)
                 
 
             epoch_loss += loss.data.cpu().numpy()
             epoch_psnr += np.sum(utils.get_metrics(gt.permute(0, 2, 3, 1), recon.permute(0, 2, 3, 1), 'psnr', False, normalized=True))
-        epoch_samples += len(y)
+        epoch_samples += batch_size
     epoch_loss /= epoch_samples
     epoch_psnr /= epoch_samples
     return network, epoch_loss, epoch_psnr
@@ -132,7 +126,7 @@ def trajtrain(network, dataloader, trained_reconnet, optimizer, args):
     logger['loss_train'] = []
     logger['loss_val'] = []
 
-    for epoch in range(1, args.num_epochs+1):
+    for epoch in range(1, args.epochs+1):
         for batch_idx, (y, gt) in enumerate(dataloader):
             print(batch_idx)
             y = y.float().to(args.device)

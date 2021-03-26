@@ -16,14 +16,12 @@ class HyperNetwork(nn.Module):
 
     Takes hyperparameters and outputs weights of main U-Net
     """
-    def __init__(self, hyparch, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
+    def __init__(self, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
         """
         Parameters
         ----------
         conv_layers : dict
             Dictionary of convolutional layers in main U-Net
-        hyparch : str
-            Hypernetwork architecture [small, medium, large]
         f_size : int 
             Kernel size
         in_dim : int
@@ -34,48 +32,25 @@ class HyperNetwork(nn.Module):
             Hidden dimension of main U-Net
         """
         super(HyperNetwork, self).__init__()
-        self.hyparch = hyparch
 
         # Initialize weights
         constant_scale = f_size*f_size*unet_nh
         init_std = lambda d_i : (2 / (d_i * constant_scale))**0.5
 
         # Network layers
-        if hyparch == 'small':
-            print('Small Hypernetwork')
-            dim1, dim2 = 2, 4
-        elif hyparch == 'medium':
-            print('Medium Hypernetwork')
-            dim1, dim2 = 8, 32
-        elif hyparch == 'large':
-            print('Large Hypernetwork')
-            dim1, dim2 = 8, 32
-        elif hyparch =='huge':
-            print('Huge Hypernetwork')
-            dim1, dim2 = 16, 64
-        elif hyparch == 'massive':
-            print('Massive Hypernetwork')
-            dim1, dim2 = 32, 128
-
-        self.lin1 = nn.Linear(in_dim, dim1)
-        self.lin2 = nn.Linear(dim1, dim2)
-        self.lin_out = nn.Linear(dim2, dim2)
+        self.lin1 = nn.Linear(in_dim, h_dim)
+        self.lin2 = nn.Linear(h_dim, h_dim)
+        self.lin3 = nn.Linear(h_dim, h_dim)
+        self.lin4 = nn.Linear(h_dim, h_dim)
 
         self.lin1.weight.data.normal_(std=init_std(in_dim))
         self.lin1.bias.data.fill_(0)
-        self.lin2.weight.data.normal_(std=init_std(dim1))
+        self.lin2.weight.data.normal_(std=init_std(h_dim))
         self.lin2.bias.data.fill_(0)
-        self.lin_out.weight.data.normal_(std=init_std(dim2))
-        self.lin_out.bias.data.fill_(0)
-
-        if hyparch is not 'small':
-            self.lin3 = nn.Linear(dim2, dim2)
-            self.lin4 = nn.Linear(dim2, dim2)
-
-            self.lin3.weight.data.normal_(std=init_std(dim2))
-            self.lin3.bias.data.fill_(0)
-            self.lin4.weight.data.normal_(std=init_std(dim2))
-            self.lin4.bias.data.fill_(0)
+        self.lin3.weight.data.normal_(std=init_std(h_dim))
+        self.lin3.bias.data.fill_(0)
+        self.lin4.weight.data.normal_(std=init_std(h_dim))
+        self.lin4.bias.data.fill_(0)
 
         # Activations
         self.relu = nn.LeakyReLU(inplace=True)
@@ -86,90 +61,56 @@ class HyperNetwork(nn.Module):
         ----------
         x : torch.Tensor (batch_size, num_hyperparams)
             Hyperparameter values
-
-        Returns
-        ----------
-        wl : list
-            Weights indexed by layer
-        bl : list 
-            Biases indexed by layer
         """
-        if self.hyparch == 'small' or self.hyparch == 'medium':
-            # x = self.batchnorm1(self.relu(self.lin1(x)))
-            # x = self.batchnorm2(self.relu(self.lin2(x)))
-            x = self.relu(self.lin1(x))
-            x = self.relu(self.lin2(x))
-
-        elif self.hyparch in ['large', 'huge', 'massive', 'gigantic']:
-            # x = self.batchnorm1(self.relu(self.lin1(x)))
-            # x = self.batchnorm2(self.relu(self.lin2(x)))
-            # x = self.batchnorm3(self.relu(self.lin3(x)))
-            # x = self.batchnorm4(self.relu(self.lin4(x)))
-            x = self.relu(self.lin1(x))
-            x = self.relu(self.lin2(x))
-            x = self.relu(self.lin3(x))
-            x = self.relu(self.lin4(x))
-        else:
-            sys.exit('Error with hypernet forward pass')
-
-        hyp_out = self.lin_out(x)
-        return hyp_out
+        x = self.relu(self.lin1(x))
+        x = self.relu(self.lin2(x))
+        x = self.relu(self.lin3(x))
+        x = self.relu(self.lin4(x))
+        return x
 
 class Unet(nn.Module):
     """Main U-Net for image reconstruction"""
-    def __init__(self, device, num_hyperparams, hyparch, nh=64, residual=True):
+    def __init__(self, device, num_hyperparams, hnet_hdim, unet_hdim, residual=True):
         """
         Parameters
         ----------
-        device : str 
-            PyTorch device, 'cpu' or 'cuda:<gpu_id>'
-        num_hyperparams : int
-            Number of hyperparameters (i.e. number of regularization functions)
-        nh : int
-            Hidden channel dimension of U-Net
-        residual : bool
-            Whether or not to use residual U-Net architecture
+        device : PyTorch device, 'cpu' or 'cuda:<gpu_id>'
+        num_hyperparams : Number of hyperparameters (i.e. number of regularization functions)
+        hnet_hdim : Hidden channel dimension of HyperNetwork
+        unet_hdim : Hidden channel dimension of U-Net
+        residual : Whether or not to use residual U-Net architecture
         """
         super(Unet, self).__init__()
 
         self.residual = residual
-        self.nh = nh
+        self.unet_hdim = unet_hdim
         self.device = device
 
         self.maxpool = nn.MaxPool2d(2)
         self.upsample = layers.Upsample(scale_factor=2, mode='bilinear', align_corners=True)        
         self.relu = nn.ReLU(inplace=True)
 
-        if hyparch == 'small':
-            hyp_out_units = 4
-        elif hyparch == 'medium':
-            hyp_out_units = 32 
-        elif hyparch == 'large':
-            hyp_out_units = 32
-        else:
-            raise Exception()
-
         # UNet
-        self.conv_down0 = layers.BatchConv2DLayer(2, nh, hyp_out_units, device, padding=1)
-        self.conv_down1 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.conv_down2 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.conv_down3 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.conv_down4 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.conv_down5 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.conv_down6 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.conv_down7 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_down0 = layers.BatchConv2DLayer(2, unet_hdim, hnet_hdim, padding=1)
+        self.conv_down1 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_down2 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_down3 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_down4 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_down5 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_down6 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_down7 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
 
-        self.conv_up8 = layers.BatchConv2DLayer(nh+nh, nh, hyp_out_units, device, padding=1)
-        self.conv_up9 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.conv_up10 = layers.BatchConv2DLayer(nh+nh, nh, hyp_out_units, device, padding=1)
-        self.conv_up11 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
-        self.conv_up12 = layers.BatchConv2DLayer(nh+nh, nh, hyp_out_units, device, padding=1)
-        self.conv_up13 = layers.BatchConv2DLayer(nh, nh, hyp_out_units, device, padding=1)
+        self.conv_up8 = layers.BatchConv2DLayer(unet_hdim+unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_up9 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_up10 = layers.BatchConv2DLayer(unet_hdim+unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_up11 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_up12 = layers.BatchConv2DLayer(unet_hdim+unet_hdim, unet_hdim, hnet_hdim, padding=1)
+        self.conv_up13 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1)
 
-        self.conv_last14 = layers.BatchConv2DLayer(nh, 2, hyp_out_units, device, ks=1)
+        self.conv_last14 = layers.BatchConv2DLayer(unet_hdim, 2, hnet_hdim, ks=1)
 
         # HyperNetwork
-        self.hnet = HyperNetwork(hyparch, in_dim=num_hyperparams, unet_nh=nh)
+        self.hnet = HyperNetwork(in_dim=num_hyperparams, h_dim=hnet_hdim, unet_nh=unet_hdim)
 
     def forward(self, zf, hyperparams):
         """
@@ -177,15 +118,9 @@ class Unet(nn.Module):
         ----------
         zf : torch.Tensor (batch_size, img_height, img_width, 2)
             Zero-filled reconstruction of under-sampled measurement
-        y : torch.Tensor (batch_size, img_height, img_width, 2)
-            Undersampled measurement
         hyperparams : torch.Tensor (batch_size, num_hyperparams)
             Hyperparameter values
 
-        Returns
-        ----------
-        x : torch.Tensor (batch_size, img_height, img_width, 2)
-            Reconstructed image
         """
         x = zf
         x = x.permute(0, 3, 1, 2)

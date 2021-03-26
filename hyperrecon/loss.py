@@ -19,41 +19,35 @@ from . import utils
 
 class AmortizedLoss(nn.Module):
     """Loss function for model"""
-    def __init__(self, reg_types, range_restrict, sampling_method, device, mask, evaluate=False):
+    def __init__(self, reg_types, range_restrict, sampling_method, topK, device, mask, take_avg=True):
         """
         Parameters
         ----------
-        reg_types : list
-            List of strings which describes which regularization
+        reg_types : List of strings which describes which regularization
                 functions to use and in what order
-        range_restrict : bool
-            Whether or not to range restrict hyperparameter values
+        range_restrict : Bool, whether or not to range restrict hyperparameter values
             if True, then for 1 and 2 hyperparameters, respectively:
                 Loss = (1-alpha)*DC + alpha*Reg1
                 Loss = alpha*DC + (1-alpha)*beta*Reg1 + (1-alpha)*(1-beta)*Reg2
             else:
                 Loss = DC + alpha*Reg1
                 Loss = DC + alpha*Reg1 + beta*Reg2
-        mask : torch.Tensor 
-            Undersampling mask
-        sampling_method : string
-            Either uhs or dhs
-        evaluate : bool
-            Train or val
+        mask : Undersampling mask, must be Torch.tensor
+        sampling_method : Either uhs or dhs
         """
         super(AmortizedLoss, self).__init__()
         self.reg_types = reg_types
         self.range_restrict = range_restrict
         self.sampling_method = sampling_method
-        self.evaluate = evaluate
+        self.topK = topK
         self.device = device
-        self.mask = torch.tensor(mask, requires_grad=False).float().to(device)
+        self.mask = mask
+        self.take_avg = take_avg
 
         self.l1 = torch.nn.L1Loss(reduction='none')
-        self.l2 = torch.nn.MSELoss(reduction='none')
 
         if 'w' in reg_types:
-            self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(self.device) # Accepts all wave types available to PyWavelets
+            self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(self.device)
         if 'sh' in reg_types:
             scales = [0.5] * 2
             self.shearlet = ShearletTransform(*mask.shape, scales)#, cache='/home/aw847/shear_cache/')
@@ -113,8 +107,7 @@ class AmortizedLoss(nn.Module):
         l1_shear = torch.sum(self.l1(shears, torch.zeros_like(shears)), dim=(1, 2, 3))
         return l1_shear
 
-
-    def forward(self, x_hat, y, hyperparams, cap_reg, topK, schedule):
+    def forward(self, x_hat, y, hyperparams, cap_reg, schedule):
         '''
         Parameters
         ----------
@@ -146,7 +139,8 @@ class AmortizedLoss(nn.Module):
 
         # Regularization
         loss_dict['cap'] = cap_reg
-        loss_dict['tv'] = self.get_tv(x_hat)
+        if 'tv' in self.reg_types:
+            loss_dict['tv'] = self.get_tv(x_hat)
         if 'w' in self.reg_types:
             loss_dict['w'] = self.get_wavelets(x_hat)
         if 'sh' in self.reg_types:
@@ -155,31 +149,25 @@ class AmortizedLoss(nn.Module):
         if self.range_restrict and len(self.reg_types) == 1:
             assert len(self.reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'
             alpha = hyperparams[:, 0]
-            loss = (1-alpha)*dc + alpha*loss_dict[self.reg_types[0]]
+            loss = (1-alpha)*loss_dict['dc'] + alpha*loss_dict[self.reg_types[0]]
 
         elif self.range_restrict and len(self.reg_types) == 2:
             assert len(self.reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'
             alpha = hyperparams[:, 0]
             beta = hyperparams[:, 1]
-            if schedule:
-                loss = alpha * dc + (1-alpha)*beta * loss_dict[self.reg_types[0]] + (1-alpha)*(1-beta) * loss_dict[self.reg_types[1]]
-            else:
-                loss = alpha * dc + (1-alpha) * loss_dict[self.reg_types[1]]
+            loss = alpha*loss_dict['dc'] + (1-alpha)*beta * loss_dict[self.reg_types[0]] + (1-alpha)*(1-beta) * loss_dict[self.reg_types[1]]
 
         else:
             assert len(self.reg_types) == hyperparams.shape[1] - 1, 'num_hyperparams and reg mismatch'
             loss = hyperparams[:,0]*loss_dict['dc']
             for i in range(schedule):
-                loss += hyperparams[:,i+1] * loss_dict[self.reg_types[i]]
+                loss = loss + hyperparams[:,i+1] * loss_dict[self.reg_types[i]]
             loss = loss / torch.sum(hyperparams, dim=1)
 
-        if self.evaluate:
-            return loss, loss_dict, hyperparams
-        else:
-            loss, sort_hyperparams = self.process_losses(loss, dc, topK, hyperparams)
-            return loss, loss_dict, sort_hyperparams
+        loss, sort_hyperparams = self._process_losses(loss, loss_dict['dc'], hyperparams)
+        return loss, loss_dict, sort_hyperparams
 
-    def process_losses(self, unsup_losses, dc_losses, topK, hyperparams):
+    def _process_losses(self, unsup_losses, dc_losses, hyperparams):
         '''Performs DHS sampling if topK is not None, otherwise UHS sampling
 
         Parameters
@@ -200,15 +188,18 @@ class AmortizedLoss(nn.Module):
         sort_hyperparams : torch.Tensor
             Hyperparmeters sorted by best DC
         '''
-        if topK is not None:
+        if self.topK is not None and self.take_avg:
             assert self.sampling_method == 'dhs'
             _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
             sort_losses = unsup_losses[perm] # Reorder total losses by lowest to highest DC loss
             sort_hyperparams = hyperparams[perm]
 
-            loss = torch.sum(sort_losses[:topK]) # Take only the losses with lowest DC
-        else:
+            loss = torch.sum(sort_losses[:self.topK]) # Take only the losses with lowest DC
+        elif self.topK is None and self.take_avg:
             loss = torch.sum(unsup_losses)
+            sort_hyperparams = hyperparams
+        else:
+            loss = unsup_losses
             sort_hyperparams = hyperparams
 
         return loss, sort_hyperparams

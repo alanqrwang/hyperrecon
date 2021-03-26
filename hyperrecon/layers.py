@@ -27,7 +27,7 @@ class BatchConv2DLayer(nn.Module):
 
     Takes hypernet output and transforms it to weights and biases
     """
-    def __init__(self, in_channels, out_channels, hyp_out_units, device, stride=1,
+    def __init__(self, in_channels, out_channels, hyp_out_units, stride=1,
                  padding=0, dilation=1, ks=3):
         super(BatchConv2DLayer, self).__init__()
 
@@ -43,8 +43,8 @@ class BatchConv2DLayer(nn.Module):
 
         kernel_units = np.prod(self.get_weight_shape())
         bias_units = np.prod(self.get_bias_shape())
-        self.hyperkernel = nn.Linear(hyp_out_units, kernel_units).to(device)
-        self.biaskernel = nn.Linear(hyp_out_units, bias_units).to(device)
+        self.hyperkernel = nn.Linear(hyp_out_units, kernel_units)
+        self.biaskernel = nn.Linear(hyp_out_units, bias_units)
         self.tanh = nn.Tanh()
 
     def forward(self, x, hyp_out, include_bias=True):

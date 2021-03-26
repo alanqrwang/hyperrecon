@@ -23,14 +23,17 @@ class Dataset(data.Dataset):
         return x, y
 
 ######### Loading data #####################
-def get_mask(undersampling_rate, centered=False):
+def get_mask(undersampling_rate, as_tensor=True, centered=False):
     # mask = np.load('data/mask.npy')
     if undersampling_rate == 4:
         mask = np.load('/nfs02/users/aw847/data/masks/poisson_disk_4p2_256_256.npy')
     if undersampling_rate == 8:
         mask = np.load('/nfs02/users/aw847/data/masks/poisson_disk_8p3_256_256.npy')
     if not centered:
-        return np.fft.fftshift(mask)
+        mask = np.fft.fftshift(mask)
+
+    if as_tensor:
+        return torch.tensor(mask, requires_grad=False).float()
     else:
         return mask
 
