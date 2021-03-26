@@ -53,8 +53,8 @@ def trainer(xdata, gt_data, conf):
 
     ##### Model, Optimizer, Sampler, Loss ############
     num_hyperparams = len(conf['reg_types']) if conf['range_restrict'] else len(conf['reg_types']) + 1
-    network = model.Unet(conf['device'], num_hyperparams=num_hyperparams, hyparch=conf['hyparch'], \
-                nh=conf['unet_hidden']).to(conf['device'])
+    network = model.Unet(conf['device'], num_hyperparams=num_hyperparams, hnet_hdim=conf['hnet_hdim'], \
+                use_tanh=conf['use_tanh'], use_bn=conf['use_bn'], nh=conf['unet_hidden']).to(conf['device'])
 
     optimizer = torch.optim.Adam(network.parameters(), lr=conf['lr'])
     if conf['force_lr'] is not None:
@@ -74,8 +74,8 @@ def trainer(xdata, gt_data, conf):
     ##################################################
 
     ############## Training loop #####################
-    for epoch in range(conf['load_checkpoint']+1, conf['num_epochs']+1):
-        print('\nEpoch %d/%d' % (epoch, conf['num_epochs']))
+    for epoch in range(conf['load_checkpoint']+1, conf['epochs']+1):
+        print('\nEpoch %d/%d' % (epoch, conf['epochs']))
         if conf['force_lr'] is not None:
             print('Force learning rate:', conf['force_lr'])
         else:
@@ -237,7 +237,7 @@ def validate(network, dataloader, criterion, hpsampler, conf, topK, epoch):
 def trajtrain(network, dataloader, trained_reconnet, criterion, optimizer, conf, lmbda, psnr_map=None, dc_map=None):
     losses = []
 
-    for epoch in range(1, conf['num_epochs']+1):
+    for epoch in range(1, conf['epochs']+1):
         for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
             if batch_idx > 100:
                 break

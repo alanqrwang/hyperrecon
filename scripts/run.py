@@ -17,7 +17,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--force_lr', type=float, default=None, help='Force learning rate')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
-    parser.add_argument('--num_epochs', type=int, default=100, help='Total training epochs')
+    parser.add_argument('--epochs', type=int, default=100, help='Total training epochs')
     parser.add_argument('--load_checkpoint', type=int, default=0, help='Load checkpoint at specificed epoch')
     parser.add_argument('--log_interval', type=int, default=1, help='Frequency of logs')
     parser.add_argument('--gpu_id', type=int, default=0, help='gpu id to train on')
@@ -30,8 +30,9 @@ if __name__ == "__main__":
 
     parser.add_argument('--reg_types', nargs='+', type=str, help='<Required> Set flag', required=True)
     parser.add_argument('--sampling', choices=['uhs', 'dhs'], type=str, help='Sampling method', required=True)
-    parser.add_argument('--hyparch', choices=['small', 'medium', 'large', 'huge', 'massive', 'gigantic'], type=str, help='Hypernetwork architecture', required=True)
-
+    parser.add_argument('--hnet_hdim', type=int, help='Hypernetwork architecture', required=True)
+    utils.add_bool_arg(parser, 'use_bn')
+    utils.add_bool_arg(parser, 'use_tanh')
     print('legacy code')
     
     args = parser.parse_args()
