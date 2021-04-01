@@ -50,3 +50,5 @@ coverage.xml
 docs/_build/
 
 *.gitignore
+*.err
+*.out
