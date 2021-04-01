@@ -34,6 +34,7 @@ class HpSampler(nn.Module):
         """
         if val:
             ref_hps = utils.get_reference_hps(self.num_hyperparams, self.range_restrict)
+            print('ref', ref_hps)
             hyperparams = ref_hps.repeat(int(np.ceil(batch_size / len(ref_hps))), 1)[:batch_size]
         else:
             hyperparams = torch.rand((batch_size, self.num_hyperparams))

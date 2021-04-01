@@ -11,6 +11,7 @@ from . import loss as losslayer
 import numpy as np
 import myutils
 import sys
+import torch.autograd.profiler as profiler
 
 def tester(model_path, xdata, gt_data, conf, device, take_avg, n_grid=20, convert=False):
     """Driver code for test-time inference.
@@ -35,27 +36,39 @@ def tester(model_path, xdata, gt_data, conf, device, take_avg, n_grid=20, conver
     else:
         topK = conf['topK']
 
+    num_hyperparams = len(reg_types) if range_restrict else len(reg_types) + 1
     if len(reg_types) == 2:
         alphas = np.linspace(0, 1, n_grid)
         betas = np.linspace(0, 1, n_grid)
         hps = torch.tensor(np.stack(np.meshgrid(alphas, betas), -1).reshape(-1,2)).float().to(device)
+        # hps = torch.tensor([[0.9, 0.1],
+        #  [0.995, 0.6],
+        #  [0.9, 0.2],
+        #  [0.995, 0.5],
+        #  [0.9, 0],
+        #  [0.99, 0.7]]).float().to(device)
+        # hps = utils.get_reference_hps(num_hyperparams, range_restrict).to(device)
+        # print('ref', hps)
+        # hps = hps.repeat(int(np.ceil(batch_size / len(hps))), 1)[:batch_size]
         if not range_restrict:
             hps = utils.oldloss2newloss(hps)
     elif len(reg_types) == 1:
         hps = torch.linspace(0, 1, n_grid).view(-1, 1).float().to(device)
         if not range_restrict:
             hps = utils.oldloss2newloss(hps)
-    num_hyperparams = len(reg_types) if range_restrict else len(reg_types) + 1
 
     valset = dataset.Dataset(xdata, gt_data)
     params = {'batch_size': batch_size,
          'shuffle': False,
-         'num_workers': 0}
+         'num_workers': 0,
+         'pin_memory': True}
     dataloader = torch.utils.data.DataLoader(valset, **params)
+    dataloader = {'x': xdata, 'gt': gt_data}
 
     mask = dataset.get_mask(4).to(device)
 
     network = model.Unet(device, num_hyperparams, conf['hnet_hdim'], conf['unet_hdim']).to(device) 
+    # network = model.BaseUnet().to(device) 
 
     network = utils.load_checkpoint(network, model_path)
     criterion = losslayer.AmortizedLoss(reg_types, range_restrict, conf['sampling'], topK, device, mask, take_avg=False)
@@ -75,6 +88,8 @@ def test(trained_model, dataloader, device, hps, take_avg, criterion=None, \
     If take_avg is True, then returns [len(hps)]
     """
     trained_model.eval()
+    xdata = torch.tensor(dataloader['x'])
+    gt_data = torch.tensor(dataloader['gt'])
 
     res = {}
     recons = []
@@ -86,27 +101,29 @@ def test(trained_model, dataloader, device, hps, take_avg, criterion=None, \
     all_psnrs = []
 
     for h in hps:
-        # print(h)
-        for i, (y, gt) in enumerate(dataloader): 
-            batch_h = h.expand(len(y), -1)
-            y, gt = y.float().to(device), gt.float().to(device)
-            zf = utils.ifft(y)
-            y, zf = utils.scale(y, zf)
+        print(h)
+        # for i, (y, gt) in enumerate(dataloader): 
+        # y, gt = y.float().to(device), gt.float().to(device)
+        y, gt = xdata.float().to(device), gt_data.float().to(device)
+        zf = utils.ifft(y)
+        y, zf = utils.scale(y, zf)
+        batch_h = h.expand(len(y), -1)
 
-            pred = trained_model(zf, batch_h)
-            cap_reg = trained_model.get_l1_weight_penalty(len(y))
-            if give_recons:
-                recons.append(pred.cpu().detach().numpy())
-            if give_loss:
-                assert criterion is not None, 'loss must be provided'
-                loss, regs, _ = criterion(pred, y, batch_h, cap_reg, hps.shape[1]-1)
-                losses.append(loss.cpu().detach().numpy())
-                dcs.append(regs['dc'].cpu().detach().numpy())
-                cap_regs.append(regs['cap'].cpu().detach().numpy())
-                tvs.append(regs['tv'].cpu().detach().numpy())
-            if give_metrics:
-                psnrs = get_metrics(y, gt, pred, metric_type='relative psnr', take_avg=take_avg)
-                all_psnrs.append(psnrs)
+        pred, cap_reg = trained_model(zf, batch_h)
+        # cap_reg = trained_model.get_l1_weight_penalty(len(y))
+        if give_recons:
+            recons.append(pred.cpu().detach().numpy())
+        if give_loss:
+            assert criterion is not None, 'loss must be provided'
+            loss, regs, _ = criterion(pred, y, batch_h, cap_reg, hps.shape[1]-1)
+            losses.append(loss.cpu().detach().numpy())
+            dcs.append(regs['dc'].cpu().detach().numpy())
+            cap_regs.append(regs['cap'].cpu().detach().numpy())
+            tvs.append(regs['tv'].cpu().detach().numpy())
+        if give_metrics:
+            psnrs = utils.get_metrics(gt, pred, metric_type='psnr', take_avg=take_avg)
+            # psnrs = get_metrics(y, gt, pred, metric_type='psnr', take_avg=take_avg)
+            all_psnrs.append(psnrs)
 
 
 
@@ -126,7 +143,8 @@ def test(trained_model, dataloader, device, hps, take_avg, criterion=None, \
     if give_metrics:
         res['rpsnr'] = np.array(all_psnrs)
         if take_avg:
-            res['rpsnr'] = res['rpsnr'].mean(axis=1)
+            # res['rpsnr'] = res['rpsnr'].mean(axis=1)
+            print(res['rpsnr'].mean())
 
     return res
 

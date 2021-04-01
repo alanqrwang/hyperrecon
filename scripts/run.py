@@ -14,11 +14,12 @@ class Parser(argparse.ArgumentParser):
         super(Parser, self).__init__(description='HyperRecon')
         # I/O parameters
         self.add_argument('-fp', '--filename_prefix', type=str, help='filename prefix', required=True)
-        self.add_argument('--models_dir', default='/nfs02/users/aw847/models/HyperRecon/', type=str, help='directory to save models')
+        self.add_argument('--models_dir', default='/share/sablab/nfs02/users/aw847/models/HyperRecon/', type=str, help='directory to save models')
         self.add_argument('--log_interval', type=int, default=100, help='Frequency of logs')
         self.add_argument('--load', type=str, default=None, help='Load checkpoint at .h5 path')
-        self.add_argument('--cont', type=int, default=None, help='Load checkpoint at .h5 path')
+        self.add_argument('--cont', type=int, default=0, help='Load checkpoint at .h5 path')
         self.add_argument('--gpu_id', type=int, default=0, help='gpu id to train on')
+        self.add_argument('--date', type=str, default=None, help='Override date')
         
         # Machine learning parameters
         self.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
@@ -39,7 +40,10 @@ class Parser(argparse.ArgumentParser):
         args = self.parse_args()
         if args.sampling == 'dhs':
             assert args.topK is not None, 'DHS sampling must set topK'
-        date = '{}'.format(time.strftime('%b_%d'))
+        if args.date is None:
+            date = '{}'.format(time.strftime('%b_%d'))
+        else:
+            date = args.date
 
         args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date, \
             '{lr}_{batch_size}_{reg_types}_{hnet_hdim}_{unet_hdim}_{topK}_{range_restrict}_{schedule}'.format(
@@ -92,7 +96,8 @@ def trainer(xdata, gt_data, args):
 
     params = {'batch_size': args.batch_size,
          'shuffle': True,
-         'num_workers': 4}
+         'num_workers': 4, 
+         'pin_memory': True}
     dataloaders = {
         'train': torch.utils.data.DataLoader(trainset, **params),
         'val': torch.utils.data.DataLoader(valset, **params),
@@ -116,7 +121,7 @@ def trainer(xdata, gt_data, args):
     if args.load:
         network, optimizer = utils.load_checkpoint(network, args.load, optimizer)
     # Load from previous checkpoint
-    if args.cont:
+    if args.cont > 0:
         load_file = os.path.join(args.run_dir, 'checkpoints', 'model.{epoch:04d}.h5'.format(epoch=args.cont))
         network, optimizer = utils.load_checkpoint(network, load_file, optimizer)
         logger['loss_train'] = list(np.loadtxt(os.path.join(args.run_dir, 'loss_train.txt'))[:args.cont])
@@ -128,7 +133,7 @@ def trainer(xdata, gt_data, args):
     ##################################################
 
     ############## Training loop #####################
-    for epoch in range(1, args.epochs+1):
+    for epoch in range(args.cont+1, args.epochs+1):
         tic = time.time()
 
         print('\nEpoch %d/%d' % (epoch, args.epochs))

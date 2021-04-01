@@ -26,9 +26,9 @@ class Dataset(data.Dataset):
 def get_mask(undersampling_rate, as_tensor=True, centered=False):
     # mask = np.load('data/mask.npy')
     if undersampling_rate == 4:
-        mask = np.load('/nfs02/users/aw847/data/masks/poisson_disk_4p2_256_256.npy')
+        mask = np.load('/share/sablab/nfs02/users/aw847/data/masks/poisson_disk_4p2_256_256.npy')
     if undersampling_rate == 8:
-        mask = np.load('/nfs02/users/aw847/data/masks/poisson_disk_8p3_256_256.npy')
+        mask = np.load('/share/sablab/nfs02/users/aw847/data/masks/poisson_disk_8p3_256_256.npy')
     if not centered:
         mask = np.fft.fftshift(mask)
 
@@ -47,9 +47,9 @@ def get_data(data_path):
 def get_train_gt(old=False):
     # gt_path = 'data/example_x.npy'
     if old:
-        gt_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
+        gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
     else:
-        gt_path = '/nfs02/users/aw847/data/brain/adrian/20000splits/brain_train_normalized.npy'
+        gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/20000splits/brain_train_normalized.npy'
     gt = get_data(gt_path)
     return gt
 
@@ -57,27 +57,31 @@ def get_train_data(undersampling_rate, old=False):
     # data_path = 'data/example_y.npy'
     if old:
         if undersampling_rate == 4:
-            data_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_4p2.npy'
+            data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_4p2.npy'
         else:
-            data_path = '/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_8p3.npy'
+            data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_8p3.npy'
     else:
-        data_path = '/nfs02/users/aw847/data/brain/adrian/20000splits/brain_train_normalized_4p2.npy'
+        data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/20000splits/brain_train_normalized_4p2.npy'
     data = get_data(data_path)
     return data
 
 
-def get_test_gt(old=False):
-    if old:
-        gt_path = '/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
-    else:
-        gt_path = '/nfs02/users/aw847/data/brain/adrian/20000splits/brain_test_normalized.npy'
+def get_test_gt(size='med'):
+    if size=='small':
+        gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_10slices.npy'
+    elif size=='med':
+        gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
+    elif size=='large':
+        gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/20000splits/brain_test_normalized.npy'
     gt = get_data(gt_path)
     return gt
 
-def get_test_data(old=False):
-    if old:
-        data_path = '/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_4p2.npy'
-    else:
-        data_path = '/nfs02/users/aw847/data/brain/adrian/20000splits/brain_test_normalized_4p2.npy'
+def get_test_data(size='med'):
+    if size=='small':
+        data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_4p2_10slices.npy'
+    elif size=='med':
+        data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_4p2.npy'
+    elif size=='large':
+        data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/20000splits/brain_test_normalized_4p2.npy'
     data = get_data(data_path)
     return data

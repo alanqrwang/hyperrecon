@@ -10,6 +10,7 @@ from . import layers
 import torch
 import torch.nn as nn
 import sys
+import torch.autograd.profiler as profiler
 
 class HyperNetwork(nn.Module):
     """Hypernetwork architecture and forward pass
@@ -126,91 +127,125 @@ class Unet(nn.Module):
         x = x.permute(0, 3, 1, 2)
 
         hyp_out = self.hnet(hyperparams)
+        penalty = torch.zeros(len(zf), requires_grad=True).to(self.device)
 
         # conv_down1
-        x = self.relu(self.conv_down0(x, hyp_out))
-        conv1 = self.relu(self.conv_down1(x, hyp_out))
+        x, l1 = self.conv_down0(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
+        x, l1 = self.conv_down1(x, hyp_out)
+        conv1 = self.relu(x)
+        penalty = penalty + l1
+
         x = self.maxpool(conv1)
+
         # conv_down2
-        x = self.relu(self.conv_down2(x, hyp_out))
-        conv2 = self.relu(self.conv_down3(x, hyp_out))
+        x, l1 = self.conv_down2(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
+        x, l1 = self.conv_down3(x, hyp_out)
+        conv2 = self.relu(x)
+        penalty = penalty + l1
+
         x = self.maxpool(conv2)
+
         # conv_down3
-        x = self.relu(self.conv_down4(x, hyp_out))
-        conv3 = self.relu(self.conv_down5(x, hyp_out))
+        x, l1 = self.conv_down4(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
+        x, l1 = self.conv_down5(x, hyp_out)
+        conv3 = self.relu(x)
+        penalty = penalty + l1
+
         x = self.maxpool(conv3)   
+
         # conv_down4
-        x = self.relu(self.conv_down6(x, hyp_out))
-        conv4 = self.relu(self.conv_down7(x, hyp_out))
+        x, l1 = self.conv_down6(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
+        x, l1 = self.conv_down7(x, hyp_out)
+        conv4 = self.relu(x)
+        penalty = penalty + l1
+
         x = self.upsample(conv4)        
         x = torch.cat([x, conv3], dim=1)
+
         # conv_up3
-        x = self.relu(self.conv_up8(x, hyp_out))
-        x = self.relu(self.conv_up9(x, hyp_out))
+        x, l1 = self.conv_up8(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
+        x, l1 = self.conv_up9(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
         x = self.upsample(x)        
         x = torch.cat([x, conv2], dim=1)       
+
         # conv_up2
-        x = self.relu(self.conv_up10(x, hyp_out))
-        x = self.relu(self.conv_up11(x, hyp_out))
+        x, l1 = self.conv_up10(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
+        x, l1 = self.conv_up11(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
         x = self.upsample(x)        
         x = torch.cat([x, conv1], dim=1)   
+
         # conv_up1
-        x = self.relu(self.conv_up12(x, hyp_out))
-        x = self.relu(self.conv_up13(x, hyp_out))
+        x, l1 = self.conv_up12(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
+        x, l1 = self.conv_up13(x, hyp_out)
+        x = self.relu(x)
+        penalty = penalty + l1
+
         # last
-        x = self.conv_last14(x, hyp_out)
+        x, l1 = self.conv_last14(x, hyp_out)
+        penalty = penalty + l1
 
         x = x.permute(0, 2, 3, 1)
         if self.residual:
             x = zf + x
 
-        return x
+        return x, penalty
 
     def get_l1_weight_penalty(self, num_examples):
-        # Compute layer-wise L1 capacity regularization
-        kl = []
-        bl = []
-        kl.append(self.conv_down0.kernel)
-        bl.append(self.conv_down0.bias)
-        kl.append(self.conv_down1.kernel)
-        bl.append(self.conv_down1.bias)
-        kl.append(self.conv_down2.kernel)
-        bl.append(self.conv_down2.bias)
-        kl.append(self.conv_down3.kernel)
-        bl.append(self.conv_down3.bias)
-        kl.append(self.conv_down4.kernel)
-        bl.append(self.conv_down4.bias)
-        kl.append(self.conv_down5.kernel)
-        bl.append(self.conv_down5.bias)
-        kl.append(self.conv_down6.kernel)
-        bl.append(self.conv_down6.bias)
-        kl.append(self.conv_down7.kernel)
-        bl.append(self.conv_down7.bias)
+        '''Compute layer-wise L1 weight penalty'''
+        penalty = torch.zeros(num_examples, requires_grad=True).to(self.device)
+        penalty = penalty + self.conv_down0.get_l1_weight_penalty()
+        penalty = penalty + self.conv_down1.get_l1_weight_penalty()
+        penalty = penalty + self.conv_down2.get_l1_weight_penalty()
+        penalty = penalty + self.conv_down3.get_l1_weight_penalty()
+        penalty = penalty + self.conv_down4.get_l1_weight_penalty()
+        penalty = penalty + self.conv_down5.get_l1_weight_penalty()
+        penalty = penalty + self.conv_down6.get_l1_weight_penalty()
+        penalty = penalty + self.conv_down7.get_l1_weight_penalty()
 
-        kl.append(self.conv_up8.kernel)
-        bl.append(self.conv_up8.bias)
-        kl.append(self.conv_up9.kernel)
-        bl.append(self.conv_up9.bias)
-        kl.append(self.conv_up10.kernel)
-        bl.append(self.conv_up10.bias)
-        kl.append(self.conv_up11.kernel)
-        bl.append(self.conv_up11.bias)
-        kl.append(self.conv_up12.kernel)
-        bl.append(self.conv_up12.bias)
-        kl.append(self.conv_up13.kernel)
-        bl.append(self.conv_up13.bias)
+        penalty = penalty + self.conv_up8.get_l1_weight_penalty()
+        penalty = penalty + self.conv_up9.get_l1_weight_penalty()
+        penalty = penalty + self.conv_up10.get_l1_weight_penalty()
+        penalty = penalty + self.conv_up11.get_l1_weight_penalty()
+        penalty = penalty + self.conv_up12.get_l1_weight_penalty()
+        penalty = penalty + self.conv_up13.get_l1_weight_penalty()
+        penalty = penalty + self.conv_last14.get_l1_weight_penalty()
 
-        kl.append(self.conv_last14.kernel)
-        bl.append(self.conv_last14.bias)
+        # Old code that's probably wrong
+        # cap_reg = torch.zeros(num_examples, requires_grad=True).to(self.device)
+        # for k, b in zip(kl, bl):
+        #     k_flat = k.view(num_examples, -1)
+        #     b_flat = b.view(num_examples, -1)
+        #     cap_reg += torch.norm(k_flat, dim=1)
+        #     cap_reg += torch.norm(b_flat, dim=1)
 
-        cap_reg = torch.zeros(num_examples, requires_grad=True).to(self.device)
-        for k, b in zip(kl, bl):
-            k_flat = k.view(num_examples, -1)
-            b_flat = b.view(num_examples, -1)
-            cap_reg += torch.norm(k_flat, dim=1)
-            cap_reg += torch.norm(b_flat, dim=1)
-
-        return cap_reg
+        return penalty
 
 class TrajNet(nn.Module):
     def __init__(self, in_dim=1, h_dim=8, out_dim=2):

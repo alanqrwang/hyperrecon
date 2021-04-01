@@ -24,10 +24,16 @@ def add_bool_arg(parser, name, default=True):
 
 def fft(x):
     """Normalized 2D Fast Fourier Transform"""
+    # complex_x = torch.view_as_complex(x)
+    # fft = torch.fft.fft2(complex_x,  norm='ortho')
+    # return torch.view_as_real(fft) 
     return torch.fft(x, signal_ndim=2, normalized=True)
 
 def ifft(x):
     """Normalized 2D Inverse Fast Fourier Transform"""
+    # complex_x = torch.view_as_complex(x)
+    # ifft = torch.fft.ifft2(complex_x, norm='ortho')
+    # return torch.view_as_real(ifft) 
     return torch.ifft(x, signal_ndim=2, normalized=True)
 
 def absval(arr):
@@ -162,7 +168,6 @@ def get_everything(path, device, take_avg=True, recons_only=False, \
                    hypernet=True, metric_type='relative psnr', \
                    cp=None, n_grid=20, \
                    gt_data=None, xdata=None, test_data=True, convert=False):
-    mask = torch.tensor(dataset.get_mask(4)).to(device).float()
     
     # Forward through latest available model
     if cp is None:
@@ -186,7 +191,6 @@ def get_everything(path, device, take_avg=True, recons_only=False, \
         xdata = xdata[3:3+N]
 
     args_txtfile = os.path.join(path, 'args.txt')
-    print(args_txtfile)
     if os.path.exists(args_txtfile):
         with open(args_txtfile) as json_file:
             args = json.load(json_file)

@@ -43,7 +43,7 @@ def plot_over_hyperparams(vals, xticks, yticks=None, title=None, ax=None, vlim=N
         if vlim is not None:
             h = ax.imshow(grid, vmin=vlim[0], vmax=vlim[1], cmap=cm)
         else:
-            h = ax.imshow(grid, cmap=cm, aspect='auto')
+            h = ax.imshow(grid, cmap=cm)
         if colorbar:
             divider = make_axes_locatable(ax)
             cax = divider.append_axes('right', size='5%', pad=0.05)

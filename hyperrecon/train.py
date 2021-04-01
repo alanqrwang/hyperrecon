@@ -57,8 +57,8 @@ def train(network, dataloader, criterion, optimizer, hpsampler, device, epoch):
 
             hyperparams = hpsampler.sample(batch_size).to(device)
 
-            recon = network(zf, hyperparams)
-            cap_reg = network.get_l1_weight_penalty(batch_size)
+            recon, cap_reg = network(zf, hyperparams)
+            # cap_reg = network.get_l1_weight_penalty(batch_size)
             loss, _, sort_hyperparams = criterion(recon, y, hyperparams, cap_reg, epoch)
 
             loss.backward()
@@ -108,14 +108,17 @@ def validate(network, dataloader, criterion, hpsampler, device, epoch):
             y, zf = utils.scale(y, zf)
 
             hyperparams = hpsampler.sample(batch_size, val=True).to(device)
+            print(hyperparams)
 
-            recon = network(zf, hyperparams)
-            cap_reg = network.get_l1_weight_penalty(batch_size)
+            recon, cap_reg = network(zf, hyperparams)
+            # cap_reg = network.get_l1_weight_penalty(batch_size)
             loss, _, _ = criterion(recon, y, hyperparams, cap_reg, epoch)
                 
 
             epoch_loss += loss.data.cpu().numpy()
-            epoch_psnr += np.sum(utils.get_metrics(gt.permute(0, 2, 3, 1), recon.permute(0, 2, 3, 1), 'psnr', False, normalized=True))
+            metrics = utils.get_metrics(gt.permute(0, 2, 3, 1), recon.permute(0, 2, 3, 1), 'psnr', False, normalized=True)
+            print(metrics)
+            epoch_psnr += np.sum(metrics)
         epoch_samples += batch_size
     epoch_loss /= epoch_samples
     epoch_psnr /= epoch_samples
