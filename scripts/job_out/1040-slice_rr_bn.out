@@ -1,0 +1,198 @@
+Importing exception
+Importing exception
+legacy code
+Loading from /share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_4p2.npy
+Shape: (2500, 256, 256, 2)
+Loading from /share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy
+Shape: (2500, 256, 256, 1)
+Appending complex dimension into gt...
+Arguments:
+{'batch_size': 32,
+ 'device': 'cuda:0',
+ 'epochs': 5000,
+ 'filename': "/share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', "
+             "'tv']_64_None_True",
+ 'filename_prefix': 'l1-fix-slice',
+ 'force_lr': None,
+ 'gpu_id': 0,
+ 'hnet_hdim': 64,
+ 'load_checkpoint': 0,
+ 'log_interval': 25,
+ 'loss_schedule': 0,
+ 'lr': 1e-05,
+ 'models_dir': '/share/sablab/nfs02/users/aw847/models/HyperHQSNet/',
+ 'range_restrict': True,
+ 'reg_types': ['cap', 'tv'],
+ 'sample_schedule': 0,
+ 'sampling': 'uhs',
+ 'topK': None,
+ 'undersampling_rate': 4,
+ 'unet_hidden': 64,
+ 'use_bn': True,
+ 'use_tanh': True}
+
+Epoch 1/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 1: test loss: 6411.501125, test psnr: 22.717735
+
+Epoch 2/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 2: test loss: 31159.931938, test psnr: 18.918723
+
+Epoch 3/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 3: test loss: 46975.945469, test psnr: 18.281055
+
+Epoch 4/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 4: test loss: 43107.388500, test psnr: 18.101250
+
+Epoch 5/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 5: test loss: 192386.259937, test psnr: 17.642673
+
+Epoch 6/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 6: test loss: 21692.903656, test psnr: 18.734356
+
+Epoch 7/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 7: test loss: 15113.528531, test psnr: 19.217909
+
+Epoch 8/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 8: test loss: 9929.850062, test psnr: 19.448571
+
+Epoch 9/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 9: test loss: 19128.901219, test psnr: 19.366751
+
+Epoch 10/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 10: test loss: 149218.426625, test psnr: 19.022144
+
+Epoch 11/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 11: test loss: 322156.046500, test psnr: 18.912056
+
+Epoch 12/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 12: test loss: 10926.446969, test psnr: 19.360158
+
+Epoch 13/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 13: test loss: 10175.604594, test psnr: 19.489616
+
+Epoch 14/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 14: test loss: 219467.755437, test psnr: 18.838408
+
+Epoch 15/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 15: test loss: 9815.061906, test psnr: 19.386887
+
+Epoch 16/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 16: test loss: 12691.586594, test psnr: 19.017002
+
+Epoch 17/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 17: test loss: 15026.336156, test psnr: 19.144907
+
+Epoch 18/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 18: test loss: 10470.198062, test psnr: 19.223753
+
+Epoch 19/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 19: test loss: 9689.824000, test psnr: 19.752660
+
+Epoch 20/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 20: test loss: 7747.018859, test psnr: 19.825479
+
+Epoch 21/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 21: test loss: 9426.109656, test psnr: 19.286770
+
+Epoch 22/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 22: test loss: 14492.829172, test psnr: 19.524658
+
+Epoch 23/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs
+Saved loss to /share/sablab/nfs02/users/aw847/models/HyperHQSNet/l1-fix-slice_1e-05_32_['cap', 'tv']_64_None_True/losses.pkl
+Epoch 23: test loss: 31357.720547, test psnr: 19.434505
+
+Epoch 24/5000
+Learning rate: 1e-05
+UHS sampling
+Loss schedule: 2 regs

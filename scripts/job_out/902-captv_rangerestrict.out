@@ -1,0 +1,100 @@
+Importing exception
+Importing exception
+Arguments:
+{'batch_size': 32,
+ 'ckpt_dir': "/share/sablab/nfs02/users/aw847/models/HyperRecon/l1-fix/Mar_31/0.001_32_['cap', "
+             "'tv']_64_64_None_True_None/checkpoints",
+ 'cont': 1150,
+ 'date': None,
+ 'epochs': 5000,
+ 'filename_prefix': 'l1-fix',
+ 'gpu_id': 0,
+ 'hnet_hdim': 64,
+ 'load': None,
+ 'log_interval': 25,
+ 'loss_schedule': None,
+ 'lr': 0.001,
+ 'models_dir': '/share/sablab/nfs02/users/aw847/models/HyperRecon/',
+ 'range_restrict': True,
+ 'reg_types': ['cap', 'tv'],
+ 'run_dir': "/share/sablab/nfs02/users/aw847/models/HyperRecon/l1-fix/Mar_31/0.001_32_['cap', "
+            "'tv']_64_64_None_True_None",
+ 'sampling': 'uhs',
+ 'topK': None,
+ 'undersampling_rate': 4,
+ 'unet_hdim': 64}
+Loading from /share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_4p2.npy
+Shape: (2500, 256, 256, 2)
+Loading from /share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy
+Shape: (2500, 256, 256, 1)
+Appending complex dimension into gt...
+conv_down0.hyperkernel.weight
+conv_down0.hyperkernel.bias
+conv_down0.hyperbias.weight
+conv_down0.hyperbias.bias
+conv_down1.hyperkernel.weight
+conv_down1.hyperkernel.bias
+conv_down1.hyperbias.weight
+conv_down1.hyperbias.bias
+conv_down2.hyperkernel.weight
+conv_down2.hyperkernel.bias
+conv_down2.hyperbias.weight
+conv_down2.hyperbias.bias
+conv_down3.hyperkernel.weight
+conv_down3.hyperkernel.bias
+conv_down3.hyperbias.weight
+conv_down3.hyperbias.bias
+conv_down4.hyperkernel.weight
+conv_down4.hyperkernel.bias
+conv_down4.hyperbias.weight
+conv_down4.hyperbias.bias
+conv_down5.hyperkernel.weight
+conv_down5.hyperkernel.bias
+conv_down5.hyperbias.weight
+conv_down5.hyperbias.bias
+conv_down6.hyperkernel.weight
+conv_down6.hyperkernel.bias
+conv_down6.hyperbias.weight
+conv_down6.hyperbias.bias
+conv_down7.hyperkernel.weight
+conv_down7.hyperkernel.bias
+conv_down7.hyperbias.weight
+conv_down7.hyperbias.bias
+conv_up8.hyperkernel.weight
+conv_up8.hyperkernel.bias
+conv_up8.hyperbias.weight
+conv_up8.hyperbias.bias
+conv_up9.hyperkernel.weight
+conv_up9.hyperkernel.bias
+conv_up9.hyperbias.weight
+conv_up9.hyperbias.bias
+conv_up10.hyperkernel.weight
+conv_up10.hyperkernel.bias
+conv_up10.hyperbias.weight
+conv_up10.hyperbias.bias
+conv_up11.hyperkernel.weight
+conv_up11.hyperkernel.bias
+conv_up11.hyperbias.weight
+conv_up11.hyperbias.bias
+conv_up12.hyperkernel.weight
+conv_up12.hyperkernel.bias
+conv_up12.hyperbias.weight
+conv_up12.hyperbias.bias
+conv_up13.hyperkernel.weight
+conv_up13.hyperkernel.bias
+conv_up13.hyperbias.weight
+conv_up13.hyperbias.bias
+conv_last14.hyperkernel.weight
+conv_last14.hyperkernel.bias
+conv_last14.hyperbias.weight
+conv_last14.hyperbias.bias
+hnet.lin1.weight
+hnet.lin1.bias
+hnet.lin2.weight
+hnet.lin2.bias
+hnet.lin3.weight
+hnet.lin3.bias
+hnet.lin4.weight
+hnet.lin4.bias
+Total parameters: 38492802
+Loading checkpoint from /share/sablab/nfs02/users/aw847/models/HyperRecon/l1-fix/Mar_31/0.001_32_['cap', 'tv']_64_64_None_True_None/checkpoints/model.1150.h5
