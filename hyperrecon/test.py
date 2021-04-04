@@ -75,9 +75,9 @@ def tester(model_path, xdata, gt_data, conf, device, take_avg, n_grid=20, conver
 
     gr = False
     gl = True
-    return test(network, dataloader, device, hps, take_avg, criterion=criterion, give_recons=gr, give_loss=gl, give_metrics=True)
+    return test(network, dataloader, device, hps, take_avg, conf['metric_type'], conf['take_absval'], criterion=criterion, give_recons=gr, give_loss=gl, give_metrics=True)
 
-def test(trained_model, dataloader, device, hps, take_avg, criterion=None, \
+def test(trained_model, dataloader, device, hps, take_avg, metric_type, take_absval, criterion=None, \
         give_recons=False, give_loss=False, give_metrics=False):
     """Testing for a fixed set of hyperparameter setting.
 
@@ -121,8 +121,7 @@ def test(trained_model, dataloader, device, hps, take_avg, criterion=None, \
             cap_regs.append(regs['cap'].cpu().detach().numpy())
             tvs.append(regs['tv'].cpu().detach().numpy())
         if give_metrics:
-            psnrs = utils.get_metrics(gt, pred, metric_type='psnr', take_avg=take_avg)
-            # psnrs = get_metrics(y, gt, pred, metric_type='psnr', take_avg=take_avg)
+            psnrs = utils.get_metrics(gt, pred, zf, metric_type=metric_type, take_avg=take_avg, take_absval=take_absval)
             all_psnrs.append(psnrs)
 
 
@@ -142,28 +141,8 @@ def test(trained_model, dataloader, device, hps, take_avg, criterion=None, \
 
     if give_metrics:
         res['rpsnr'] = np.array(all_psnrs)
-        if take_avg:
-            # res['rpsnr'] = res['rpsnr'].mean(axis=1)
-            print(res['rpsnr'].mean())
 
     return res
-
-def get_metrics(y, gt, recons, metric_type, take_avg, normalized=True):
-    metrics = []
-    zf = utils.ifft(y)
-    if normalized:
-        recons_pro = utils.normalize_recons(recons)
-        gt_pro = utils.normalize_recons(gt)
-        zf_pro = utils.normalize_recons(zf)
-    else:
-        recons_pro = myutils.array.make_imshowable(recons)
-        gt_pro = myutils.array.make_imshowable(gt)
-        zf_pro = myutils.array.make_imshowable(zf)
-    for i in range(len(recons)):
-        metric = myutils.metrics.get_metric(recons_pro[i].cpu().detach().numpy(), gt_pro[i].cpu().detach().numpy(), metric_type, zero_filled=zf_pro[i].cpu().detach().numpy())
-        metrics.append(metric)
-    return np.array(metrics)
-
 
 def baseline_test(model_path, xdata, gt_data, conf, device, take_avg, give_recons=True, give_loss=True, give_metrics=True):
     """Baselines test function"""

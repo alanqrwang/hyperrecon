@@ -71,8 +71,8 @@ def nextPowerOf2(n):
 
     return 1 << count;
 
-def normalize(arr):
-    """Normalizes a batch of images into range [0, 1]"""
+def rescale(arr):
+    """Rescales a batch of images into range [0, 1]"""
     if type(arr) is np.ndarray:
         if len(arr.shape) > 2:
             res = np.zeros(arr.shape)
@@ -136,38 +136,39 @@ def save_loss(save_dir, logger, *metrics):
 
 def get_args(path):
     args_txtfile = os.path.join(path, 'args.txt')
-    print(args_txtfile)
     if os.path.exists(args_txtfile):
         with open(args_txtfile) as json_file:
             config = json.load(json_file)
     return config
 
-def get_metrics(gt, recons, metric_type, take_avg, normalized=True):
+def get_metrics(gt, recons, zf, metric_type, take_avg, normalized=True, take_absval=True):
     metrics = []
+    if take_absval:
+        recons = absval(recons)
+        gt = absval(gt)
+        zf = absval(zf)
     if normalized:
-        recons_pro = normalize(recons)
-        gt_pro = normalize(gt)
-    else:
-        recons_pro = myutils.array.make_imshowable(recons)
-        gt_pro = myutils.array.make_imshowable(gt)
+        recons = rescale(recons)
+        gt = rescale(gt)
+        zf = rescale(zf)
 
     if len(recons.shape) > 2:
         for i in range(len(recons)):
-            metric = myutils.metrics.get_metric(recons_pro[i], gt_pro[i], metric_type)
+            metric = myutils.metrics.get_metric(recons[i], gt[i], metric_type, zero_filled=zf[i])
             metrics.append(metric)
     else:
-        metric = myutils.metrics.get_metric(recons_pro, gt_pro, metric_type)
+        metric = myutils.metrics.get_metric(recons, gt, metric_type)
         metrics.append(metric)
 
     if take_avg:
-        return np.mean(np.array(metrics))
+        return np.array(metrics).mean()
     else:
         return np.array(metrics)
 
-def get_everything(path, device, take_avg=True, recons_only=False, \
-                   hypernet=True, metric_type='relative psnr', \
+def get_everything(path, device, take_avg=True, \
+                   metric_type='relative psnr', \
                    cp=None, n_grid=20, \
-                   gt_data=None, xdata=None, test_data=True, convert=False):
+                   gt_data=None, xdata=None, test_data=True, convert=False, take_absval=True):
     
     # Forward through latest available model
     if cp is None:
@@ -179,7 +180,6 @@ def get_everything(path, device, take_avg=True, recons_only=False, \
         model_path = os.path.join(path, 'checkpoints/model.{epoch:04d}.h5'.format(epoch=cp))
         
     if gt_data is None:
-        N=10
         if test_data:
             gt_data = dataset.get_test_gt(old=True)
             xdata = dataset.get_test_data(old=True)
@@ -187,15 +187,14 @@ def get_everything(path, device, take_avg=True, recons_only=False, \
             gt_data = dataset.get_train_gt(old=True)
             xdata = datset.get_train_data(old=True)
 
-        gt_data = gt_data[3:3+N]
-        xdata = xdata[3:3+N]
-
     args_txtfile = os.path.join(path, 'args.txt')
     if os.path.exists(args_txtfile):
         with open(args_txtfile) as json_file:
             args = json.load(json_file)
     else:
         raise Exception('no args found')
+    args['metric_type'] = metric_type
+    args['take_absval'] = take_absval
 
     result_dict = test.tester(model_path, xdata, gt_data, args, device, take_avg, n_grid, convert)
     return result_dict

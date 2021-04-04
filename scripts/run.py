@@ -23,6 +23,7 @@ class Parser(argparse.ArgumentParser):
         
         # Machine learning parameters
         self.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+        self.add_argument('--force_lr', type=float, default=None, help='Learning rate')
         self.add_argument('--batch_size', type=int, default=32, help='Batch size')
         self.add_argument('--epochs', type=int, default=100, help='Total training epochs')
         self.add_argument('--unet_hdim', type=int, default=64)
@@ -115,6 +116,10 @@ def trainer(xdata, gt_data, args):
     criterion = hyperloss.AmortizedLoss(args.reg_types, args.range_restrict, args.sampling, \
         args.topK, args.device, args.mask)
     ##################################################
+
+    if args.force_lr is not None:
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = args.force_lr
 
     ############ Checkpoint Loading ##################
     # Load from path
