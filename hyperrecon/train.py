@@ -67,10 +67,10 @@ def trainer(xdata, gt_data, conf):
 
     ############ Checkpoint Loading ##################
     if conf['load_checkpoint'] != 0:
-        # pretrain_path = os.path.join(conf['filename'], 'model.{epoch:04d}.h5'.format(epoch=conf['load_checkpoint']))
-        # network, optimizer = utils.load_checkpoint(network, pretrain_path, optimizer)
-        pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/8fold_1e-05_42_[\'cap\', \'tv\']_64_None_True/model.5000.h5'
-        network = utils.load_checkpoint(network, pretrain_path)
+        pretrain_path = os.path.join(conf['filename'], 'model.{epoch:04d}.h5'.format(epoch=conf['load_checkpoint']))
+        network, optimizer = utils.load_checkpoint(network, pretrain_path, optimizer)
+        # pretrain_path = '/nfs02/users/aw847/models/HyperHQSNet/8fold_1e-05_42_[\'cap\', \'tv\']_64_None_True/model.5000.h5'
+        # network = utils.load_checkpoint(network, pretrain_path)
     ##################################################
 
     ############## Training loop #####################
