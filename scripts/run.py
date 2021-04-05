@@ -115,6 +115,9 @@ def trainer(xdata, gt_data, args):
     hpsampler = sampler.HpSampler(num_hyperparams, args.device, args.range_restrict)
     criterion = hyperloss.AmortizedLoss(args.reg_types, args.range_restrict, args.sampling, \
         args.topK, args.device, args.mask)
+
+    # if args.scheduler:
+    #     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
     ##################################################
 
     if args.force_lr is not None:

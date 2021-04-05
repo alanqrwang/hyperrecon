@@ -181,11 +181,14 @@ def get_everything(path, device, take_avg=True, \
         
     if gt_data is None:
         if test_data:
-            gt_data = dataset.get_test_gt(old=True)
-            xdata = dataset.get_test_data(old=True)
+            gt_data = dataset.get_test_gt('med')
+            xdata = dataset.get_test_data('med')
         else:
-            gt_data = dataset.get_train_gt(old=True)
-            xdata = datset.get_train_data(old=True)
+            gt_data = dataset.get_train_gt('med')
+            xdata = dataset.get_train_data('med')
+    N=1
+    gt_data = gt_data[3:3+N]
+    xdata = xdata[3:3+N]
 
     args_txtfile = os.path.join(path, 'args.txt')
     if os.path.exists(args_txtfile):
@@ -205,19 +208,20 @@ def gather_baselines(device):
     base_recons = []
     alphas = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.85,0.9,0.93,0.95,0.98, 0.99,0.995,0.999,1.0]
     betas =  [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.85,0.9,0.93,0.95,0.98, 0.99,0.995,0.999,1.0]
-    baseline_temp = '/nfs02/users/aw847/models/HQSplitting/hypernet-baselines/hp-baseline_{beta:01}_{alpha:01}_unet_0.0001_0_5_0_64/t1_4p2_unsup/'
+    baseline_temp = '/share/sablab/nfs02/users/aw847/models/HQSplitting/hypernet-baselines/hp-baseline_{beta:01}_{alpha:01}_unet_0.0001_0_5_0_64/t1_4p2_unsup/model.0100.h5'
 
-    N=10
-    gt_data = dataset.get_test_gt(old=True)
+    N=1
+    gt_data = dataset.get_test_gt('med')
     gt_data = gt_data[3:3+N]
-    xdata = dataset.get_test_data(old=True)
+    xdata = dataset.get_test_data('med')
     xdata = xdata[3:3+N]
     hps = []
     for beta in betas:
         for alpha in alphas:
             hps.append([alpha, beta])
             baseline_path = baseline_temp.format(alpha=np.round(alpha, 3), beta=np.round(beta, 3))
-            base = get_everything(baseline_path, device, hypernet=False, metric_type='relative ssim', take_avg=False, gt_data=gt_data, xdata=xdata)
+            print(baseline_path)
+            base = test.baseline_test(baseline_path, xdata, gt_data, device, take_avg=False)
             print(base['recons'].shape)
             print(base['rpsnr'].shape)
             print(base['dc'].shape)

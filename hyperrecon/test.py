@@ -68,12 +68,11 @@ def tester(model_path, xdata, gt_data, conf, device, take_avg, n_grid=20, conver
     mask = dataset.get_mask(4).to(device)
 
     network = model.Unet(device, num_hyperparams, conf['hnet_hdim'], conf['unet_hdim']).to(device) 
-    # network = model.BaseUnet().to(device) 
 
     network = utils.load_checkpoint(network, model_path)
     criterion = losslayer.AmortizedLoss(reg_types, range_restrict, conf['sampling'], topK, device, mask, take_avg=False)
 
-    gr = False
+    gr = True
     gl = True
     return test(network, dataloader, device, hps, take_avg, conf['metric_type'], conf['take_absval'], criterion=criterion, give_recons=gr, give_loss=gl, give_metrics=True)
 
@@ -144,7 +143,7 @@ def test(trained_model, dataloader, device, hps, take_avg, metric_type, take_abs
 
     return res
 
-def baseline_test(model_path, xdata, gt_data, conf, device, take_avg, give_recons=True, give_loss=True, give_metrics=True):
+def baseline_test(model_path, xdata, gt_data, device, take_avg, give_recons=True, give_loss=True, give_metrics=True):
     """Baselines test function"""
     network = model.BaseUnet().to(device) 
     network = utils.load_checkpoint(network, model_path)
@@ -153,7 +152,7 @@ def baseline_test(model_path, xdata, gt_data, conf, device, take_avg, give_recon
     mask = dataset.get_mask(4)
     mask = torch.tensor(mask, requires_grad=False).float().to(device)
 
-    criterion = losslayer.AmortizedLoss(['cap', 'tv'], True, 'uhs', device, mask, evaluate=True)
+    criterion = losslayer.AmortizedLoss(['cap', 'tv'], True, 'uhs', None, device, mask, take_avg=False)
 
     res = {}
     recons = []
@@ -177,13 +176,13 @@ def baseline_test(model_path, xdata, gt_data, conf, device, take_avg, give_recon
             recons.append(pred.cpu().detach().numpy()[0])
         if give_loss:
             assert criterion is not None, 'loss must be provided'
-            loss, regs, _ = criterion(pred, y, h, cap_reg, None, schedule=True)
+            loss, regs, _ = criterion(pred, y, h, cap_reg, schedule=True)
             losses.append(loss.cpu().detach().numpy()[0])
             dcs.append(regs['dc'].cpu().detach().numpy()[0])
             # cap_regs.append(regs['cap'].cpu().detach().numpy()[0])
             tvs.append(regs['tv'].cpu().detach().numpy()[0])
         if give_metrics:
-            psnrs = get_metrics(y, gt, pred, metric_type='relative ssim', take_avg=take_avg)
+            psnrs = utils.get_metrics(gt, pred, zf, metric_type='relative psnr', take_avg=take_avg, take_absval=True)
             all_psnrs.append(psnrs[0])
 
 
