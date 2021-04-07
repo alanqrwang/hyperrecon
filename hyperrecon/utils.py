@@ -11,7 +11,6 @@ import pickle
 # import parse
 import glob
 from . import test, dataset
-from hqsnet import test as hqstest
 import myutils
 import json
 
@@ -27,6 +26,9 @@ def fft(x):
     # complex_x = torch.view_as_complex(x)
     # fft = torch.fft.fft2(complex_x,  norm='ortho')
     # return torch.view_as_real(fft) 
+
+    if x.shape[-1] == 1:
+        x = torch.cat((x, torch.zeros_like(x)), dim=-1)
     return torch.fft(x, signal_ndim=2, normalized=True)
 
 def ifft(x):
@@ -35,28 +37,6 @@ def ifft(x):
     # ifft = torch.fft.ifft2(complex_x, norm='ortho')
     # return torch.view_as_real(ifft) 
     return torch.ifft(x, signal_ndim=2, normalized=True)
-
-def absval(arr):
-    """
-    Takes absolute value of last dimension, if complex.
-    Input dims:  (N, l, w, 2)
-    Output dims: (N, l, w)
-    """
-    assert arr.shape[-1] == 2 or arr.shape[-1] == 1
-    if torch.is_tensor(arr):
-        arr = arr.norm(dim=-1)
-    else:
-        arr = np.linalg.norm(arr, axis=-1)
-
-    return arr
-
-def scale(y, zf):
-    """Scales inputs for numerical stability"""
-    flat_yzf = torch.flatten(absval(zf), start_dim=1, end_dim=2)
-    max_val_per_batch, _ = torch.max(flat_yzf, dim=1, keepdim=True)
-    y = y / max_val_per_batch.view(len(y), 1, 1, 1)
-    zf = zf / max_val_per_batch.view(len(y), 1, 1, 1)
-    return y, zf
 
 def nextPowerOf2(n):
     """Get next power of 2"""
@@ -90,11 +70,6 @@ def rescale(arr):
             return res
         else:
             return (arr - torch.min(arr)) / (torch.max(arr) - torch.min(arr))
-
-def normalize_recons(recons):
-    recons = absval(recons)
-    recons = normalize(recons)
-    return recons
 
 def count_parameters(model):
     """Count total parameters in model"""
@@ -140,67 +115,6 @@ def get_args(path):
         with open(args_txtfile) as json_file:
             config = json.load(json_file)
     return config
-
-def get_metrics(gt, recons, zf, metric_type, take_avg, normalized=True, take_absval=True):
-    metrics = []
-    if take_absval:
-        recons = absval(recons)
-        gt = absval(gt)
-        zf = absval(zf)
-    if normalized:
-        recons = rescale(recons)
-        gt = rescale(gt)
-        zf = rescale(zf)
-
-    if len(recons.shape) > 2:
-        for i in range(len(recons)):
-            metric = myutils.metrics.get_metric(recons[i], gt[i], metric_type, zero_filled=zf[i])
-            metrics.append(metric)
-    else:
-        metric = myutils.metrics.get_metric(recons, gt, metric_type)
-        metrics.append(metric)
-
-    if take_avg:
-        return np.array(metrics).mean()
-    else:
-        return np.array(metrics)
-
-def get_everything(path, device, take_avg=True, \
-                   metric_type='relative psnr', \
-                   cp=None, n_grid=20, \
-                   gt_data=None, xdata=None, test_data=True, convert=False, take_absval=True):
-    
-    # Forward through latest available model
-    if cp is None:
-        glob_path = path.replace('[', '[()').replace(']', '()]').replace('()', '[]')
-        model_paths = sorted(glob.glob(os.path.join(glob_path, 'checkpoints/model.*.h5')))
-        model_path = model_paths[-1]
-    # Or forward through specified epoch
-    else:
-        model_path = os.path.join(path, 'checkpoints/model.{epoch:04d}.h5'.format(epoch=cp))
-        
-    if gt_data is None:
-        if test_data:
-            gt_data = dataset.get_test_gt('med')
-            xdata = dataset.get_test_data('med')
-        else:
-            gt_data = dataset.get_train_gt('med')
-            xdata = dataset.get_train_data('med')
-    N=1
-    gt_data = gt_data[3:3+N]
-    xdata = xdata[3:3+N]
-
-    args_txtfile = os.path.join(path, 'args.txt')
-    if os.path.exists(args_txtfile):
-        with open(args_txtfile) as json_file:
-            args = json.load(json_file)
-    else:
-        raise Exception('no args found')
-    args['metric_type'] = metric_type
-    args['take_absval'] = take_absval
-
-    result_dict = test.tester(model_path, xdata, gt_data, args, device, take_avg, n_grid, convert)
-    return result_dict
 
 def gather_baselines(device):
     base_psnrs = []

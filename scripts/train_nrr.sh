@@ -2,4 +2,4 @@
 
 source activate aw847-torch14
 
-python -u run.py -fp l1-fix --log_interval 25 --lr 1e-03 --epochs 5000 --hnet_hdim 64 --reg_types cap tv --sampling uhs --no_range_restrict --cont 3125 --date Mar_30 --force_lr 1e-5
+python run.py -fp 1chan --log_interval 25 --lr 1e-3 --epochs 5000 --reg_types cap tv --sampling uhs --no_range_restrict --hnet_hdim 64 --use_tanh --lr 1e-4

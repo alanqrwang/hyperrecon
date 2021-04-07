@@ -57,16 +57,11 @@ class AmortizedLoss(nn.Module):
 
         Parameters
         ----------
-        x : torch.Tensor (batch_size, img_height, img_width, 2)
+        x : torch.Tensor (batch_size, img_height, img_width, 1)
             Input image
-
-        Returns
-        ----------
-        tv_loss : TV loss
         """
-        x = x.permute(0, 3, 1, 2)
-        tv_x = torch.sum((x[:, 0, :, :-1] - x[:, 0, :, 1:]).abs() + (x[:, 1, :, :-1] - x[:, 1, :, 1:]).abs(), dim=(1, 2))
-        tv_y = torch.sum((x[:, 0, :-1, :] - x[:, 0, 1:, :]).abs() + (x[:, 1, :-1, :] - x[:, 1, 1:, :]).abs(), dim=(1, 2))
+        tv_x = torch.sum((x[:, :, :-1, 0] - x[:, :, 1:, 0]).abs(), dim=(1, 2))
+        tv_y = torch.sum((x[:, :-1, :, 0] - x[:, 1:, :, 0]).abs(), dim=(1, 2))
         return tv_x + tv_y
         
     def get_wavelets(self, x):
@@ -107,7 +102,7 @@ class AmortizedLoss(nn.Module):
         l1_shear = torch.sum(self.l1(shears, torch.zeros_like(shears)), dim=(1, 2, 3))
         return l1_shear
 
-    def forward(self, x_hat, y, hyperparams, cap_reg, schedule):
+    def forward(self, x_hat, y, hyperparams, cap_reg):
         '''
         Parameters
         ----------
@@ -160,7 +155,7 @@ class AmortizedLoss(nn.Module):
         else:
             assert len(self.reg_types) == hyperparams.shape[1] - 1, 'num_hyperparams and reg mismatch'
             loss = hyperparams[:,0]*loss_dict['dc']
-            for i in range(schedule):
+            for i in range(len(self.reg_types)):
                 loss = loss + hyperparams[:,i+1] * loss_dict[self.reg_types[i]]
             loss = loss / torch.sum(hyperparams, dim=1)
 
@@ -193,11 +188,12 @@ class AmortizedLoss(nn.Module):
             _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
             sort_losses = unsup_losses[perm] # Reorder total losses by lowest to highest DC loss
             sort_hyperparams = hyperparams[perm]
-
             loss = torch.sum(sort_losses[:self.topK]) # Take only the losses with lowest DC
+
         elif self.topK is None and self.take_avg:
             loss = torch.sum(unsup_losses)
             sort_hyperparams = hyperparams
+
         else:
             loss = unsup_losses
             sort_hyperparams = hyperparams

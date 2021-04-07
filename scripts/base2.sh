@@ -1,0 +1,93 @@
+#!/bin/bash
+
+source activate aw847-torch14
+
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.0
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.1
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.2
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.3
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.4
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.5
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.6
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.7
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.8
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.9
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.93
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.95
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.98
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.99
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.995
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 0.999
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.4 1.0
+
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.0
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.1
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.2
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.3
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.4
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.5
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.6
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.7
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.8
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.9
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.93
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.95
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.98
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.99
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.995
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 0.999
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.5 1.0
+
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.0
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.1
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.2
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.3
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.4
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.5
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.6
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.7
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.8
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.9
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.93
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.95
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.98
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.99
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.995
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 0.999
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.6 1.0
+
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.0
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.1
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.2
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.3
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.4
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.5
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.6
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.7
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.8
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.9
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.93
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.95
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.98
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.99
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.995
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 0.999
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 0.999 1.0
+
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.0
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.1
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.2
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.3
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.4
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.5
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.6
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.7
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.8
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.9
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.93
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.95
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.98
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.99
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.995
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 0.999
+python run.py -fp base --log_interval 100 --lr 1e-3 --epochs 100 --reg_types cap tv --sampling uhs --range_restrict --weights 1.0 1.0

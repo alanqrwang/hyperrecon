@@ -19,7 +19,7 @@ class Upsample(nn.Module):
     def forward(self, x):
         return F.interpolate(x, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
 
-class BatchConv2DLayer(nn.Module):
+class HyperConv2d(nn.Module):
     """
     Conv2D for a batch of images and weights
     For batch size B of images and weights, convolutions are computed between
@@ -28,13 +28,14 @@ class BatchConv2DLayer(nn.Module):
     Takes hypernet output and transforms it to weights and biases
     """
     def __init__(self, in_channels, out_channels, hyp_out_units, stride=1,
-                 padding=0, dilation=1, ks=3):
-        super(BatchConv2DLayer, self).__init__()
+                 padding=0, dilation=1, ks=3, use_tanh=True):
+        super(HyperConv2d, self).__init__()
 
         self.stride = stride
         self.padding = padding
         self.dilation = dilation
         self.ks = ks
+        self.use_tanh = use_tanh
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -47,31 +48,6 @@ class BatchConv2DLayer(nn.Module):
         self.hyperbias = nn.Linear(hyp_out_units, bias_units)
         self.tanh = nn.Tanh()
 
-#     def forward(self, x, hyp_out, include_bias=True):
-#         assert x.shape[0] == hyp_out.shape[0], "dim=0 of x must be equal in size to dim=0 of hypernet output"
-
-#         b_i, c, h, w = x.shape
-
-#         # Reshape input and get weights from hyperkernel
-#         out = x
-#         self.kernel = self.tanh(self.hyperkernel(hyp_out))
-#         weight = self.kernel.view(b_i, self.out_channels, self.in_channels, self.ks, self.ks)
-
-#         out = torch.zeros(b_i, self.out_channels, x.shape[-2], x.shape[-1]).cuda()
-#         for i in range(b_i):
-#             out[i] = F.conv2d(x[i:i+1], weight=weight[i], bias=None, stride=self.stride, dilation=self.dilation, \
-#                            groups=1, padding=self.padding)
-
-#         # out = out.view(b_i, self.out_channels, out.shape[-2], out.shape[-1])
-
-#         if include_bias:
-#             # Get weights from hyperbias
-#             self.bias = self.tanh(self.hyperbias(hyp_out))
-#             out = out + self.bias.unsqueeze(-1).unsqueeze(-1)
-
-#         l1_reg = torch.norm(self.kernel, dim=1, p=1) + torch.norm(self.bias, dim=1, p=1)
-#         print(l1_reg)
-#         return out, l1_reg
     def forward(self, x, hyp_out, include_bias=True):
         assert x.shape[0] == hyp_out.shape[0], "dim=0 of x must be equal in size to dim=0 of hypernet output"
 
@@ -80,7 +56,9 @@ class BatchConv2DLayer(nn.Module):
 
         # Reshape input and get weights from hyperkernel
         out = x.permute([1, 0, 2, 3, 4]).contiguous().view(b_j, b_i * c, h, w)
-        self.kernel = self.tanh(self.hyperkernel(hyp_out))
+        self.kernel = self.hyperkernel(hyp_out)
+        if self.use_tanh:
+            self.kernel = self.tanh(self.kernel)
         weight = self.kernel.view(b_i * self.out_channels, self.in_channels, self.ks, self.ks)
 
         out = F.conv2d(out, weight=weight, bias=None, stride=self.stride, dilation=self.dilation, groups=b_i,
@@ -95,8 +73,7 @@ class BatchConv2DLayer(nn.Module):
             out = out + self.bias.unsqueeze(1).unsqueeze(3).unsqueeze(3)
 
         out = out[:,0,...]
-        l1_reg = torch.norm(self.kernel, dim=1, p=1) + torch.norm(self.bias, dim=1, p=1)
-        return out, l1_reg
+        return out
 
     def get_weight_shape(self):
         return [self.out_channels, self.in_channels, self.ks, self.ks]
@@ -104,6 +81,40 @@ class BatchConv2DLayer(nn.Module):
     def get_bias_shape(self):
         return [self.out_channels]
 
+
+class ConvBlock(nn.Module):
+    """
+    Specific convolutional block followed by leakyrelu for unet.
+    Setting hyp_out_units activates batched convolutional weight training for hypernetworks
+    """
+
+    def __init__(self, in_channels, out_channels, stride=1,
+                 padding=0, dilation=1, ks=3, hyp_out_units=None, use_tanh=True):
+        super().__init__()
+
+        if hyp_out_units is not None:
+            self.conv = HyperConv2d(in_channels, out_channels, hyp_out_units, stride=stride,
+                 padding=padding, dilation=dilation, ks=ks, use_tanh=use_tanh)
+        else:
+            self.conv = nn.Conv2d(in_channels, out_channels, ks, stride=stride, padding=padding, dilation=dilation)
+
+        self.activation = nn.LeakyReLU(0.2)
+
+    def forward(self, x, hyp_out):
+        if hyp_out is None:
+            out = self.conv(x)
+        else:
+            out = self.conv(x, hyp_out)
+        out = self.activation(out)
+        return out
+    
     def get_l1_weight_penalty(self):
-        assert self.kernel is not None and self.bias is not None
-        return torch.norm(self.kernel, dim=1, p=1) + torch.norm(self.bias, dim=1, p=1)
+        if isinstance(self.conv, nn.Conv2d):
+            l1 = torch.norm(self.conv.weight.data, p=1) + torch.norm(self.conv.bias.data, p=1)
+        elif isinstance(self.conv, HyperConv2d):
+            assert self.conv.kernel is not None and self.conv.bias is not None
+            l1 = torch.norm(self.conv.kernel, dim=1, p=1) + torch.norm(self.conv.bias, dim=1, p=1)
+        else:
+            raise Exception()
+
+        return l1
