@@ -11,7 +11,6 @@ import pickle
 # import parse
 import glob
 from . import test, dataset
-from hqsnet import test as hqstest
 import myutils
 import json
 
@@ -181,14 +180,11 @@ def get_everything(path, device, take_avg=True, \
         
     if gt_data is None:
         if test_data:
-            gt_data = dataset.get_test_gt('med')
-            xdata = dataset.get_test_data('med')
+            gt_data = dataset.get_test_gt('small')
+            xdata = dataset.get_test_data('small')
         else:
             gt_data = dataset.get_train_gt('med')
             xdata = dataset.get_train_data('med')
-    N=1
-    gt_data = gt_data[3:3+N]
-    xdata = xdata[3:3+N]
 
     args_txtfile = os.path.join(path, 'args.txt')
     if os.path.exists(args_txtfile):

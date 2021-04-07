@@ -72,7 +72,7 @@ def tester(model_path, xdata, gt_data, conf, device, take_avg, n_grid=20, conver
     network = utils.load_checkpoint(network, model_path)
     criterion = losslayer.AmortizedLoss(reg_types, range_restrict, conf['sampling'], topK, device, mask, take_avg=False)
 
-    gr = True
+    gr = False
     gl = True
     return test(network, dataloader, device, hps, take_avg, conf['metric_type'], conf['take_absval'], criterion=criterion, give_recons=gr, give_loss=gl, give_metrics=True)
 
@@ -98,6 +98,8 @@ def test(trained_model, dataloader, device, hps, take_avg, metric_type, take_abs
     ws = []
     tvs = []
     all_psnrs = []
+    all_rpsnrs = []
+    all_zf_psnrs = []
 
     for h in hps:
         print(h)
@@ -120,8 +122,12 @@ def test(trained_model, dataloader, device, hps, take_avg, metric_type, take_abs
             cap_regs.append(regs['cap'].cpu().detach().numpy())
             tvs.append(regs['tv'].cpu().detach().numpy())
         if give_metrics:
-            psnrs = utils.get_metrics(gt, pred, zf, metric_type=metric_type, take_avg=take_avg, take_absval=take_absval)
+            psnrs = utils.get_metrics(gt, pred, zf, metric_type='psnr', take_avg=take_avg, take_absval=take_absval)
+            rpsnrs = utils.get_metrics(gt, pred, zf, metric_type='relative psnr', take_avg=take_avg, take_absval=take_absval)
+            zf_psnrs = utils.get_metrics(gt, zf, zf, metric_type='psnr', take_avg=take_avg, take_absval=take_absval)
             all_psnrs.append(psnrs)
+            all_rpsnrs.append(rpsnrs)
+            all_zf_psnrs.append(zf_psnrs)
 
 
 
@@ -139,7 +145,9 @@ def test(trained_model, dataloader, device, hps, take_avg, metric_type, take_abs
             res['tv'] = res['tv'].mean(axis=1)
 
     if give_metrics:
-        res['rpsnr'] = np.array(all_psnrs)
+        res['psnr'] = np.array(all_psnrs)
+        res['rpsnr'] = np.array(all_rpsnrs)
+        res['zf_psnr'] = np.array(all_zf_psnrs)
 
     return res
 
