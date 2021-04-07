@@ -183,10 +183,11 @@ for epoch in range(args.cont+1, args.epochs+1):
             loss.backward()
             optimizer.step()
 
+            # TODO: fix zf 2 channel for computing rpsnr
             epoch_loss += loss.data.cpu().numpy()
             epoch_psnr += metrics.get_metrics(gt.permute(0, 2, 3, 1), \
                         recon.permute(0, 2, 3, 1), zf.permute(0, 2, 3, 1), \
-                        'psnr', reduction='sum')
+                        'psnr', normalized=True, reduction='sum')
             epoch_samples += batch_size
 
         epoch_loss /= epoch_samples
