@@ -21,7 +21,8 @@ def plot_img(img, title=None, ax=None, rot90=False):
     return ax, im
 
 def plot_over_hyperparams(vals, xticks, yticks=None, title=None, ax=None, vlim=None, colorbar=True, \
-        xlabel=None, ylabel=None, labels=None, all_ticks=None, annotate_max=True, cmap='coolwarm', white_text=None, contours=None):
+        xlabel=None, ylabel=None, labels=None, all_ticks=None, annotate_max=True, cmap='coolwarm', \
+        white_text=None, contours=None, point=None):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     ax = ax or plt.gca()
     vals = np.array(vals)
@@ -39,6 +40,9 @@ def plot_over_hyperparams(vals, xticks, yticks=None, title=None, ax=None, vlim=N
         if annotate_max:
             ymax, xmax = np.unravel_index(grid.argmax(), grid.shape)
             ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
+
+        if point is not None:
+            ax.scatter([point[0]], [point[1]], marker='*', s=100, color='black')
 
         if vlim is not None:
             h = ax.imshow(grid, vmin=vlim[0], vmax=vlim[1], cmap=cm)

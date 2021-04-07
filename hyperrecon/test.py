@@ -72,7 +72,7 @@ def tester(model_path, xdata, gt_data, conf, device, take_avg, n_grid=20, conver
     network = utils.load_checkpoint(network, model_path)
     criterion = losslayer.AmortizedLoss(reg_types, range_restrict, conf['sampling'], topK, device, mask, take_avg=False)
 
-    gr = False
+    gr = True
     gl = True
     return test(network, dataloader, device, hps, take_avg, conf['metric_type'], conf['take_absval'], criterion=criterion, give_recons=gr, give_loss=gl, give_metrics=True)
 

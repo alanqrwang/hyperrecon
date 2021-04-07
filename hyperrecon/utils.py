@@ -182,6 +182,8 @@ def get_everything(path, device, take_avg=True, \
         if test_data:
             gt_data = dataset.get_test_gt('small')
             xdata = dataset.get_test_data('small')
+            gt_data = np.concatenate((gt_data, np.zeros(gt_data.shape)), axis=3)
+            print('appended')
         else:
             gt_data = dataset.get_train_gt('med')
             xdata = dataset.get_train_data('med')

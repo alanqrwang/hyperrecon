@@ -17,12 +17,12 @@ class HyperNetwork(nn.Module):
 
     Takes hyperparameters and outputs weights of main U-Net
     """
-    def __init__(self, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
+    def __init__(self, normalize, f_size=3, in_dim=1, h_dim=32, unet_nh=64):
         """
         Parameters
         ----------
-        conv_layers : dict
-            Dictionary of convolutional layers in main U-Net
+        normalize : bool
+            Whether or not to normalize the input; removes a degree of freedom
         f_size : int 
             Kernel size
         in_dim : int
@@ -37,6 +37,7 @@ class HyperNetwork(nn.Module):
         # Initialize weights
         constant_scale = f_size*f_size*unet_nh
         init_std = lambda d_i : (2 / (d_i * constant_scale))**0.5
+        self.normalize = normalize
 
         # Network layers
         self.lin1 = nn.Linear(in_dim, h_dim)
@@ -63,6 +64,8 @@ class HyperNetwork(nn.Module):
         x : torch.Tensor (batch_size, num_hyperparams)
             Hyperparameter values
         """
+        if self.normalize:
+            x = x / np.sum(x)
         x = self.relu(self.lin1(x))
         x = self.relu(self.lin2(x))
         x = self.relu(self.lin3(x))
