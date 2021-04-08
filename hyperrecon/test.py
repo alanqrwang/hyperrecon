@@ -82,7 +82,7 @@ def tester(path, device, take_avg, cp=None, n_grid=20, gt_data=None, xdata=None,
 
     mask = dataset.get_mask(4).to(device)
 
-    network = networks.HyperUnet(num_hyperparams, args['unet_hdim'], hh=args['hnet_hdim'], use_tanh=args['use_tanh']).to(device) 
+    network = networks.HyperUnet(num_hyperparams, not args['range_restrict'], args['unet_hdim'], hh=args['hnet_hdim'], use_tanh=args['use_tanh']).to(device) 
 
     network = utils.load_checkpoint(network, model_path)
     criterion = losslayer.AmortizedLoss(reg_types, range_restrict, args['sampling'], topK, device, mask, take_avg=False)

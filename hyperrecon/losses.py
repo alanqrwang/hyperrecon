@@ -102,11 +102,11 @@ class AmortizedLoss(nn.Module):
         l1_shear = torch.sum(self.l1(shears, torch.zeros_like(shears)), dim=(1, 2, 3))
         return l1_shear
 
-    def forward(self, x_hat, y, hyperparams, cap_reg):
+    def forward(self, recon, y, hyperparams, cap_reg):
         '''
         Parameters
         ----------
-        x_hat : torch.Tensor (batch_size, img_height, img_width, 2)
+        recon : torch.Tensor (batch_size, img_height, img_width, 2)
             Reconstructed image
         y : torch.Tensor (batch_size, img_height, img_width, 2)
             Under-sampled measurement
@@ -130,16 +130,16 @@ class AmortizedLoss(nn.Module):
         '''
         
         loss_dict = {}
-        loss_dict['dc'] = get_dc_loss(x_hat, y, self.mask)
+        loss_dict['dc'] = get_dc_loss(recon, y, self.mask)
 
         # Regularization
         loss_dict['cap'] = cap_reg
         if 'tv' in self.reg_types:
-            loss_dict['tv'] = self.get_tv(x_hat)
+            loss_dict['tv'] = self.get_tv(recon)
         if 'w' in self.reg_types:
-            loss_dict['w'] = self.get_wavelets(x_hat)
+            loss_dict['w'] = self.get_wavelets(recon)
         if 'sh' in self.reg_types:
-            loss_dict['sh'] = self.get_shearlets(x_hat)
+            loss_dict['sh'] = self.get_shearlets(recon)
 
         if self.range_restrict and len(self.reg_types) == 1:
             assert len(self.reg_types) == hyperparams.shape[1], 'num_hyperparams and reg mismatch'

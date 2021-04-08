@@ -11,7 +11,7 @@ from . import utils
 
 class HpSampler(nn.Module):
     """Hyperparameter sampler class"""
-    def __init__(self, num_hyperparams, device, range_restrict, weights):
+    def __init__(self, num_hyperparams, range_restrict, weights):
         """
         Parameters
         ----------
@@ -21,7 +21,6 @@ class HpSampler(nn.Module):
         super(HpSampler, self).__init__()
 
         self.num_hyperparams = num_hyperparams
-        self.device = device
         self.range_restrict = range_restrict
         if weights is not None:
             self.weights = torch.tensor(weights)
@@ -47,4 +46,4 @@ class HpSampler(nn.Module):
             hyperparams = ref_hps.repeat(int(np.ceil(batch_size / len(ref_hps))), 1)[:batch_size]
         else:
             hyperparams = torch.rand((batch_size, self.num_hyperparams))
-        return hyperparams.to(self.device)
+        return hyperparams

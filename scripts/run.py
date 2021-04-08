@@ -112,7 +112,11 @@ dataloaders = {
 args.mask = dataset.get_mask(args.undersampling_rate).to(args.device)
 
 # Model
-model = networks.HyperUnet(args.num_hyperparams, args.unet_hdim, hh=args.hnet_hdim, use_tanh=args.use_tanh).to(args.device)
+model = networks.HyperUnet(args.num_hyperparams, \
+        not args.range_restrict, \
+        args.unet_hdim, \
+        hh=args.hnet_hdim, \
+        use_tanh=args.use_tanh).to(args.device)
 print('Total parameters:', utils.count_parameters(model))
 
 # Optimizer

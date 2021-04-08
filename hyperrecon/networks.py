@@ -13,22 +13,20 @@ class HyperNetwork(nn.Module):
 
     Takes hyperparameters and outputs weights of main U-Net
     """
-    def __init__(self, in_dim=1, h_dim=32):
+    def __init__(self, normalize, in_dim=1, h_dim=32):
         """
         Parameters
         ----------
         conv_layers : dict
             Dictionary of convolutional layers in main U-Net
-        f_size : int 
-            Kernel size
         in_dim : int
             Input dimension
         h_dim : int
             Hidden dimension
-        unet_nh : int
-            Hidden dimension of main U-Net
         """
         super(HyperNetwork, self).__init__()
+
+        self.normalize = normalize
 
         # Network layers
         self.lin1 = nn.Linear(in_dim, h_dim)
@@ -46,6 +44,9 @@ class HyperNetwork(nn.Module):
         x : torch.Tensor (batch_size, num_hyperparams)
             Hyperparameter values
         """
+        if self.normalize:
+            print('normalizing')
+            x = x / torch.sum(x, dim=1, keepdim=True)
         x = self.relu(self.lin1(x))
         x = self.relu(self.lin2(x))
         x = self.relu(self.lin3(x))
@@ -158,11 +159,11 @@ class Unet(nn.Module):
 
 class HyperUnet(nn.Module):
     """Main U-Net for image reconstruction"""
-    def __init__(self, num_hyperparams, uh, residual=True, hh=None, use_tanh=True):
+    def __init__(self, num_hyperparams, normalize, uh, residual=True, hh=None, use_tanh=True):
         """
         Parameters
         ----------
-        num_hyperparams : Number of hyperparameters (i.e. number of regularization functions)
+        num_hyperparams : Number of hyperparameters
         uh : Hidden channel dimension of U-Net
         residual : Whether or not to use residual U-Net architecture
         hh : Hidden channel dimension of HyperNetwork, activates hypernetwork if provided
@@ -173,7 +174,7 @@ class HyperUnet(nn.Module):
         self.hh = hh
 
         if hh is not None:
-            self.hypernet = HyperNetwork(in_dim=num_hyperparams, h_dim=hh)
+            self.hypernet = HyperNetwork(normalize, in_dim=num_hyperparams, h_dim=hh)
         self.unet = Unet(uh, hh=hh, use_tanh=use_tanh)
 
     def forward(self, y, hyperparams):
