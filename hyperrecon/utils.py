@@ -6,13 +6,12 @@ For more details, please read:
 """
 import torch
 import numpy as np
-import os
 import pickle
 # import parse
 import glob
 from . import test, dataset
 import myutils
-import json
+import os
 
 def add_bool_arg(parser, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -26,6 +25,8 @@ def fft(x):
     # complex_x = torch.view_as_complex(x)
     # fft = torch.fft.fft2(complex_x,  norm='ortho')
     # return torch.view_as_real(fft) 
+    if x.shape[-1] == 1:
+        x = torch.cat((x, torch.zeros_like(x)), dim=3)
     return torch.fft(x, signal_ndim=2, normalized=True)
 
 def ifft(x):
@@ -102,13 +103,19 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 ######### Saving/Loading checkpoints ############
-def load_checkpoint(model, path, optimizer=None):
+def load_checkpoint(model, path, optimizer=None, scheduler=None):
     print('Loading checkpoint from', path)
     checkpoint = torch.load(path, map_location=torch.device('cpu'))
     model.load_state_dict(checkpoint['state_dict'])
-    if optimizer is not None:
+    if optimizer is not None and scheduler is not None:
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        scheduler.load_state_dict(checkpoint['scheduler'])
+        return model, optimizer, scheduler
+
+    elif optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer'])
         return model, optimizer
+
     else:
         return model
 
@@ -140,16 +147,16 @@ def get_args(path):
             config = json.load(json_file)
     return config
 
-def get_metrics(gt, recons, zf, metric_type, take_avg, normalized=True, take_absval=True):
+def get_metrics(gt, recons, zf, metric_type, normalized=True, take_absval=True):
     metrics = []
     if take_absval:
         recons = absval(recons)
         gt = absval(gt)
         zf = absval(zf)
-    if normalized:
-        recons = rescale(recons)
-        gt = rescale(gt)
-        zf = rescale(zf)
+    # if normalized:
+    #     recons = rescale(recons)
+    #     gt = rescale(gt)
+    #     zf = rescale(zf)
 
     if len(recons.shape) > 2:
         for i in range(len(recons)):
@@ -159,46 +166,8 @@ def get_metrics(gt, recons, zf, metric_type, take_avg, normalized=True, take_abs
         metric = myutils.metrics.get_metric(recons, gt, metric_type)
         metrics.append(metric)
 
-    if take_avg:
-        return np.array(metrics).mean()
-    else:
-        return np.array(metrics)
+    return np.array(metrics)
 
-def get_everything(path, device, take_avg=True, \
-                   metric_type='relative psnr', \
-                   cp=None, n_grid=20, \
-                   gt_data=None, xdata=None, test_data=True, convert=False, take_absval=True):
-    
-    # Forward through latest available model
-    if cp is None:
-        glob_path = path.replace('[', '[()').replace(']', '()]').replace('()', '[]')
-        model_paths = sorted(glob.glob(os.path.join(glob_path, 'checkpoints/model.*.h5')))
-        model_path = model_paths[-1]
-    # Or forward through specified epoch
-    else:
-        model_path = os.path.join(path, 'checkpoints/model.{epoch:04d}.h5'.format(epoch=cp))
-        
-    if gt_data is None:
-        if test_data:
-            gt_data = dataset.get_test_gt('small')
-            xdata = dataset.get_test_data('small')
-            gt_data = np.concatenate((gt_data, np.zeros(gt_data.shape)), axis=3)
-            print('appended')
-        else:
-            gt_data = dataset.get_train_gt('med')
-            xdata = dataset.get_train_data('med')
-
-    args_txtfile = os.path.join(path, 'args.txt')
-    if os.path.exists(args_txtfile):
-        with open(args_txtfile) as json_file:
-            args = json.load(json_file)
-    else:
-        raise Exception('no args found')
-    args['metric_type'] = metric_type
-    args['take_absval'] = take_absval
-
-    result_dict = test.tester(model_path, xdata, gt_data, args, device, take_avg, n_grid, convert)
-    return result_dict
 
 def gather_baselines(device):
     base_psnrs = []
@@ -208,11 +177,8 @@ def gather_baselines(device):
     betas =  [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.85,0.9,0.93,0.95,0.98, 0.99,0.995,0.999,1.0]
     baseline_temp = '/share/sablab/nfs02/users/aw847/models/HQSplitting/hypernet-baselines/hp-baseline_{beta:01}_{alpha:01}_unet_0.0001_0_5_0_64/t1_4p2_unsup/model.0100.h5'
 
-    N=1
-    gt_data = dataset.get_test_gt('med')
-    gt_data = gt_data[3:3+N]
-    xdata = dataset.get_test_data('med')
-    xdata = xdata[3:3+N]
+    gt_data = dataset.get_test_gt('small')
+    xdata = dataset.get_test_data('small')
     hps = []
     for beta in betas:
         for alpha in alphas:
@@ -229,10 +195,19 @@ def gather_baselines(device):
 
     return np.array(hps), np.array(base_psnrs), np.array(base_dcs), np.array(base_recons)
 
+def newloss2oldloss(points):
+    '''Convert new loss hps to old loss hps
+    
+    points: (N, 3)
+    '''
+    points_convert1 = points[:, 0] / (points[:, 0] + points[:, 1] + points[:, 2])
+    points_convert2 = points[:, 1] / (points[:, 1] + points[:, 2])
+    points_convert = torch.stack((points_convert1, points_convert2), dim=1).numpy()
+    return points_convert
 def oldloss2newloss(old_hps):
     '''Convert old loss hps to new loss hps
     
-    old_hps: (N, num_hyperparams)
+    old_hps: (N, 2)
     '''
     if old_hps.shape[1] == 1:
         a0 = 1-old_hps[:, 0]
@@ -249,17 +224,17 @@ def oldloss2newloss(old_hps):
 
 def get_reference_hps(num_hyperparams, range_restrict=True):
     hps_2 = torch.tensor([[0.9, 0.1],
-     [0.995, 0.6],
-     [0.9, 0.2],
-     [0.995, 0.5],
-     [0.9, 0],
-     [0.99, 0.7]]).float()
+                          [0.995, 0.6],
+                          [0.9, 0.2],
+                          [0.995, 0.5],
+                          [0.9, 0],
+                          [0.99, 0.7]]).float()
     hps_1 = torch.tensor([[0.5],
-     [0.6],
-     [0.7],
-     [0.8],
-     [0.9],
-     [0.99]]).float()
+                          [0.6],
+                          [0.7],
+                          [0.8],
+                          [0.9],
+                          [0.99]]).float()
     if num_hyperparams == 2 and range_restrict:
         return hps_2
     elif num_hyperparams == 3 and not range_restrict:

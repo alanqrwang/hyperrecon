@@ -1,12 +1,13 @@
 import torch
 import numpy as np
-from hyperrecon import utils, train, dataset, model, sampler
+from hyperrecon import utils, dataset, model, sampler
 from hyperrecon import loss as hyperloss
 import argparse
 import os
 import json
 from pprint import pprint
 import time
+from tqdm import tqdm
 
 
 class Parser(argparse.ArgumentParser):
@@ -26,16 +27,21 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('--force_lr', type=float, default=None, help='Learning rate')
         self.add_argument('--batch_size', type=int, default=32, help='Batch size')
         self.add_argument('--epochs', type=int, default=100, help='Total training epochs')
-        self.add_argument('--unet_hdim', type=int, default=64)
+        self.add_argument('--unet_hdim', type=int, default=32)
         self.add_argument('--hnet_hdim', type=int, help='Hypernetwork architecture', required=True)
+        self.add_argument('--n_ch_out', type=int, help='Number of output channels of main network', default=1)
 
         # Model parameters
         self.add_argument('--topK', type=int, default=None)
-        self.add_argument('--loss_schedule', type=int, default=None)
-        self.add_argument('--undersampling_rate', type=int, default=4, choices=[4, 8])
-        self.add_argument('--reg_types', nargs='+', type=str, help='<Required> Set flag', required=True)
+        self.add_argument('--undersampling_rate', type=str, default=4, choices=['4p2', '8p25', '8p3'])
+        self.add_argument('--losses', choices=['dc', 'tv', 'cap', 'w', 'sh', 'mse', 'l1', 'ssim', 'perc'], \
+                nargs='+', type=str, help='<Required> Set flag', required=True)
         self.add_argument('--sampling', choices=['uhs', 'dhs'], type=str, help='Sampling method', required=True)
         utils.add_bool_arg(self, 'range_restrict')
+        utils.add_bool_arg(self, 'scheduler', default=False)
+        utils.add_bool_arg(self, 'use_tanh', default=False)
+        self.add_argument('--hyperparameters', type=float, default=None)
+        self.add_argument('--organ', choices=['brain', 'knee'], type=str, default='knee')
         
     def parse(self):
         args = self.parse_args()
@@ -47,15 +53,16 @@ class Parser(argparse.ArgumentParser):
             date = args.date
 
         args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date, \
-            '{lr}_{batch_size}_{reg_types}_{hnet_hdim}_{unet_hdim}_{topK}_{range_restrict}_{schedule}'.format(
+            '{lr}_{batch_size}_{losses}_{hnet_hdim}_{unet_hdim}_{topK}_{range_restrict}_{hps}_{use_tanh}'.format(
             lr=args.lr,
             batch_size=args.batch_size,
-            reg_types=args.reg_types,
+            losses=args.losses,
             hnet_hdim=args.hnet_hdim,
             unet_hdim=args.unet_hdim,
             range_restrict=args.range_restrict,
             topK=args.topK,
-            schedule=args.loss_schedule
+            hps=args.hyperparameters,
+            use_tanh=args.use_tanh
             ))
 
         args.ckpt_dir = os.path.join(args.run_dir, 'checkpoints')
@@ -69,24 +76,147 @@ class Parser(argparse.ArgumentParser):
             json.dump(vars(args), args_file, indent=4)
         return args
 
-def trainer(xdata, gt_data, args):
-    """Training loop. 
+def train(network, dataloader, criterion, optimizer, hpsampler, device):
+    """Train for one epoch
 
-    Parameters
-    ----------
-    xdata : Dataset of under-sampled measurements
-    gt_data : Dataset of fully-sampled images
-    args : Miscellaneous parameters
+        Parameters
+        ----------
+        network : hyperrrecon.UNet
+            Main network and hypernetwork
+        dataloader : torch.utils.data.DataLoader
+            Training set dataloader
+        optimizer : torch.optim.Adam
+            Adam optimizer
+        hpsampler : hyperrecon.HpSampler
+            Hyperparameter sampler
 
-    Returns
-    ----------
-    network : Main network and hypernetwork
-    optimizer : Adam optimizer
-    epoch_loss : Loss for this epoch
+        Returns
+        ----------
+        network : hyperrecon.UNet
+            Main network and hypernetwork
+        optimizer : torch.optim.Adam
+            Adam optimizer
+        epoch_loss : float
+            Loss for this epoch
     """
+    network.train()
+
+    epoch_loss = 0
+    epoch_samples = 0
+    epoch_psnr = 0
+
+    for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        batch_size = len(y)
+        y = y.float().to(device)
+        gt = gt.float().to(device)
+
+        optimizer.zero_grad()
+        with torch.set_grad_enabled(True):
+            zf = utils.ifft(y)
+            y, zf = utils.scale(y, zf)
+
+            hyperparams = hpsampler.sample(batch_size).to(device)
+            print(hyperparams)
+
+            recon, cap_reg = network(zf, hyperparams)
+            loss, _, sort_hyperparams = criterion(recon, y, hyperparams, cap_reg, gt=gt)
+
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.data.cpu().numpy() * batch_size
+            epoch_psnr += np.mean(utils.get_metrics(gt.permute(0, 2, 3, 1), \
+                    recon.permute(0, 2, 3, 1), zf.permute(0, 2, 3, 1), \
+                    'psnr', take_absval=False)) * batch_size
+        epoch_samples += batch_size
+
+    # np.save('', np.array(backproped_hps))
+    epoch_loss /= epoch_samples
+    epoch_psnr /= epoch_samples
+    return network, optimizer, epoch_loss, epoch_psnr
+
+def validate(network, dataloader, criterion, hpsampler, device):
+    """Validate for one epoch
+
+        Parameters
+        ----------
+        network : hyperrecon.UNet
+            Main network and hypernetwork
+        dataloader : torch.utils.data.DataLoader
+            Training set dataloader
+        hpsampler : hyperrecon.HpSampler
+            Hyperparameter sampler
+
+        Returns
+        ----------
+        network : hyperrecon.UNet
+            Main network and hypernetwork
+        epoch_loss : float
+            Loss for this epoch
+    """
+    network.eval()
+
+    epoch_loss1 = 0
+    epoch_loss2 = 0
+    epoch_samples = 0
+    epoch_psnr = 0
+
+    for batch_idx, (y, gt) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        batch_size = len(y)
+        y = y.float().to(device)
+        gt = gt.float().to(device)
+
+        with torch.set_grad_enabled(False):
+            zf = utils.ifft(y)
+            y, zf = utils.scale(y, zf)
+
+            hyperparams = hpsampler.sample(batch_size, val='one').to(device)
+            recon, cap_reg = network(zf, hyperparams)
+            loss1, _, _ = criterion(recon, y, hyperparams, cap_reg, gt=gt)
+                
+            hyperparams = hpsampler.sample(batch_size, val='zero').to(device)
+            recon, cap_reg = network(zf, hyperparams)
+            loss2, _, _ = criterion(recon, y, hyperparams, cap_reg, gt=gt)
+
+            epoch_loss1 += loss1.data.cpu().numpy() * batch_size
+            epoch_loss2 += loss2.data.cpu().numpy() * batch_size
+            metrics = utils.get_metrics(gt.permute(0, 2, 3, 1), recon.permute(0, 2, 3, 1), \
+                    zf.permute(0, 2, 3, 1), 'psnr', take_absval=False)
+            epoch_psnr += np.mean(metrics) * batch_size
+        epoch_samples += batch_size
+    epoch_loss1 /= epoch_samples
+    epoch_loss2 /= epoch_samples
+    epoch_psnr /= epoch_samples
+    return network, epoch_loss1, epoch_loss2, epoch_psnr
+
+
+if __name__ == "__main__":
+    args = Parser().parse()
+    
+    # GPU Handling
+    if torch.cuda.is_available():
+        args.device = torch.device('cuda:'+str(args.gpu_id))
+    else:
+        args.device = torch.device('cpu')
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
+
+    # Dataset
+    xdata = dataset.get_train_data(args.undersampling_rate, organ=args.organ)
+    gt_data = dataset.get_train_gt(organ=args.organ)
+    # xdata = dataset.get_test_data('small')
+    # gt_data = dataset.get_test_gt('small')
+    if args.n_ch_out == 2:
+        print('Appending complex dimension into gt...')
+        gt_data = np.concatenate((gt_data, np.zeros(gt_data.shape)), axis=3)
+
+    # Undersampling mask
+    args.mask = dataset.get_mask(args.undersampling_rate).to(args.device)
+
+    # Train
     logger = {}
     logger['loss_train'] = []
     logger['loss_val'] = []
+    logger['loss_val2'] = []
     logger['epoch_train_time'] = []
     logger['psnr_train'] = []
     logger['psnr_val'] = []
@@ -106,18 +236,27 @@ def trainer(xdata, gt_data, args):
     ##################################################
 
     ##### Model, Optimizer, Sampler, Loss ############
-    num_hyperparams = len(args.reg_types) if args.range_restrict else len(args.reg_types) + 1
-    network = model.Unet(args.device, num_hyperparams, args.hnet_hdim, \
-                args.unet_hdim).to(args.device)
+    num_hyperparams = len(args.losses)-1 if args.range_restrict else len(args.losses)
+    if args.hyperparameters is None:
+        network = model.HyperUnet(args.device,
+                         num_hyperparams,
+                         args.hnet_hdim,
+                         args.unet_hdim, 
+                         hnet_norm=not args.range_restrict,
+                         n_ch_out=args.n_ch_out,
+                         use_tanh=args.use_tanh).to(args.device)
+    else:
+        network = model.Unet(n_ch_out=args.n_ch_out, 
+                             unet_hdim=args.unet_hdim).to(args.device)
 
     print('Total parameters:', utils.count_parameters(network))
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
-    hpsampler = sampler.HpSampler(num_hyperparams, args.device, args.range_restrict)
-    criterion = hyperloss.AmortizedLoss(args.reg_types, args.range_restrict, args.sampling, \
+    hpsampler = sampler.HpSampler(num_hyperparams, args.range_restrict, debug=False, hps=args.hyperparameters)
+    criterion = hyperloss.AmortizedLoss(args.losses, args.range_restrict, args.sampling, \
         args.topK, args.device, args.mask)
 
-    # if args.scheduler:
-    #     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    if args.scheduler:
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True, min_lr=1e-7)
     ##################################################
 
     if args.force_lr is not None:
@@ -127,17 +266,23 @@ def trainer(xdata, gt_data, args):
     ############ Checkpoint Loading ##################
     # Load from path
     if args.load:
-        network, optimizer = utils.load_checkpoint(network, args.load, optimizer)
+        load_path = args.load
     # Load from previous checkpoint
-    if args.cont > 0:
-        load_file = os.path.join(args.run_dir, 'checkpoints', 'model.{epoch:04d}.h5'.format(epoch=args.cont))
-        network, optimizer = utils.load_checkpoint(network, load_file, optimizer)
+    elif args.cont > 0:
+        load_path = os.path.join(args.run_dir, 'checkpoints', 'model.{epoch:04d}.h5'.format(epoch=args.cont))
         logger['loss_train'] = list(np.loadtxt(os.path.join(args.run_dir, 'loss_train.txt'))[:args.cont])
         logger['loss_val'] = list(np.loadtxt(os.path.join(args.run_dir, 'loss_val.txt'))[:args.cont])
         logger['epoch_train_time'] = list(np.loadtxt(os.path.join(args.run_dir, 'epoch_train_time.txt'))[:args.cont])
         logger['psnr_train'] = list(np.loadtxt(os.path.join(args.run_dir, 'psnr_train.txt'))[:args.cont])
         logger['psnr_val'] = list(np.loadtxt(os.path.join(args.run_dir, 'psnr_val.txt'))[:args.cont])
-
+    else:
+        load_path = None
+ 
+    if load_path is not None:
+        if False:#args.scheduler:
+            network, optimizer, scheduler = utils.load_checkpoint(network, load_path, optimizer, scheduler)
+        else:
+            network, optimizer = utils.load_checkpoint(network, load_path, optimizer)
     ##################################################
 
     ############## Training loop #####################
@@ -145,61 +290,33 @@ def trainer(xdata, gt_data, args):
         tic = time.time()
 
         print('\nEpoch %d/%d' % (epoch, args.epochs))
-        print('Learning rate:', args.lr)
+        print('Learning rate:', args.lr if args.force_lr is None else args.force_lr)
         print('DHS sampling' if args.sampling == 'dhs' else 'UHS sampling')
 
-        # Loss scheduling for >2 hyperparameters. 
-        if args.loss_schedule is None:
-            schedule = len(args.reg_types)
-            print('%d losses' % schedule)
-        else:
-            schedule = min(epoch//args.loss_schedule, len(args.reg_types))
-            print('%d losses' % schedule)
-
         # Train
-        network, optimizer, train_epoch_loss, train_epoch_psnr = train.train(network, dataloaders['train'], \
-                criterion, optimizer, hpsampler, args.device, schedule)
+        network, optimizer, train_epoch_loss, train_epoch_psnr = train(network, dataloaders['train'], \
+                criterion, optimizer, hpsampler, args.device)
         # Validate
-        network, val_epoch_loss, val_epoch_psnr = train.validate(network, dataloaders['val'], criterion, hpsampler, args.device, \
-                schedule)
+        network, val_epoch_ssim, val_epoch_l1, val_epoch_psnr = validate(network, dataloaders['val'], criterion, hpsampler, args.device)
+        # val_epoch_loss, val_epoch_psnr = 0, 0
+        if args.scheduler:
+            scheduler.step(val_epoch_loss)
         
         epoch_train_time = time.time() - tic
 
         # Save checkpoints
         logger['loss_train'].append(train_epoch_loss)
-        logger['loss_val'].append(val_epoch_loss)
+        logger['loss_val'].append(val_epoch_ssim)
+        logger['loss_val2'].append(val_epoch_l1)
         logger['psnr_train'].append(train_epoch_psnr)
         logger['psnr_val'].append(val_epoch_psnr)
         logger['epoch_train_time'].append(epoch_train_time)
 
-        utils.save_loss(args.run_dir, logger, 'loss_train', 'loss_val', 'epoch_train_time', \
+        utils.save_loss(args.run_dir, logger, 'loss_train', 'loss_val', 'loss_val2', 'epoch_train_time', \
                 'psnr_train', 'psnr_val')
         if epoch % args.log_interval == 0:
             utils.save_checkpoint(epoch, network.state_dict(), optimizer.state_dict(), \
                     args.ckpt_dir)
 
         print("Epoch {}: test loss: {:.6f}, test psnr: {:.6f}, time: {:.6f}".format( \
-            epoch, val_epoch_loss, val_epoch_psnr, epoch_train_time))
-
-if __name__ == "__main__":
-    args = Parser().parse()
-    
-    # GPU Handling
-    if torch.cuda.is_available():
-        args.device = torch.device('cuda:'+str(args.gpu_id))
-    else:
-        args.device = torch.device('cpu')
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
-
-    # Dataset
-    xdata = dataset.get_train_data(args.undersampling_rate, old=True)
-    gt_data = dataset.get_train_gt(old=True)
-    if gt_data.shape[-1] == 1:
-        print('Appending complex dimension into gt...')
-        gt_data = np.concatenate((gt_data, np.zeros(gt_data.shape)), axis=3)
-
-    # Undersampling mask
-    args.mask = dataset.get_mask(args.undersampling_rate).to(args.device)
-
-    # Train
-    trainer(xdata, gt_data, args)
+            epoch, train_epoch_loss, train_epoch_psnr, epoch_train_time))

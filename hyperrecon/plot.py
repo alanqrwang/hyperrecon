@@ -88,27 +88,23 @@ def plot_over_hyperparams(vals, xticks, yticks=None, title=None, ax=None, vlim=N
         if len(vals.shape) > 1:
             for i in range(len(vals)):
                 h = ax.plot(xticks, vals[i], '.--')
-                ax.legend()
         else:
             h = ax.plot(xticks, vals, '.--')
 
         ax.set_xlabel('alpha', fontsize=16)
-        ax.legend()
-        # ax.legend(labels)
         if vlim:
             ax.set_ylim(vlim)
         ax.grid()
 
     if title is not None:
-        ax.set_title(title, fontsize=24)
+        ax.set_title(title, fontsize=20)
 
     if white_text is not None:
         ax.text(0.10,0.9, white_text, color='white', fontsize=20,
                  horizontalalignment='left',
                  verticalalignment='center',
                  transform = ax.transAxes)
-    ax.xaxis.labelpad = -15
-    return h
+    return h[0]
 
 def plot_prior_maps(path, ax=None, xlabel=None, ylabel=None, ticks='ends'):
     ax = ax or plt.gca() 
