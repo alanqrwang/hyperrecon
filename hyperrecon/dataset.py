@@ -6,21 +6,47 @@ For more details, please read:
 """
 import torch
 from torch.utils import data
+import torchio as tio
 import numpy as np
+import os
 
-class Dataset(data.Dataset):
-    def __init__(self, data, labels):
-        self.data = data
-        self.labels = labels
+class SubjectDataset(data.Dataset):
+    def __init__(self, data_path, split, transform=None):
+        super(SubjectDataset, self).__init__()
+        self.data_path = data_path
+        self.split = split
+        self.transform = transform
 
-    def __len__(self):
-        return len(self.data)
+        self.subjects = self._gather_subjects()
 
-    def __getitem__(self, index):
-        # Load data and get label
-        x = self.data[index]
-        y = self.labels[index]
-        return x, y
+    def _gather_subjects(self):
+        vol_base_path = os.path.join(self.data_path, self.split, 'origs/')
+        seg_base_path = os.path.join(self.data_path, self.split, 'asegs/')
+        vol_names = os.listdir(vol_base_path)
+
+        subjects = []
+        for vol_name in vol_names:
+            if vol_name.endswith('.npz'):
+                name = vol_name[:-8]
+                vol_path = os.path.join(vol_base_path, name + 'orig.npz')
+                seg_path = os.path.join(seg_base_path, name + 'aseg.npz')
+                subject = tio.Subject(
+                             mri=tio.ScalarImage(vol_path, reader=self._reader),
+                             seg=tio.LabelMap(seg_path, reader=self._reader),
+                         )
+                # print((subject.spatial_shape[2]))
+                subjects.append(subject)
+        return subjects
+
+    def _reader(self, path):
+        img = np.load(path)
+        img = img['vol_data']
+        img = torch.from_numpy(img).unsqueeze(0)
+        img = img.permute(0, 2, 1, 3).float()
+        return img, np.eye(4)
+
+    def get_tio_dataset(self):
+        return tio.SubjectsDataset(self.subjects, transform=self.transform)
 
 ######### Loading data #####################
 def get_mask(undersampling_rate, as_tensor=True, centered=False):

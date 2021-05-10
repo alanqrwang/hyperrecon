@@ -58,7 +58,7 @@ class HyperNetwork(nn.Module):
 
 class HyperUnet(nn.Module):
     """Main U-Net for image reconstruction"""
-    def __init__(self, device, num_hyperparams, hnet_hdim, unet_hdim, hnet_norm, n_ch_out, residual=True, use_tanh=True):
+    def __init__(self, device, num_hyperparams, hnet_hdim, unet_hdim, hnet_norm, n_ch_in, n_ch_out, residual=True, use_tanh=True):
         """
         Parameters
         ----------
@@ -82,7 +82,7 @@ class HyperUnet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
         # UNet
-        self.conv_down0 = layers.BatchConv2DLayer(2, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
+        self.conv_down0 = layers.BatchConv2DLayer(n_ch_in, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
         self.conv_down1 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
         self.conv_down2 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
         self.conv_down3 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
@@ -107,14 +107,14 @@ class HyperUnet(nn.Module):
         """
         Parameters
         ----------
-        zf : torch.Tensor (batch_size, img_height, img_width, 2)
+        zf : torch.Tensor (batch_size, 2, img_height, img_width)
             Zero-filled reconstruction of under-sampled measurement
         hyperparams : torch.Tensor (batch_size, num_hyperparams)
             Hyperparameter values
 
         """
         x = zf
-        x = x.permute(0, 3, 1, 2)
+        # x = x.permute(0, 3, 1, 2)
 
         hyp_out = self.hnet(hyperparams)
         penalty = torch.zeros(len(zf), requires_grad=True).to(self.device)
@@ -190,7 +190,7 @@ class HyperUnet(nn.Module):
         penalty = penalty + l1
         # out.register_hook(self.printnorm)
 
-        out = out.permute(0, 2, 3, 1)
+        # out = out.permute(0, 2, 3, 1)
         if self.residual:
             if self.n_ch_out == 1:
                 zf = zf.norm(-1, keepdim=True)
@@ -237,11 +237,11 @@ class TrajNet(nn.Module):
         return out
 
 class Unet(nn.Module):
-    def __init__(self, n_ch_out=1, unet_hdim=32, residual=True):
+    def __init__(self, n_ch_in=2, n_ch_out=1, unet_hdim=32, residual=True):
         super(Unet, self).__init__()
                 
         self.residual = residual
-        self.dconv_down1 = self.double_conv(2, unet_hdim)
+        self.dconv_down1 = self.double_conv(n_ch_in, unet_hdim)
         self.dconv_down2 = self.double_conv(unet_hdim, unet_hdim)
         self.dconv_down3 = self.double_conv(unet_hdim, unet_hdim)
         self.dconv_down4 = self.double_conv(unet_hdim, unet_hdim)        
@@ -265,7 +265,7 @@ class Unet(nn.Module):
         
     def forward(self, zf, hyperparams=None):
         x = zf
-        x = x.permute(0, 3, 1, 2)
+        # x = x.permute(0, 3, 1, 2)
 
         conv1 = self.dconv_down1(x)
         x = self.maxpool(conv1)
@@ -292,7 +292,7 @@ class Unet(nn.Module):
         x = self.dconv_up1(x)
         
         out = self.conv_last(x)
-        out = out.permute(0, 2, 3, 1)
+        # out = out.permute(0, 2, 3, 1)
         if self.residual:
             zf = zf.norm(-1, keepdim=True)
             out = zf + out 

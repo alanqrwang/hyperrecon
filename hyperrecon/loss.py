@@ -71,7 +71,7 @@ class AmortizedLoss(nn.Module):
         ----------
         tv_loss : TV loss
         """
-        x = x.permute(0, 3, 1, 2)
+        # x = x.permute(0, 3, 1, 2)
         tv_x = torch.sum((x[:, 0, :, :-1] - x[:, 0, :, 1:]).abs(), dim=(1, 2))
         tv_y = torch.sum((x[:, 0, :-1, :] - x[:, 0, 1:, :]).abs(), dim=(1, 2))
         if x.shape[1] == 2:
@@ -117,43 +117,41 @@ class AmortizedLoss(nn.Module):
         l1_shear = torch.sum(self.l1(shears, torch.zeros_like(shears)), dim=(1, 2, 3))
         return l1_shear
 
-    def get_ssim(self, recon, gt):
-        recon = recon.permute(0, 3, 1, 2)
-        gt = gt.permute(0, 3, 1, 2)
-        assert recon.shape[1] == 1 and gt.shape[1] == 1, 'Channel dimension incorrect'
-        ssim_out = 1-self.ssim_loss(recon, gt)
+    def get_ssim(self, input, target):
+        # input = input.permute(0, 3, 1, 2)
+        # target = target.permute(0, 3, 1, 2)
+        assert input.shape[1] == 1 and target.shape[1] == 1, 'Channel dimension incorrect'
+        ssim_out = 1-self.ssim_loss(input, target)
         ssim_out = ssim_out / 0.31786856
         return ssim_out
 
-    def get_watson_dft(self, recon, gt):
-        recon = recon.permute(0, 3, 1, 2)
-        gt = gt.permute(0, 3, 1, 2)
-        loss = self.watson_dft(recon, gt)
+    def get_watson_dft(self, input, target):
+        # input = input.permute(0, 3, 1, 2)
+        # target = target.permute(0, 3, 1, 2)
+        loss = self.watson_dft(input, target)
         return loss
 
     def get_dc_loss(self, x_hat, y, mask):
         l2 = torch.nn.MSELoss(reduction='none')
-        mask_expand = mask.unsqueeze(2)
 
-        Fx_hat = utils.fft(x_hat)
-        UFx_hat = Fx_hat * mask_expand
+        UFx_hat = utils.undersample(x_hat, mask)
         dc = torch.sum(l2(UFx_hat, y), dim=(1, 2, 3))
         return dc
 
-    def get_l1(self, recon, gt):
-        l1 = torch.mean(self.l1(recon, gt), dim=(1, 2, 3))
+    def get_l1(self, input, target):
+        l1 = torch.mean(self.l1(input, target), dim=(1, 2, 3))
         l1 = l1 / 0.045254722
         return l1
 
-    def get_mse(self, recon, gt):
+    def get_mse(self, input, target):
         mse_loss = torch.nn.MSELoss(reduction='none')
-        return torch.mean(mse_loss(recon, gt), dim=(1, 2, 3))
+        return torch.mean(mse_loss(input, target), dim=(1, 2, 3))
 
-    def forward(self, recon, y, hyperparams, cap_reg, gt=None):
+    def forward(self, input, y, hyperparams, cap_reg, target=None):
         '''
         Parameters
         ----------
-        recon : torch.Tensor (batch_size, img_height, img_width, 2)
+        input : torch.Tensor (batch_size, img_height, img_width, 2)
             Reconstructed image
         y : torch.Tensor (batch_size, img_height, img_width, 2)
             Under-sampled measurement
@@ -177,29 +175,33 @@ class AmortizedLoss(nn.Module):
         # Regularization
         loss_dict['cap'] = cap_reg
         if 'dc' in self.losses:
-            loss_dict['dc'] = self.get_dc_loss(recon, y, self.mask)
+            loss_dict['dc'] = self.get_dc_loss(input, y, self.mask)
         if 'tv' in self.losses:
-            loss_dict['tv'] = self.get_tv(recon)
+            loss_dict['tv'] = self.get_tv(input)
         if 'w' in self.losses:
-            loss_dict['w'] = self.get_wavelets(recon)
+            loss_dict['w'] = self.get_wavelets(input)
         if 'sh' in self.losses:
-            loss_dict['sh'] = self.get_shearlets(recon)
+            loss_dict['sh'] = self.get_shearlets(input)
+        if 'dice' in self.losses:
+            dice_loss = get_dice(input, target)
+            loss_dict['dice'] = dice_loss
         if 'l1' in self.losses:
-            assert gt is not None, 'supervised loss requires ground truth'
-            loss_dict['l1'] = self.get_l1(recon, gt)
+            assert target is not None, 'supervised loss requires ground truth'
+            loss_dict['l1'] = self.get_l1(input, target)
         if 'mse' in self.losses:
-            assert gt is not None, 'supervised loss requires ground truth'
-            loss_dict['mse'] = self.get_mse(recon, gt)
+            assert target is not None, 'supervised loss requires ground truth'
+            loss_dict['mse'] = self.get_mse(input, target)
         if 'ssim' in self.losses:
-            assert gt is not None, 'supervised loss requires ground truth'
-            loss_dict['ssim'] = self.get_ssim(recon, gt)
+            assert target is not None, 'supervised loss requires ground truth'
+            loss_dict['ssim'] = self.get_ssim(input, target)
         if 'perc' in self.losses:
-            assert gt is not None, 'supervised loss requires ground truth'
-            loss_dict['perc'] = self.get_watson_dft(recon, gt)
+            assert target is not None, 'supervised loss requires ground truth'
+            loss_dict['perc'] = self.get_watson_dft(input, target)
 
         if self.range_restrict and len(self.losses) == 2:
             assert len(self.losses) == hyperparams.shape[1] + 1, 'num_hyperparams and loss mismatch'
             alpha = hyperparams[:, 0]
+            print(loss_dict[self.losses[0]].shape, loss_dict[self.losses[1]].shape) 
             loss = (1-alpha)*loss_dict[self.losses[0]] + alpha*loss_dict[self.losses[1]]
 
         elif self.range_restrict and len(self.losses) == 3:
@@ -245,7 +247,7 @@ class AmortizedLoss(nn.Module):
             _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
             sort_losses = losses[perm] # Reorder total losses by lowest to highest DC loss
             sort_hyperparams = hyperparams[perm]
-            loss = torch.sum(sort_losses[:self.topK]) # Take only the losses with lowest DC
+            loss = torch.mean(sort_losses[:self.topK]) # Take only the losses with lowest DC
         elif self.topK is None and self.take_avg:
             loss = torch.mean(losses)
             sort_hyperparams = hyperparams
@@ -255,6 +257,24 @@ class AmortizedLoss(nn.Module):
 
         return loss, sort_hyperparams
 
+def get_dice(pred, target):
+    eps = 1
+    assert pred.size() == target.size(), 'Input and target are different dim'
+
+    if len(target.size())==4:
+        n,c,x,y = target.size()
+    if len(target.size())==5:
+        n,c,x,y,z = target.size()
+
+    target = target.view(n,c,-1)
+    pred = pred.view(n,c,-1)
+
+    num = torch.sum(2*(target*pred),2) + eps
+    den = (pred*pred).sum(2) + (target*target).sum(2) + eps
+    dice_loss = 1-num/den
+    ind_avg = dice_loss.mean(1) # Average across channels
+
+    return ind_avg
 
 def trajloss(recons, dc_losses, lmbda, device, loss_type, mse=None):
     '''Trajectory Net Loss

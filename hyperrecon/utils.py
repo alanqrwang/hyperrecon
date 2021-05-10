@@ -21,20 +21,38 @@ def add_bool_arg(parser, name, default=True):
     parser.set_defaults(**{name:default})
 
 def fft(x):
-    """Normalized 2D Fast Fourier Transform"""
+    """Normalized 2D Fast Fourier Transform
+
+    x: input of shape (batch_size, n_ch, l, w)
+    """
     # complex_x = torch.view_as_complex(x)
     # fft = torch.fft.fft2(complex_x,  norm='ortho')
     # return torch.view_as_real(fft) 
+    x = x.permute(0, 2, 3, 1)
     if x.shape[-1] == 1:
         x = torch.cat((x, torch.zeros_like(x)), dim=3)
-    return torch.fft(x, signal_ndim=2, normalized=True)
+    x = torch.fft(x, signal_ndim=2, normalized=True)
+    x = x.permute(0, 3, 1, 2)
+    return x
 
 def ifft(x):
-    """Normalized 2D Inverse Fast Fourier Transform"""
+    """Normalized 2D Inverse Fast Fourier Transform
+
+    x: input of shape (batch_size, n_ch, l, w)
+    """
     # complex_x = torch.view_as_complex(x)
     # ifft = torch.fft.ifft2(complex_x, norm='ortho')
     # return torch.view_as_real(ifft) 
-    return torch.ifft(x, signal_ndim=2, normalized=True)
+    x = x.permute(0, 2, 3, 1)
+    torch.ifft(x, signal_ndim=2, normalized=True)
+    x = x.permute(0, 3, 1, 2)
+    return x
+
+def undersample(img, mask):
+    mask_expand = mask.unsqueeze(2)
+    Fx_hat = fft(img)
+    UFx_hat = Fx_hat * mask_expand
+    return UFx_hat
 
 def absval(arr):
     """
