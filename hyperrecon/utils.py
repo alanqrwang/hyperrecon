@@ -5,6 +5,7 @@ For more details, please read:
     "Regularization-Agnostic Compressed Sensing MRI with Hypernetworks" 
 """
 import torch
+import torchio as tio
 import numpy as np
 import pickle
 # import parse
@@ -36,6 +37,17 @@ def ifft(x):
     # return torch.view_as_real(ifft) 
     return torch.ifft(x, signal_ndim=2, normalized=True)
 
+def undersample(fullysampled, mask):
+    '''Generate undersampled k-space data with given binary mask'''
+    if fullysampled.shape[-1] == 1:
+        fullysampled = torch.cat((fullysampled, torch.zeros_like(fullysampled)), dim=3)
+
+    mask_expand = mask.unsqueeze(2)
+
+    ksp = fft(fullysampled)
+    under_ksp = ksp * mask_expand
+    return under_ksp
+
 def absval(arr):
     """
     Takes absolute value of last dimension, if complex.
@@ -53,10 +65,40 @@ def absval(arr):
 def scale(y, zf):
     """Scales inputs for numerical stability"""
     flat_yzf = torch.flatten(absval(zf), start_dim=1, end_dim=2)
-    max_val_per_batch, _ = torch.max(flat_yzf, dim=1, keepdim=True)
+    max_val_per_batch, _ = torch.max(flat_yzf, dim=1, keepdim=True) 
+
+    # Handling the edge case of image of all 0's
+    max_val_per_batch[max_val_per_batch==0] = 1
+    
     y = y / max_val_per_batch.view(len(y), 1, 1, 1)
     zf = zf / max_val_per_batch.view(len(y), 1, 1, 1)
     return y, zf
+
+def prepare_batch(batch, args, split='train'):
+    if isinstance(batch, tuple) == 4:
+        inputs = batch[0].float().to(args['device'])
+        targets = batch[1].float().to(args['device'])
+    else: # Volume was loaded, so randomly take batch_size slices
+        volume = batch['mri'][tio.DATA]
+        num_slices = volume.shape[2]
+        if split == 'train':
+            rand_ind = np.random.choice(num_slices, args['batch_size'], replace=False)
+        else:
+            rand_ind = np.arange(num_slices, step=8)
+
+        targets = volume[0, :, rand_ind].to(args['device']).permute(1, 2, 3, 0)
+        targets = rescale(targets)
+        under_ksp = undersample(targets, args['mask'])
+
+        zf = ifft(under_ksp)
+
+        if args['rescale_in']:
+            zf = zf.norm(2, dim=-1, keepdim=True)
+            zf = rescale(zf)
+        else:
+            under_ksp, zf = scale(under_ksp, zf)
+
+    return zf, targets, under_ksp
 
 def nextPowerOf2(n):
     """Get next power of 2"""
@@ -72,29 +114,26 @@ def nextPowerOf2(n):
     return 1 << count;
 
 def rescale(arr):
-    """Rescales a batch of images into range [0, 1]"""
-    if type(arr) is np.ndarray:
-        if len(arr.shape) > 2:
-            res = np.zeros(arr.shape)
-            for i in range(len(arr)):
-                res[i] = (arr[i] - np.min(arr[i])) / (np.max(arr[i]) - np.min(arr[i]))
-            return res
-        else:
-            return (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
+    """Rescales a batch of images into range [0, 1]
 
-    else:
-        if len(arr.shape) > 2:
-            res = torch.zeros_like(arr)
-            for i in range(len(arr)):
-                res[i] = (arr[i] - torch.min(arr[i])) / (torch.max(arr[i]) - torch.min(arr[i]))
-            return res
-        else:
-            return (arr - torch.min(arr)) / (torch.max(arr) - torch.min(arr))
+    arr: (batch_size, l, w, 2)
+    """
+    flat_arr = torch.flatten(arr, start_dim=1, end_dim=2)
+    max_per_batch, _ = torch.max(flat_arr, dim=1, keepdim=True) 
+    min_per_batch, _ = torch.min(flat_arr, dim=1, keepdim=True) 
 
-def normalize_recons(recons):
-    recons = absval(recons)
-    recons = normalize(recons)
-    return recons
+    # Handling the edge case of image of all 0's
+    max_per_batch[max_per_batch==0] = 1 
+
+    max_per_batch = max_per_batch.view(len(arr), 1, 1, 1)
+    min_per_batch = min_per_batch.view(len(arr), 1, 1, 1)
+
+    return (arr - min_per_batch) / (max_per_batch - min_per_batch)
+
+# def normalize_recons(recons):
+#     recons = absval(recons)
+#     recons = normalize(recons)
+#     return recons
 
 def count_parameters(model):
     """Count total parameters in model"""

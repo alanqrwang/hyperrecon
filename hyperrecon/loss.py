@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from perceptualloss.loss_provider import LossProvider
 from . import utils
 import pytorch_ssim
+from unetsegmentation import test as segtest
 
 class AmortizedLoss(nn.Module):
     """Loss function for model"""
@@ -118,11 +119,19 @@ class AmortizedLoss(nn.Module):
         return l1_shear
 
     def get_ssim(self, recon, gt):
+        '''
+        Mean ssim loss on test set:
+        knee, 8p3: 0.31786856
+        brain, 8p3: 0.04896923
+        brain, 16p3: 0.27682352
+        brain, 16p3, dataloader raw: 0.19311385291318098
+        brain, 16p3, dataloader [0,1]: 0.3292024733188252
+        '''
         recon = recon.permute(0, 3, 1, 2)
         gt = gt.permute(0, 3, 1, 2)
         assert recon.shape[1] == 1 and gt.shape[1] == 1, 'Channel dimension incorrect'
         ssim_out = 1-self.ssim_loss(recon, gt)
-        ssim_out = ssim_out / 0.31786856
+        ssim_out = ssim_out / 0.3292024733188252
         return ssim_out
 
     def get_watson_dft(self, recon, gt):
@@ -141,13 +150,28 @@ class AmortizedLoss(nn.Module):
         return dc
 
     def get_l1(self, recon, gt):
+        '''
+        Mean l1 loss on test set:
+        knee, 8p3: 0.045254722
+        brain, 8p3: 0.012755771
+        brain, 16p3: 0.06143104
+        brain, 16p3, dataloader raw: 0.024369188099323463
+        brain, 16p3, dataloader [0,1]: 0.053978089925294626
+        '''
         l1 = torch.mean(self.l1(recon, gt), dim=(1, 2, 3))
-        l1 = l1 / 0.045254722
+        l1 = l1 / 0.053978089925294626
         return l1
 
     def get_mse(self, recon, gt):
         mse_loss = torch.nn.MSELoss(reduction='none')
         return torch.mean(mse_loss(recon, gt), dim=(1, 2, 3))
+
+    def get_dice(self, recon, gt, seg):
+        # pretrained_segmentation_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/bn/May_11/0.005_64_32/'
+        pretrained_segmentation_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/easier-problem/May_21/0.005_64_32_2/'
+
+        res_dict = segtest.tester(pretrained_segmentation_path, xdata=recon, seg_data=seg)
+        return res_dict['losses'], res_dict['preds']
 
     def forward(self, recon, y, hyperparams, cap_reg, gt=None):
         '''
@@ -201,6 +225,9 @@ class AmortizedLoss(nn.Module):
             assert len(self.losses) == hyperparams.shape[1] + 1, 'num_hyperparams and loss mismatch'
             alpha = hyperparams[:, 0]
             loss = (1-alpha)*loss_dict[self.losses[0]] + alpha*loss_dict[self.losses[1]]
+            # print(loss_dict[self.losses[0]])
+            # print(loss_dict[self.losses[1]])
+            # print(loss)
 
         elif self.range_restrict and len(self.losses) == 3:
             assert len(self.losses) == hyperparams.shape[1] + 1, 'num_hyperparams and loss mismatch'

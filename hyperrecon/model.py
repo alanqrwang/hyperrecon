@@ -58,7 +58,7 @@ class HyperNetwork(nn.Module):
 
 class HyperUnet(nn.Module):
     """Main U-Net for image reconstruction"""
-    def __init__(self, device, num_hyperparams, hnet_hdim, unet_hdim, hnet_norm, n_ch_out, residual=True, use_tanh=True):
+    def __init__(self, device, num_hyperparams, hnet_hdim, unet_hdim, hnet_norm, n_ch_in, n_ch_out, residual=True, use_tanh=True):
         """
         Parameters
         ----------
@@ -75,6 +75,7 @@ class HyperUnet(nn.Module):
         self.residual = residual
         self.unet_hdim = unet_hdim
         self.device = device
+        self.n_ch_in = n_ch_in
         self.n_ch_out = n_ch_out
 
         self.maxpool = nn.MaxPool2d(2)
@@ -82,7 +83,7 @@ class HyperUnet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
         # UNet
-        self.conv_down0 = layers.BatchConv2DLayer(2, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
+        self.conv_down0 = layers.BatchConv2DLayer(n_ch_in, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
         self.conv_down1 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
         self.conv_down2 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
         self.conv_down3 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
@@ -199,18 +200,6 @@ class HyperUnet(nn.Module):
         assert out.shape[-1] == self.n_ch_out, 'Incorrect output channels'
         return out, penalty
 
-    def printnorm(self, x):
-        # input is a tuple of packed inputs
-        # output is a Tensor. output.data is the Tensor we are interested
-        print('Inside ' + self.__class__.__name__ + ' forward')
-        print('norm0:', x[0].data.norm())
-        print('norm1:', x[1].data.norm())
-        print('norm2:', x[2].data.norm())
-        print('norm3:', x[3].data.norm())
-        print('norm4:', x[4].data.norm())
-        print('norm5:', x[5].data.norm())
-        print('norm6:', x[6].data.norm())
-        print('norm7:', x[7].data.norm())
 
 class TrajNet(nn.Module):
     def __init__(self, in_dim=1, h_dim=8, out_dim=2):
@@ -237,11 +226,11 @@ class TrajNet(nn.Module):
         return out
 
 class Unet(nn.Module):
-    def __init__(self, n_ch_out=1, unet_hdim=32, residual=True):
+    def __init__(self, n_ch_in=2, n_ch_out=1, unet_hdim=32, residual=True):
         super(Unet, self).__init__()
                 
         self.residual = residual
-        self.dconv_down1 = self.double_conv(2, unet_hdim)
+        self.dconv_down1 = self.double_conv(n_ch_in, unet_hdim)
         self.dconv_down2 = self.double_conv(unet_hdim, unet_hdim)
         self.dconv_down3 = self.double_conv(unet_hdim, unet_hdim)
         self.dconv_down4 = self.double_conv(unet_hdim, unet_hdim)        
@@ -290,7 +279,7 @@ class Unet(nn.Module):
         x = torch.cat([x, conv1], dim=1)   
         
         x = self.dconv_up1(x)
-        
+
         out = self.conv_last(x)
         out = out.permute(0, 2, 3, 1)
         if self.residual:
