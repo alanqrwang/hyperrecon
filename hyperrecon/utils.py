@@ -22,28 +22,35 @@ def add_bool_arg(parser, name, default=True):
     parser.set_defaults(**{name:default})
 
 def fft(x):
-    """Normalized 2D Fast Fourier Transform"""
+    """Normalized 2D Fast Fourier Transform
+
+    x: input of shape (batch_size, n_ch, l, w)
+    """
     # complex_x = torch.view_as_complex(x)
     # fft = torch.fft.fft2(complex_x,  norm='ortho')
     # return torch.view_as_real(fft) 
     if x.shape[-1] == 1:
         x = torch.cat((x, torch.zeros_like(x)), dim=3)
-    return torch.fft(x, signal_ndim=2, normalized=True)
+    x = torch.fft(x, signal_ndim=2, normalized=True)
+    return x
 
 def ifft(x):
-    """Normalized 2D Inverse Fast Fourier Transform"""
+    """Normalized 2D Inverse Fast Fourier Transform
+
+    x: input of shape (batch_size, n_ch, l, w)
+    """
     # complex_x = torch.view_as_complex(x)
     # ifft = torch.fft.ifft2(complex_x, norm='ortho')
     # return torch.view_as_real(ifft) 
-    return torch.ifft(x, signal_ndim=2, normalized=True)
+    torch.ifft(x, signal_ndim=2, normalized=True)
+    return x
 
 def undersample(fullysampled, mask):
     '''Generate undersampled k-space data with given binary mask'''
     if fullysampled.shape[-1] == 1:
         fullysampled = torch.cat((fullysampled, torch.zeros_like(fullysampled)), dim=3)
 
-    mask_expand = mask.unsqueeze(2)
-
+    mask_expand = mask.unsqueeze(-1)
     ksp = fft(fullysampled)
     under_ksp = ksp * mask_expand
     return under_ksp
@@ -75,28 +82,25 @@ def scale(y, zf):
     return y, zf
 
 def prepare_batch(batch, args, split='train'):
-    if isinstance(batch, tuple) == 4:
-        inputs = batch[0].float().to(args['device'])
-        targets = batch[1].float().to(args['device'])
-    else: # Volume was loaded, so randomly take batch_size slices
-        volume = batch['mri'][tio.DATA]
-        num_slices = volume.shape[2]
-        if split == 'train':
-            rand_ind = np.random.choice(num_slices, args['batch_size'], replace=False)
-        else:
-            rand_ind = np.arange(num_slices, step=8)
+    volume = batch['mri'][tio.DATA]
+    num_slices = volume.shape[2]
+    if split == 'train':
+        rand_ind = np.random.choice(num_slices, args['batch_size'], replace=False)
+    else:
+        rand_ind = np.arange(num_slices, step=8)
 
-        targets = volume[0, :, rand_ind].to(args['device']).permute(1, 2, 3, 0)
-        targets = rescale(targets)
-        under_ksp = undersample(targets, args['mask'])
+    targets = volume[0, :, rand_ind].to(args['device']).permute(1, 2, 3, 0)
+    targets = rescale(targets)
+    print(targets.shape)
+    under_ksp = undersample(targets, args['mask'])
 
-        zf = ifft(under_ksp)
+    zf = ifft(under_ksp)
 
-        if args['rescale_in']:
-            zf = zf.norm(2, dim=-1, keepdim=True)
-            zf = rescale(zf)
-        else:
-            under_ksp, zf = scale(under_ksp, zf)
+    if args['rescale_in']:
+        zf = zf.norm(2, dim=-1, keepdim=True)
+        zf = rescale(zf)
+    else:
+        under_ksp, zf = scale(under_ksp, zf)
 
     return zf, targets, under_ksp
 

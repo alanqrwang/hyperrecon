@@ -108,7 +108,7 @@ class HyperUnet(nn.Module):
         """
         Parameters
         ----------
-        zf : torch.Tensor (batch_size, img_height, img_width, 2)
+        zf : torch.Tensor (batch_size, 2, img_height, img_width)
             Zero-filled reconstruction of under-sampled measurement
         hyperparams : torch.Tensor (batch_size, num_hyperparams)
             Hyperparameter values
