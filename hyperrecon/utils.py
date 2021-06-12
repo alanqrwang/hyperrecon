@@ -10,9 +10,11 @@ import numpy as np
 import pickle
 # import parse
 import glob
-from . import test, dataset
+from . import test, dataset, model, layers
 import myutils
 import os
+import matplotlib.pyplot as plt
+from myutils.plot import plot_img
 
 def add_bool_arg(parser, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -42,7 +44,7 @@ def ifft(x):
     # complex_x = torch.view_as_complex(x)
     # ifft = torch.fft.ifft2(complex_x, norm='ortho')
     # return torch.view_as_real(ifft) 
-    torch.ifft(x, signal_ndim=2, normalized=True)
+    x = torch.ifft(x, signal_ndim=2, normalized=True)
     return x
 
 def undersample(fullysampled, mask):
@@ -82,27 +84,24 @@ def scale(y, zf):
     return y, zf
 
 def prepare_batch(batch, args, split='train'):
-    volume = batch['mri'][tio.DATA]
-    num_slices = volume.shape[2]
-    if split == 'train':
-        rand_ind = np.random.choice(num_slices, args['batch_size'], replace=False)
+    if type(batch) == list:
+        targets = batch[0].to(args['device']).float()
+        segs = batch[1].to(args['device']).float()
+
     else:
-        rand_ind = np.arange(num_slices, step=8)
+        targets = batch.float().to(args['device'])
+        segs = None
 
-    targets = volume[0, :, rand_ind].to(args['device']).permute(1, 2, 3, 0)
-    targets = rescale(targets)
-    print(targets.shape)
     under_ksp = undersample(targets, args['mask'])
-
     zf = ifft(under_ksp)
 
     if args['rescale_in']:
-        zf = zf.norm(2, dim=-1, keepdim=True)
+        zf = zf.norm(p=2, dim=-1, keepdim=True)
         zf = rescale(zf)
     else:
         under_ksp, zf = scale(under_ksp, zf)
 
-    return zf, targets, under_ksp
+    return zf, targets, under_ksp, segs
 
 def nextPowerOf2(n):
     """Get next power of 2"""
@@ -134,16 +133,27 @@ def rescale(arr):
 
     return (arr - min_per_batch) / (max_per_batch - min_per_batch)
 
-# def normalize_recons(recons):
-#     recons = absval(recons)
-#     recons = normalize(recons)
-#     return recons
+def remove_sequential(network, all_layers):
+    for layer in network.children():
+        if type(layer) == layers.BatchConv2d: # if sequential layer, apply recursively to layers in sequential layer
+            all_layers.append(layer)
+        if list(layer.children()) != []: # if leaf node, add it to list
+            all_layers = remove_sequential(layer, all_layers)
 
-def count_parameters(model):
+    return all_layers
+
+def count_parameters(network):
     """Count total parameters in model"""
-    for name, val in model.named_parameters():
+    for name, val in network.named_parameters():
         print(name)
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    main_param_count = 0
+    all_layers = []
+    all_layers = remove_sequential(network, all_layers)
+    for l in all_layers:
+        main_param_count += np.prod(l.get_weight_shape()) + np.prod(l.get_bias_shape())
+    print('Number of main weights:', main_param_count)
+    return sum(p.numel() for p in network.parameters() if p.requires_grad)
 
 ######### Saving/Loading checkpoints ############
 def load_checkpoint(model, path, optimizer=None, scheduler=None):

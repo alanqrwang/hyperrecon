@@ -10,7 +10,6 @@ from . import layers
 import torch
 import torch.nn as nn
 import sys
-import torch.autograd.profiler as profiler
 
 class HyperNetwork(nn.Module):
     """Hypernetwork architecture and forward pass
@@ -58,7 +57,7 @@ class HyperNetwork(nn.Module):
 
 class HyperUnet(nn.Module):
     """Main U-Net for image reconstruction"""
-    def __init__(self, device, num_hyperparams, hnet_hdim, unet_hdim, hnet_norm, n_ch_in, n_ch_out, residual=True, use_tanh=True):
+    def __init__(self, in_units_hnet, h_units_hnet, hnet_norm, in_ch_main, out_ch_main, h_ch_main, residual=True):
         """
         Parameters
         ----------
@@ -73,38 +72,17 @@ class HyperUnet(nn.Module):
         super(HyperUnet, self).__init__()
 
         self.residual = residual
-        self.unet_hdim = unet_hdim
-        self.device = device
-        self.n_ch_in = n_ch_in
-        self.n_ch_out = n_ch_out
-
-        self.maxpool = nn.MaxPool2d(2)
-        self.upsample = layers.Upsample(scale_factor=2, mode='bilinear', align_corners=True)        
-        self.relu = nn.ReLU(inplace=True)
-
-        # UNet
-        self.conv_down0 = layers.BatchConv2DLayer(n_ch_in, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_down1 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_down2 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_down3 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_down4 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_down5 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_down6 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_down7 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-
-        self.conv_up8 = layers.BatchConv2DLayer(unet_hdim+unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_up9 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_up10 = layers.BatchConv2DLayer(unet_hdim+unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_up11 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_up12 = layers.BatchConv2DLayer(unet_hdim+unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-        self.conv_up13 = layers.BatchConv2DLayer(unet_hdim, unet_hdim, hnet_hdim, padding=1, use_tanh=use_tanh)
-
-        self.conv_last14 = layers.BatchConv2DLayer(unet_hdim, n_ch_out, hnet_hdim, ks=1, use_tanh=use_tanh)
 
         # HyperNetwork
-        self.hnet = HyperNetwork(hnet_norm, in_dim=num_hyperparams, h_dim=hnet_hdim)
+        self.hnet = HyperNetwork(hnet_norm, 
+                                 in_dim=in_units_hnet, 
+                                 h_dim=h_units_hnet)
+        self.unet = Unet(in_ch=in_ch_main, 
+                         out_ch=out_ch_main, 
+                         h_ch=h_ch_main, 
+                         hnet_hdim=h_units_hnet)
 
-    def forward(self, zf, hyperparams):
+    def forward(self, x, hyperparams):
         """
         Parameters
         ----------
@@ -114,92 +92,93 @@ class HyperUnet(nn.Module):
             Hyperparameter values
 
         """
+        hyp_out = self.hnet(hyperparams)
+        out = self.unet(x, hyp_out)
+
+        return out
+
+class Unet(nn.Module):
+    def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True):
+        '''
+        hnet_hdim activates hypernetwork for Unet
+        '''
+        super(Unet, self).__init__()
+                
+        self.residual = residual
+        self.hnet_hdim = hnet_hdim
+
+        self.dconv_down1 = self.double_conv(in_ch, h_ch)
+        self.dconv_down2 = self.double_conv(h_ch, h_ch)
+        self.dconv_down3 = self.double_conv(h_ch, h_ch)
+        self.dconv_down4 = self.double_conv(h_ch, h_ch)        
+
+        self.maxpool = nn.MaxPool2d(2)
+        self.upsample = layers.Upsample(scale_factor=2, mode='bilinear', align_corners=True)        
+        
+        self.dconv_up3 = self.double_conv(h_ch+h_ch, h_ch)
+        self.dconv_up2 = self.double_conv(h_ch+h_ch, h_ch)
+        self.dconv_up1 = self.double_conv(h_ch+h_ch, h_ch)
+        
+        if hnet_hdim is not None:
+            self.conv_last = layers.BatchConv2d(h_ch, out_ch, hnet_hdim, ks=1)
+        else:
+            self.conv_last = nn.Conv2d(h_ch, out_ch, 1)
+        
+
+    def double_conv(self, in_channels, out_channels):
+        if self.hnet_hdim is not None:
+            return layers.MultiSequential(
+                layers.BatchConv2d(in_channels, out_channels, self.hnet_hdim, padding=1),
+                nn.ReLU(inplace=True),
+                layers.BatchConv2d(out_channels, out_channels, self.hnet_hdim, padding=1),
+                nn.ReLU(inplace=True)
+            )   
+        else:
+            return layers.MultiSequential(
+                nn.Conv2d(in_channels, out_channels, 3, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1),
+                nn.ReLU(inplace=True)
+            )   
+        
+    def forward(self, zf, hyp_out=None):
         x = zf
         x = x.permute(0, 3, 1, 2)
 
-        hyp_out = self.hnet(hyperparams)
-        penalty = torch.zeros(len(zf), requires_grad=True).to(self.device)
-
-        # conv_down1
-        x, l1 = self.conv_down0(x, hyp_out)
-        x = self.relu(x)
-        # x.register_hook(self.printnorm)
-        penalty = penalty + l1
-        x, l1 = self.conv_down1(x, hyp_out)
-        conv1 = self.relu(x)
-        penalty = penalty + l1
+        conv1 = self.dconv_down1(x, hyp_out)
         x = self.maxpool(conv1)
 
-        # conv_down2
-        x, l1 = self.conv_down2(x, hyp_out)
-        x = self.relu(x)
-        penalty = penalty + l1
-        x, l1 = self.conv_down3(x, hyp_out)
-        conv2 = self.relu(x)
-        penalty = penalty + l1
+        conv2 = self.dconv_down2(x, hyp_out)
         x = self.maxpool(conv2)
-
-        # conv_down3
-        x, l1 = self.conv_down4(x, hyp_out)
-        x = self.relu(x)
-        penalty = penalty + l1
-        x, l1 = self.conv_down5(x, hyp_out)
-        conv3 = self.relu(x)
-        penalty = penalty + l1
+        
+        conv3 = self.dconv_down3(x, hyp_out)
         x = self.maxpool(conv3)   
-
-        # conv_down4
-        x, l1 = self.conv_down6(x, hyp_out)
-        x = self.relu(x)
-        penalty = penalty + l1
-        x, l1 = self.conv_down7(x, hyp_out)
-        conv4 = self.relu(x)
-        penalty = penalty + l1
-        x = self.upsample(conv4)        
+        
+        x = self.dconv_down4(x, hyp_out)
+        
+        x = self.upsample(x)        
         x = torch.cat([x, conv3], dim=1)
+        x = self.dconv_up3(x, hyp_out)
 
-        # conv_up3
-        x, l1 = self.conv_up8(x, hyp_out)
-        x = self.relu(x)
-        penalty = penalty + l1
-        x, l1 = self.conv_up9(x, hyp_out)
-        x = self.relu(x)
-        penalty = penalty + l1
         x = self.upsample(x)        
         x = torch.cat([x, conv2], dim=1)       
+        x = self.dconv_up2(x, hyp_out)
 
-        # conv_up2
-        x, l1 = self.conv_up10(x, hyp_out)
-        x = self.relu(x)
-        penalty = penalty + l1
-        x, l1 = self.conv_up11(x, hyp_out)
-        x = self.relu(x)
-        penalty = penalty + l1
         x = self.upsample(x)        
         x = torch.cat([x, conv1], dim=1)   
+        x = self.dconv_up1(x, hyp_out)
 
-        # conv_up1
-        x, l1 = self.conv_up12(x, hyp_out)
-        x = self.relu(x)
-        penalty = penalty + l1
-        x, l1 = self.conv_up13(x, hyp_out)
-        x = self.relu(x)
-        penalty = penalty + l1
-
-        # last
-        out, l1 = self.conv_last14(x, hyp_out)
-        penalty = penalty + l1
-        # out.register_hook(self.printnorm)
+        if self.hnet_hdim is not None:
+            out = self.conv_last(x, hyp_out)
+        else:
+            out = self.conv_last(x)
 
         out = out.permute(0, 2, 3, 1)
         if self.residual:
-            if self.n_ch_out == 1:
-                zf = zf.norm(-1, keepdim=True)
+            zf = zf.norm(p=2, dim=-1, keepdim=True)
             out = zf + out 
-
-        assert out.shape[-1] == self.n_ch_out, 'Incorrect output channels'
-        return out, penalty
-
+        
+        return out
 
 class TrajNet(nn.Module):
     def __init__(self, in_dim=1, h_dim=8, out_dim=2):
@@ -224,67 +203,4 @@ class TrajNet(nn.Module):
         x = self.lin5(x)
         out = self.sigmoid(x)
         return out
-
-class Unet(nn.Module):
-    def __init__(self, n_ch_in=2, n_ch_out=1, unet_hdim=32, residual=True):
-        super(Unet, self).__init__()
-                
-        self.residual = residual
-        self.dconv_down1 = self.double_conv(n_ch_in, unet_hdim)
-        self.dconv_down2 = self.double_conv(unet_hdim, unet_hdim)
-        self.dconv_down3 = self.double_conv(unet_hdim, unet_hdim)
-        self.dconv_down4 = self.double_conv(unet_hdim, unet_hdim)        
-
-        self.maxpool = nn.MaxPool2d(2)
-        self.upsample = layers.Upsample(scale_factor=2, mode='bilinear', align_corners=True)        
-        
-        self.dconv_up3 = self.double_conv(unet_hdim+unet_hdim, unet_hdim)
-        self.dconv_up2 = self.double_conv(unet_hdim+unet_hdim, unet_hdim)
-        self.dconv_up1 = self.double_conv(unet_hdim+unet_hdim, unet_hdim)
-        
-        self.conv_last = nn.Conv2d(unet_hdim, n_ch_out, 1)
-        
-    def double_conv(self, in_channels, out_channels):
-        return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True)
-        )   
-        
-    def forward(self, zf, hyperparams=None):
-        x = zf
-        x = x.permute(0, 3, 1, 2)
-
-        conv1 = self.dconv_down1(x)
-        x = self.maxpool(conv1)
-
-        conv2 = self.dconv_down2(x)
-        x = self.maxpool(conv2)
-        
-        conv3 = self.dconv_down3(x)
-        x = self.maxpool(conv3)   
-        
-        x = self.dconv_down4(x)
-        
-        x = self.upsample(x)        
-        x = torch.cat([x, conv3], dim=1)
-        
-        x = self.dconv_up3(x)
-        x = self.upsample(x)        
-        x = torch.cat([x, conv2], dim=1)       
-
-        x = self.dconv_up2(x)
-        x = self.upsample(x)        
-        x = torch.cat([x, conv1], dim=1)   
-        
-        x = self.dconv_up1(x)
-
-        out = self.conv_last(x)
-        out = out.permute(0, 2, 3, 1)
-        if self.residual:
-            zf = zf.norm(-1, keepdim=True)
-            out = zf + out 
-        
-        return out, None
 

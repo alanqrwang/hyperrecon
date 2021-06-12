@@ -123,21 +123,19 @@ class AmortizedLoss(nn.Module):
         Mean ssim loss on test set:
         knee, 8p3: 0.31786856
         brain, 8p3: 0.04896923
-        brain, 16p3: 0.27682352
-        brain, 16p3, dataloader raw: 0.19311385291318098
-        brain, 16p3, dataloader [0,1]: 0.3292024733188252
+        brain, 16p3, dataloader [0,1]: 0.27206547738363346
         '''
         recon = recon.permute(0, 3, 1, 2)
         gt = gt.permute(0, 3, 1, 2)
         assert recon.shape[1] == 1 and gt.shape[1] == 1, 'Channel dimension incorrect'
         ssim_out = 1-self.ssim_loss(recon, gt)
-        ssim_out = ssim_out / 0.3292024733188252
+        ssim_out = ssim_out / 0.27206547738363346
         return ssim_out
 
-    def get_watson_dft(self, input, target):
-        input = input.permute(0, 3, 1, 2)
-        target = target.permute(0, 3, 1, 2)
-        loss = self.watson_dft(input, target)
+    def get_watson_dft(self, inputs, targets):
+        inputs = inputs.permute(0, 3, 1, 2)
+        targets = targets.permute(0, 3, 1, 2)
+        loss = self.watson_dft(inputs, targets)
         return loss
 
     def get_dc_loss(self, x_hat, y, mask):
@@ -152,12 +150,10 @@ class AmortizedLoss(nn.Module):
         Mean l1 loss on test set:
         knee, 8p3: 0.045254722
         brain, 8p3: 0.012755771
-        brain, 16p3: 0.06143104
-        brain, 16p3, dataloader raw: 0.024369188099323463
-        brain, 16p3, dataloader [0,1]: 0.053978089925294626
+        brain, 16p3, dataloader [0,1]: 0.05797722685674671
         '''
         l1 = torch.mean(self.l1(recon, gt), dim=(1, 2, 3))
-        l1 = l1 / 0.053978089925294626
+        l1 = l1 / 0.05797722685674671
         return l1
 
     def get_mse(self, input, target):
@@ -165,11 +161,15 @@ class AmortizedLoss(nn.Module):
         return torch.mean(mse_loss(input, target), dim=(1, 2, 3))
 
     def get_dice(self, recon, gt, seg):
-        # pretrained_segmentation_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/bn/May_11/0.005_64_32/'
-        pretrained_segmentation_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/easier-problem/May_21/0.005_64_32_2/'
+        pretrained_segmentation_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
 
-        res_dict = segtest.tester(pretrained_segmentation_path, xdata=recon, seg_data=seg)
-        return res_dict['losses'], res_dict['preds']
+        res_dict = segtest.tester(pretrained_segmentation_path, 
+                xdata=recon.permute(0, 3, 1, 2).cpu().detach().numpy(), 
+                gt_data=gt.permute(0, 3, 1, 2).cpu().detach().numpy(), 
+                seg_data=seg.cpu().detach().numpy())
+        avg_dice = res_dict['losses_per_roi'].mean(1)
+        avg_dice_gt = res_dict['losses_per_roi_gt'].mean(1)
+        return avg_dice, avg_dice_gt, res_dict['preds'], res_dict['preds_gt'], res_dict['targets']
 
     def forward(self, recon, y, hyperparams, cap_reg, target=None):
         '''
@@ -210,16 +210,12 @@ class AmortizedLoss(nn.Module):
             dice_loss = get_dice(recon, target)
             loss_dict['dice'] = dice_loss
         if 'l1' in self.losses:
-            assert target is not None, 'supervised loss requires ground truth'
             loss_dict['l1'] = self.get_l1(recon, target)
         if 'mse' in self.losses:
-            assert target is not None, 'supervised loss requires ground truth'
             loss_dict['mse'] = self.get_mse(recon, target)
         if 'ssim' in self.losses:
-            assert target is not None, 'supervised loss requires ground truth'
             loss_dict['ssim'] = self.get_ssim(recon, target)
         if 'perc' in self.losses:
-            assert target is not None, 'supervised loss requires ground truth'
             loss_dict['perc'] = self.get_watson_dft(recon, target)
 
         if self.range_restrict and len(self.losses) == 2:

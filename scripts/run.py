@@ -1,7 +1,8 @@
 import torch
 import torchio as tio
+from torchvision import transforms
 import numpy as np
-from hyperrecon import utils, dataset, model, sampler
+from hyperrecon import utils, dataset, model, sampler, layers
 from hyperrecon import loss as hyperloss
 import argparse
 import os
@@ -10,20 +11,20 @@ from pprint import pprint
 import time
 from tqdm import tqdm
 
-
 class Parser(argparse.ArgumentParser):
     def __init__(self):
         super(Parser, self).__init__(description='HyperRecon')
         # I/O parameters
         self.add_argument('-fp', '--filename_prefix', type=str, help='filename prefix', required=True)
         self.add_argument('--models_dir', default='/share/sablab/nfs02/users/aw847/models/HyperRecon/', type=str, help='directory to save models')
-        self.add_argument('--data_path', default='/share/sablab/nfs02/users/gid-dalcaav/projects/neuron/data/t1_mix/proc/resize256-crop_x32/', 
+        self.add_argument('--data_path', default='/share/sablab/nfs02/users/aw847/data/brain/abide/',
                 type=str, help='directory to load data')
         self.add_argument('--log_interval', type=int, default=25, help='Frequency of logs')
         self.add_argument('--load', type=str, default=None, help='Load checkpoint at .h5 path')
         self.add_argument('--cont', type=int, default=0, help='Load checkpoint at .h5 path')
         self.add_argument('--gpu_id', type=int, default=0, help='gpu id to train on')
         self.add_argument('--date', type=str, default=None, help='Override date')
+        utils.add_bool_arg(self, 'legacy_dataset')
         
         # Machine learning parameters
         self.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
@@ -33,19 +34,17 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('--unet_hdim', type=int, default=32)
         self.add_argument('--hnet_hdim', type=int, help='Hypernetwork architecture', required=True)
         self.add_argument('--n_ch_out', type=int, help='Number of output channels of main network', default=1)
+        utils.add_bool_arg(self, 'rescale_in', default=True)
 
         # Model parameters
         self.add_argument('--topK', type=int, default=None)
         self.add_argument('--undersampling_rate', type=str, default='4p2', choices=['4p2', '8p25', '8p3', '16p2', '16p3'])
-        self.add_argument('--img_dims', type=str, default='160_224', choices=['160_224', '256_256'])
         self.add_argument('--losses', choices=['dc', 'tv', 'cap', 'w', 'sh', 'mse', 'l1', 'ssim', 'perc'], \
                 nargs='+', type=str, help='<Required> Set flag', required=True)
         self.add_argument('--sampling', choices=['uhs', 'dhs'], type=str, help='Sampling method', required=True)
         utils.add_bool_arg(self, 'range_restrict')
         utils.add_bool_arg(self, 'anneal', default=False)
         self.add_argument('--hyperparameters', type=float, default=None)
-        self.add_argument('--organ', choices=['brain', 'knee'], type=str, default='knee')
-        utils.add_bool_arg(self, 'rescale_in', default=False)
         
     def parse(self):
         args = self.parse_args()
@@ -88,9 +87,7 @@ def train(network, dataloader, criterion, optimizer, hpsampler, args):
     epoch_psnr = 0
 
     for batch_idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
-        if batch_idx > 25: # Artificially reduce per-epoch training time
-            break
-        zf, gt, y = utils.prepare_batch(batch, vars(args))
+        zf, gt, y, _ = utils.prepare_batch(batch, vars(args))
         batch_size = len(zf)
 
         optimizer.zero_grad()
@@ -98,9 +95,12 @@ def train(network, dataloader, criterion, optimizer, hpsampler, args):
 
             hyperparams = hpsampler.sample(batch_size, args.r1, args.r2).to(args.device)
             print('hyperparams', hyperparams)
+            if args.hyperparameters is None: # Hypernet
+                preds = network(zf, hyperparams)
+            else:
+                preds = network(zf) # Baselines
 
-            preds, cap_reg = network(zf, hyperparams)
-            loss = criterion(preds, y, hyperparams, cap_reg, target=gt)
+            loss = criterion(preds, y, hyperparams, None, target=gt)
 
             loss.backward()
             optimizer.step()
@@ -124,9 +124,7 @@ def validate(network, dataloader, criterion, hpsampler, args):
     epoch_psnr = 0
 
     for batch_idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
-        if batch_idx > 5: # Artificially reduce per-epoch training time
-            break
-        zf, gt, y = utils.prepare_batch(batch, vars(args), split='test')
+        zf, gt, y, _ = utils.prepare_batch(batch, vars(args), split='test')
         batch_size = len(zf)
 
         with torch.set_grad_enabled(False):
@@ -134,8 +132,12 @@ def validate(network, dataloader, criterion, hpsampler, args):
                 hyperparams = torch.ones((batch_size, args.num_hyperparams)).to(args.device) * args.hyperparameters
             else:
                 hyperparams = torch.ones((batch_size, args.num_hyperparams)).to(args.device)
-            preds, cap_reg = network(zf, hyperparams)
-            loss = criterion(preds, y, hyperparams, cap_reg, target=gt)
+
+            if args.hyperparameters is None: # Hypernet
+                preds = network(zf, hyperparams)
+            else:
+                preds = network(zf) # Baselines
+            loss = criterion(preds, y, hyperparams, None, target=gt)
                 
             epoch_loss += loss.data.cpu().numpy() * batch_size
             metrics = utils.get_metrics(gt.permute(0, 2, 3, 1), preds.permute(0, 2, 3, 1), \
@@ -159,7 +161,7 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
 
     # Undersampling mask
-    args.mask = dataset.get_mask(args.img_dims, args.undersampling_rate).to(args.device)
+    args.mask = dataset.get_mask('160_224', args.undersampling_rate).to(args.device)
 
     # Train
     logger = {}
@@ -171,13 +173,24 @@ if __name__ == "__main__":
     logger['psnr_val'] = []
 
     ###############  Dataset ########################
-    trainset = dataset.VolumeDataset(args.data_path, 'train').get_tio_dataset()
-    valset = dataset.VolumeDataset(args.data_path, 'validate').get_tio_dataset()
+    if args.legacy_dataset:
+        xdata = dataset.get_train_data(maskname=args.undersampling_rate)
+        gt_data = dataset.get_train_gt()
+        trainset = dataset.Dataset(xdata[:int(len(xdata)*0.8)], gt_data[:int(len(gt_data)*0.8)])
+        valset = dataset.Dataset(xdata[int(len(xdata)*0.8):], gt_data[int(len(gt_data)*0.8):])
+        params = {'batch_size': args.batch_size,
+             'shuffle': True,
+             'num_workers': 0, 
+             'pin_memory': True}
 
-    params = {'batch_size': 1,
-         'shuffle': True,
-         'num_workers': 0, 
-         'pin_memory': True}
+    else:
+        transform = transforms.Compose([layers.ClipByPercentile()])
+        trainset = dataset.SliceDataset(args.data_path, 'train', total_subjects=50, transform=transform)
+        valset = dataset.SliceDataset(args.data_path, 'validate', total_subjects=5, transform=transform)
+        params = {'batch_size': args.batch_size,
+             'shuffle': True,
+             'num_workers': 0, 
+             'pin_memory': True}
 
     dataloaders = {
         'train': torch.utils.data.DataLoader(trainset, **params),
@@ -188,18 +201,18 @@ if __name__ == "__main__":
     ##### Model, Optimizer, Sampler, Loss ############
     args.num_hyperparams = len(args.losses)-1 if args.range_restrict else len(args.losses)
     if args.hyperparameters is None:
-        network = model.HyperUnet(args.device,
+        network = model.HyperUnet(
                          args.num_hyperparams,
                          args.hnet_hdim,
-                         args.unet_hdim, 
                          hnet_norm=not args.range_restrict,
-                         n_ch_in=1 if args.rescale_in else 2,
-                         n_ch_out=args.n_ch_out,
-                         use_tanh=args.use_tanh).to(args.device)
+                         in_ch_main=1 if args.rescale_in else 2,
+                         out_ch_main=args.n_ch_out,
+                         h_ch_main=args.unet_hdim, 
+                         ).to(args.device)
     else:
-        network = model.Unet(n_ch_in=1 if args.rescale_in else 2,
-                             n_ch_out=args.n_ch_out, 
-                             unet_hdim=args.unet_hdim).to(args.device)
+        network = model.Unet(in_ch=1 if args.rescale_in else 2,
+                             out_ch=args.n_ch_out, 
+                             h_ch=args.unet_hdim).to(args.device)
     print('Total parameters:', utils.count_parameters(network))
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
