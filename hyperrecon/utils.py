@@ -1,5 +1,5 @@
 """
-Utility functions for RegAgnosticCSMRI
+Utility functions for HyperRecon
 For more details, please read:
     Alan Q. Wang, Adrian V. Dalca, and Mert R. Sabuncu. 
     "Regularization-Agnostic Compressed Sensing MRI with Hypernetworks" 
@@ -8,7 +8,6 @@ import torch
 import torchio as tio
 import numpy as np
 import pickle
-# import parse
 import glob
 from . import test, dataset, model, layers
 import myutils
@@ -220,82 +219,3 @@ def get_metrics(gt, recons, zf, metric_type, normalized=True, take_absval=True):
         metrics.append(metric)
 
     return np.array(metrics)
-
-
-def gather_baselines(device):
-    base_psnrs = []
-    base_dcs = []
-    base_recons = []
-    alphas = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.85,0.9,0.93,0.95,0.98, 0.99,0.995,0.999,1.0]
-    betas =  [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.85,0.9,0.93,0.95,0.98, 0.99,0.995,0.999,1.0]
-    baseline_temp = '/share/sablab/nfs02/users/aw847/models/HQSplitting/hypernet-baselines/hp-baseline_{beta:01}_{alpha:01}_unet_0.0001_0_5_0_64/t1_4p2_unsup/model.0100.h5'
-
-    gt_data = dataset.get_test_gt('small')
-    xdata = dataset.get_test_data('small')
-    hps = []
-    for beta in betas:
-        for alpha in alphas:
-            hps.append([alpha, beta])
-            baseline_path = baseline_temp.format(alpha=np.round(alpha, 3), beta=np.round(beta, 3))
-            print(baseline_path)
-            base = test.baseline_test(baseline_path, xdata, gt_data, device, take_avg=False)
-            print(base['recons'].shape)
-            print(base['rpsnr'].shape)
-            print(base['dc'].shape)
-            base_recons.append(base['recons'])
-            base_psnrs.append(base['rpsnr'])
-            base_dcs.append(base['dc'])
-
-    return np.array(hps), np.array(base_psnrs), np.array(base_dcs), np.array(base_recons)
-
-def newloss2oldloss(points):
-    '''Convert new loss hps to old loss hps
-    
-    points: (N, 3)
-    '''
-    points_convert1 = points[:, 0] / (points[:, 0] + points[:, 1] + points[:, 2])
-    points_convert2 = points[:, 1] / (points[:, 1] + points[:, 2])
-    points_convert = torch.stack((points_convert1, points_convert2), dim=1).numpy()
-    return points_convert
-def oldloss2newloss(old_hps):
-    '''Convert old loss hps to new loss hps
-    
-    old_hps: (N, 2)
-    '''
-    if old_hps.shape[1] == 1:
-        a0 = 1-old_hps[:, 0]
-        a1 = old_hps[:, 0]
-        new_hps = torch.stack((a0, a1), dim=1)
-    elif old_hps.shape[1] == 2:
-        a0 = old_hps[:, 0]
-        a1 = (1-old_hps[:, 0])*old_hps[:,1]
-        a2 = (1-old_hps[:, 0])*(1-old_hps[:,1])
-        new_hps = torch.stack((a0, a1, a2), dim=1)
-    else:
-        raise Exception('Unsupported num_hyperparams')
-    return new_hps 
-
-def get_reference_hps(num_hyperparams, range_restrict=True):
-    hps_2 = torch.tensor([[0.9, 0.1],
-                          [0.995, 0.6],
-                          [0.9, 0.2],
-                          [0.995, 0.5],
-                          [0.9, 0],
-                          [0.99, 0.7]]).float()
-    hps_1 = torch.tensor([[0.5],
-                          [0.6],
-                          [0.7],
-                          [0.8],
-                          [0.9],
-                          [0.99]]).float()
-    if num_hyperparams == 2 and range_restrict:
-        return hps_2
-    elif num_hyperparams == 3 and not range_restrict:
-        return oldloss2newloss(hps_2)
-    elif num_hyperparams == 1 and range_restrict:
-        return hps_1
-    elif num_hyperparams == 2 and not range_restrict:
-        return oldloss2newloss(hps_1)
-    else:
-        raise Exception('Error in num_hp and range_restrict combo')
-
