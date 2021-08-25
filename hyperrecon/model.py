@@ -1,5 +1,5 @@
 """
-Model architecture for RegAgnosticCSMRI
+Model architecture for HyperRecon
 For more details, please read:
     Alan Q. Wang, Adrian V. Dalca, and Mert R. Sabuncu. 
     "Regularization-Agnostic Compressed Sensing MRI with Hypernetworks" 
