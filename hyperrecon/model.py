@@ -53,7 +53,7 @@ class HyperNetwork(nn.Module):
         return x
 
 class HyperUnet(nn.Module):
-    """Hypernetwork + U-Net for image reconstruction"""
+    """Main U-Net for image reconstruction"""
     def __init__(self, in_units_hnet, h_units_hnet, hnet_norm, in_ch_main, out_ch_main, h_ch_main, residual=True):
         """
         Parameters
@@ -83,7 +83,7 @@ class HyperUnet(nn.Module):
         """
         Parameters
         ----------
-        x : torch.Tensor (batch_size, 2, img_height, img_width)
+        zf : torch.Tensor (batch_size, 2, img_height, img_width)
             Zero-filled reconstruction of under-sampled measurement
         hyperparams : torch.Tensor (batch_size, num_hyperparams)
             Hyperparameter values
@@ -96,8 +96,7 @@ class HyperUnet(nn.Module):
 
 class Unet(nn.Module):
     def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True):
-        '''Main U-Net
-
+        '''
         hnet_hdim activates hypernetwork for Unet
         '''
         super(Unet, self).__init__()
@@ -177,3 +176,28 @@ class Unet(nn.Module):
             out = zf + out 
         
         return out
+
+class TrajNet(nn.Module):
+    def __init__(self, in_dim=1, h_dim=8, out_dim=2):
+        super(TrajNet, self).__init__()
+        self.lin1 = nn.Linear(in_dim, h_dim)
+        self.lin2 = nn.Linear(h_dim, h_dim)
+        self.lin3 = nn.Linear(h_dim, h_dim)
+        self.lin4 = nn.Linear(h_dim, h_dim)
+        self.lin5 = nn.Linear(h_dim, out_dim)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.lin1(x)
+        x = self.relu(x)
+        x = self.lin2(x)
+        x = self.relu(x)
+        x = self.lin3(x)
+        x = self.relu(x)
+        x = self.lin2(x)
+        x = self.relu(x)
+        x = self.lin5(x)
+        out = self.sigmoid(x)
+        return out
+
