@@ -170,8 +170,8 @@ def get_test_gt(img_dims='160_224', organ='brain', size='med'):
     if size=='small':
         gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_10slices.npy'
     elif size=='med' and organ=='brain':
-        # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
-        gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/test_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
+        gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
+        # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/test_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
     elif size=='med' and organ=='knee':
         gt_path = '/share/sablab/nfs02/users/aw847/data/knee/knee_test_normalized.npy'
     gt = get_data(gt_path)
