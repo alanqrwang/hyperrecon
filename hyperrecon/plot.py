@@ -386,11 +386,11 @@ def threshold_graphs(device, save=False):
 def slices(save=False, supervised=True):
     img_idxs = [1, 2, 8]
 
-    hps = np.load('/nfs02/users/aw847/data/hypernet/baselines/hps.npy')
-    psnr_map = np.load('/nfs02/users/aw847/data/hypernet/baselines/psnrs.npy')[:, img_idxs]
-    dc_map = np.load('/nfs02/users/aw847/data/hypernet/baselines/dcs.npy')[:, img_idxs]
-    recons = np.load('/nfs02/users/aw847/data/hypernet/baselines/recons.npy')[:,img_idxs]
-    gt_data = dataset.get_test_gt(old=True)[3:13][img_idxs]
+    hps = np.load('/share/sablab/nfs02/users/aw847/data/hypernet/baselines/hps.npy')
+    psnr_map = np.load('/share/sablab/nfs02/users/aw847/data/hypernet/baselines/psnrs.npy')[:, img_idxs]
+    dc_map = np.load('/share/sablab/nfs02/users/aw847/data/hypernet/baselines/dcs.npy')[:, img_idxs]
+    recons = np.load('/share/sablab/nfs02/users/aw847/data/hypernet/baselines/recons.npy')[:,img_idxs]
+    gt_data = dataset.get_test_gt('256_256')[3:13][img_idxs]
 
     n_grid = int(np.sqrt(len(recons)))
     n_chunks = 2
@@ -449,7 +449,7 @@ def slices(save=False, supervised=True):
                 arrow = patches.Arrow(40, 55, 5, 5, width=5.0, color='r')
 
             # axes[2*img_idx+1,i+1].add_patch(arrow)
-            axes[i+1, 2*img_idx].text(0.7, 0.05,'RPSNR=%.02f' % (new_psnr), color='white', fontsize=20,
+            axes[i+1, 2*img_idx].text(0.54, 0.05,'RPSNR=%.02f' % (new_psnr), color='white', fontsize=40,
                  horizontalalignment='center',
                  verticalalignment='center',
                  transform = axes[i+1, 2*img_idx].transAxes)
@@ -461,7 +461,7 @@ def slices(save=False, supervised=True):
             # axes[i+1, 2*img_idx].set_title(best_hp)
 
     if save:
-        fig.savefig('/nfs02/users/aw847/data/hypernet/figs/representative_slices_l2.eps', format='eps')
+        fig.savefig('/share/sablab/nfs02/users/aw847/data/hypernet/figs/representative_slices_l2.eps', format='eps')
     return fig
 
 
