@@ -68,8 +68,6 @@ def get_everything(path, device, \
   hyperparameters = args['hyperparameters']
   maskname = args['undersampling_rate']
 
-  args['rescale_in'] = False if 'rescale_in' not in args else args['rescale_in']
-
   num_hyperparams = len(losses)-1 if range_restrict else len(losses)
 
   if hyperparameters is not None:
@@ -88,7 +86,7 @@ def get_everything(path, device, \
 
   args['mask'] = dataset.get_mask('160_224', maskname).to(device)
   args['device'] = device
-  n_ch_in = 1 if args['rescale_in'] else 2
+  n_ch_in = 2
 
   if args['hyperparameters'] is None:
     network = model.HyperUnet(

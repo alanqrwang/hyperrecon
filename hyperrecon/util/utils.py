@@ -39,7 +39,12 @@ def ifft(x):
   return x
 
 def undersample(fullysampled, mask):
-  '''Generate undersampled k-space data with given binary mask'''
+  '''Generate under-sampled k-space data with given binary mask.
+  
+  Args:
+    fullysampled: Clean image in image space (N, n_ch, l, w)
+    mask: Binary mask of where to under-sample (l, w)
+  '''
   mask_expand = mask.unsqueeze(0)
   ksp = fft(fullysampled)
   under_ksp = ksp * mask_expand

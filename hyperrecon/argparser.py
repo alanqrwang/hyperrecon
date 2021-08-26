@@ -41,7 +41,6 @@ class Parser(argparse.ArgumentParser):
               help='Hypernetwork architecture', default=64)
     self.add_argument('--n_ch_out', type=int,
               help='Number of output channels of main network', default=1)
-    self.add_bool_arg('rescale_in', default=True)
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)

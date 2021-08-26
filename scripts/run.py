@@ -30,10 +30,9 @@ class BaseTrain(object):
     self.legacy_dataset = args.legacy_dataset
     self.loss_list = args.loss_list
     self.hyperparameters = args.hyperparameters
-    self.rescale_in = args.rescale_in
     self.hnet_hdim = args.hnet_hdim
     self.unet_hdim = args.unet_hdim
-    self.n_ch_in = 1 if self.rescale_in else 2
+    self.n_ch_in = 2
     self.n_ch_out = args.n_ch_out
     # I/O
     self.load = args.load
@@ -226,11 +225,7 @@ class BaseTrain(object):
     under_ksp = utils.undersample(targets, self.mask)
     zf = utils.ifft(under_ksp)
 
-    if self.rescale_in:
-      zf = zf.norm(p=2, dim=1, keepdim=True)
-      zf = utils.rescale(zf)
-    else:
-      under_ksp, zf = utils.scale(under_ksp, zf)
+    under_ksp, zf = utils.scale(under_ksp, zf)
 
     return zf, targets, under_ksp, segs
 
