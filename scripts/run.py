@@ -25,7 +25,7 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('--cont', type=int, default=0, help='Load checkpoint at .h5 path')
         self.add_argument('--gpu_id', type=int, default=0, help='gpu id to train on')
         self.add_argument('--date', type=str, default=None, help='Override date')
-        utils.add_bool_arg(self, 'legacy_dataset', default=False)
+        utils.add_bool_arg('legacy_dataset', default=False)
         
         # Machine learning parameters
         self.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
@@ -35,7 +35,7 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('--unet_hdim', type=int, default=32)
         self.add_argument('--hnet_hdim', type=int, help='Hypernetwork architecture', default=64)
         self.add_argument('--n_ch_out', type=int, help='Number of output channels of main network', default=1)
-        utils.add_bool_arg(self, 'rescale_in', default=True)
+        utils.add_bool_arg('rescale_in', default=True)
 
         # Model parameters
         self.add_argument('--topK', type=int, default=None)
@@ -43,10 +43,17 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'], \
                 nargs='+', type=str, help='<Required> Set flag', required=True)
         self.add_argument('--sampling', choices=['uhs', 'dhs'], type=str, help='Sampling method', required=True)
-        utils.add_bool_arg(self, 'range_restrict')
-        utils.add_bool_arg(self, 'anneal', default=False)
+        self.add_bool_arg('range_restrict')
+        self.add_bool_arg('anneal', default=False)
         self.add_argument('--hyperparameters', type=float, default=None)
-        
+
+    def add_bool_arg(self, name, default=True):
+        """Add boolean argument to argparse parser"""
+        group = self.add_mutually_exclusive_group(required=False)
+        group.add_argument('--' + name, dest=name, action='store_true')
+        group.add_argument('--no_' + name, dest=name, action='store_false')
+        self.set_defaults(**{name:default})
+
     def parse(self):
         args = self.parse_args()
         if args.sampling == 'dhs':

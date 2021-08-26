@@ -100,19 +100,6 @@ def prepare_batch(batch, args, split='train'):
 
     return zf, targets, under_ksp, segs
 
-def nextPowerOf2(n):
-    """Get next power of 2"""
-    count = 0;
-
-    if (n and not(n & (n - 1))):
-        return n
-
-    while( n != 0):
-        n >>= 1
-        count += 1
-
-    return 1 << count;
-
 def rescale(arr):
     """Rescales a batch of images into range [0, 1]
 
