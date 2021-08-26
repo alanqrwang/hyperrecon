@@ -1,14 +1,16 @@
-from hyperrecon.loss.losses import compose_loss_seq
-from hyperrecon.loss.coefficients import generate_coefficients
-from hyperrecon.argparser import Parser
 import torch
 from torchvision import transforms
 import numpy as np
-from hyperrecon import utils, dataset, model, sampler, layers
+from hyperrecon import dataset, model, sampler, layers
 import os
 import time
 from tqdm import tqdm
 
+from hyperrecon.loss.losses import compose_loss_seq
+from hyperrecon.loss.coefficients import generate_coefficients
+from hyperrecon.argparser import Parser
+from hyperrecon.util.metric import bpsnr
+from hyperrecon.util import utils
 
 class BaseTrain(object):
   def __init__(self, args):
@@ -52,7 +54,7 @@ class BaseTrain(object):
     self.logger['psnr_val'] = []
 
   def config(self):
-    #  Data
+    # Data
     self.get_dataloader()
 
     # Model, Optimizer, Sampler, Loss
@@ -204,17 +206,15 @@ class BaseTrain(object):
       l = self.losses[i]
       loss += c * l(pred, gt, y, self.mask)
 
-    if self.topK is None:
+    if self.sampling_method == 'uhs':
       loss = torch.mean(loss)
     else:
-      assert self.sampling_method == 'dhs'
+      assert self.topK is not None
       dc_losses = loss_dict['dc']
-      _, perm = torch.sort(dc_losses)  # Sort by DC loss, low to high
-      # Reorder total losses by lowest to highest DC loss
-      sort_losses = self.losses[perm]
+      _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
+      sort_losses = self.losses[perm] # Reorder total losses by lowest to highest DC loss
       hyperparams = hyperparams[perm]
-      # Take only the losses with lowest DC
-      loss = torch.mean(sort_losses[:self.topK])
+      loss = torch.mean(sort_losses[:self.topK]) # Take only the losses with lowest DC
 
     return loss
 
@@ -267,10 +267,7 @@ class BaseTrain(object):
         self.optimizer.step()
 
         epoch_loss += loss.data.cpu().numpy() * batch_size
-        epoch_psnr += np.mean(utils.get_metrics(gt.permute(0, 2, 3, 1),
-                            pred.permute(0, 2, 3, 1), zf.permute(
-                              0, 2, 3, 1),
-                            'psnr', take_absval=False)) * batch_size
+        epoch_psnr += bpsnr(gt, pred) * batch_size
       epoch_samples += batch_size
 
     epoch_loss /= epoch_samples
@@ -306,9 +303,7 @@ class BaseTrain(object):
 
         loss = self.compute_loss(pred, gt, y, coeffs)
         epoch_loss += loss.data.cpu().numpy() * batch_size
-        metrics = utils.get_metrics(gt.permute(0, 2, 3, 1), pred.permute(0, 2, 3, 1),
-                      zf.permute(0, 2, 3, 1), 'psnr', take_absval=False)
-        epoch_psnr += np.mean(metrics) * batch_size
+        epoch_psnr += bpsnr(gt, pred) * batch_size
 
       epoch_samples += batch_size
     epoch_loss /= epoch_samples

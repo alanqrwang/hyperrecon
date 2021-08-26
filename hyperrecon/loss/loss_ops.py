@@ -2,7 +2,7 @@ import sys
 sys.path.append('/home/aw847/PerceptualSimilarity/src/')
 sys.path.append('/home/aw847/torch-radon/')
 import torch
-from hyperrecon import utils
+from hyperrecon.util import utils
 from pytorch_wavelets import DWTForward
 from torch_radon.shearlet import ShearletTransform
 from perceptualloss.loss_provider import LossProvider

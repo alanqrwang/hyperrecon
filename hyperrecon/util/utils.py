@@ -5,10 +5,8 @@ For more details, please read:
   "Regularization-Agnostic Compressed Sensing MRI with Hypernetworks" 
 """
 import torch
-import torchio as tio
 import numpy as np
-from . import test, dataset, layers
-import myutils
+from hyperrecon import test, dataset, layers
 import os
 
 
@@ -156,26 +154,7 @@ def get_args(path):
       config = json.load(json_file)
   return config
 
-def get_metrics(gt, recons, zf, metric_type, normalized=True, take_absval=True):
-  metrics = []
-  if take_absval:
-    recons = absval(recons)
-    gt = absval(gt)
-    zf = absval(zf)
-  # if normalized:
-  #     recons = rescale(recons)
-  #     gt = rescale(gt)
-  #     zf = rescale(zf)
 
-  if len(recons.shape) > 2:
-    for i in range(len(recons)):
-      metric = myutils.metrics.get_metric(recons[i], gt[i], metric_type, zero_filled=zf[i])
-      metrics.append(metric)
-  else:
-    metric = myutils.metrics.get_metric(recons, gt, metric_type)
-    metrics.append(metric)
-
-  return np.array(metrics)
 
 
 def gather_baselines(device):

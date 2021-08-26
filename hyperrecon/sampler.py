@@ -4,10 +4,8 @@ For more details, please read:
   Alan Q. Wang, Adrian V. Dalca, and Mert R. Sabuncu. 
   "Regularization-Agnostic Compressed Sensing MRI with Hypernetworks" 
 """
-import numpy as np
 import torch
 import torch.nn as nn
-from . import utils
 
 class Sampler(nn.Module):
   """Hyperparameter sampler class"""
