@@ -10,8 +10,6 @@ import numpy as np
 from . import test, dataset, layers
 import myutils
 import os
-import matplotlib.pyplot as plt
-from myutils.plot import plot_img
 
 
 def fft(x):
