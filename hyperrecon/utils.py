@@ -13,12 +13,6 @@ import os
 import matplotlib.pyplot as plt
 from myutils.plot import plot_img
 
-def add_bool_arg(parser, name, default=True):
-    """Add boolean argument to argparse parser"""
-    group = parser.add_mutually_exclusive_group(required=False)
-    group.add_argument('--' + name, dest=name, action='store_true')
-    group.add_argument('--no_' + name, dest=name, action='store_false')
-    parser.set_defaults(**{name:default})
 
 def fft(x):
     """Normalized 2D Fast Fourier Transform
@@ -79,26 +73,6 @@ def scale(y, zf):
     y = y / max_val_per_batch.view(len(y), 1, 1, 1)
     zf = zf / max_val_per_batch.view(len(y), 1, 1, 1)
     return y, zf
-
-def prepare_batch(batch, args, split='train'):
-    if type(batch) == list:
-        targets = batch[0].to(args['device']).float()
-        segs = batch[1].to(args['device']).float()
-
-    else:
-        targets = batch.float().to(args['device'])
-        segs = None
-
-    under_ksp = undersample(targets, args['mask'])
-    zf = ifft(under_ksp)
-
-    if args['rescale_in']:
-        zf = zf.norm(p=2, dim=-1, keepdim=True)
-        zf = rescale(zf)
-    else:
-        under_ksp, zf = scale(under_ksp, zf)
-
-    return zf, targets, under_ksp, segs
 
 def rescale(arr):
     """Rescales a batch of images into range [0, 1]
