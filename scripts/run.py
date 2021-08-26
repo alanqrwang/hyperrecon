@@ -1,9 +1,10 @@
+from loss.losses import compose_loss_seq, get_registered_sup_losses, get_registered_unsup_losses
+from loss.coefficients import generate_coefficients
 import torch
 import torchio as tio
 from torchvision import transforms
 import numpy as np
 from hyperrecon import utils, dataset, model, sampler, layers
-from hyperrecon import loss as hyperloss
 import argparse
 import os
 import json
@@ -24,22 +25,22 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('--cont', type=int, default=0, help='Load checkpoint at .h5 path')
         self.add_argument('--gpu_id', type=int, default=0, help='gpu id to train on')
         self.add_argument('--date', type=str, default=None, help='Override date')
-        utils.add_bool_arg(self, 'legacy_dataset')
+        utils.add_bool_arg(self, 'legacy_dataset', default=False)
         
         # Machine learning parameters
-        self.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+        self.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
         self.add_argument('--force_lr', type=float, default=None, help='Learning rate')
         self.add_argument('--batch_size', type=int, default=32, help='Batch size')
         self.add_argument('--epochs', type=int, default=100, help='Total training epochs')
         self.add_argument('--unet_hdim', type=int, default=32)
-        self.add_argument('--hnet_hdim', type=int, help='Hypernetwork architecture', required=True)
+        self.add_argument('--hnet_hdim', type=int, help='Hypernetwork architecture', default=64)
         self.add_argument('--n_ch_out', type=int, help='Number of output channels of main network', default=1)
         utils.add_bool_arg(self, 'rescale_in', default=True)
 
         # Model parameters
         self.add_argument('--topK', type=int, default=None)
         self.add_argument('--undersampling_rate', type=str, default='4p2', choices=['4p2', '8p25', '8p3', '16p2', '16p3'])
-        self.add_argument('--losses', choices=['dc', 'tv', 'cap', 'w', 'sh', 'mse', 'l1', 'ssim', 'perc'], \
+        self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'], \
                 nargs='+', type=str, help='<Required> Set flag', required=True)
         self.add_argument('--sampling', choices=['uhs', 'dhs'], type=str, help='Sampling method', required=True)
         utils.add_bool_arg(self, 'range_restrict')
@@ -59,7 +60,7 @@ class Parser(argparse.ArgumentParser):
             '{lr}_{batch_size}_{losses}_{hnet_hdim}_{unet_hdim}_{topK}_{range_restrict}_{hps}'.format(
             lr=args.lr,
             batch_size=args.batch_size,
-            losses=args.losses,
+            losses=args.loss_list,
             hnet_hdim=args.hnet_hdim,
             unet_hdim=args.unet_hdim,
             range_restrict=args.range_restrict,
@@ -78,7 +79,31 @@ class Parser(argparse.ArgumentParser):
             json.dump(vars(args), args_file, indent=4)
         return args
 
-def train(network, dataloader, criterion, optimizer, hpsampler, args):
+def compute_loss(pred, gt, y, coeffs, losses, args, take_avg=True):
+    '''
+    Args:
+        coeffs:  (bs, num_losses)
+        losses:  (num_losses)
+    '''
+    loss = 0
+    for i in range(len(losses)):
+        c = coeffs[:,i]
+        l = losses[i]
+        loss += c * l(pred, gt, y, args.mask)
+    
+    if args.topK is not None and take_avg:
+        assert args.sampling_method == 'dhs'
+        dc_losses = loss_dict['dc']
+        _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
+        sort_losses = losses[perm] # Reorder total losses by lowest to highest DC loss
+        hyperparams = hyperparams[perm]
+        loss = torch.mean(sort_losses[:args.topK]) # Take only the losses with lowest DC
+    elif args.topK is None and take_avg:
+        loss = torch.mean(loss)
+
+    return loss
+
+def train_epoch(network, dataloader, losses, optimizer, hpsampler, args):
     """Train for one epoch"""
     network.train()
 
@@ -86,7 +111,7 @@ def train(network, dataloader, criterion, optimizer, hpsampler, args):
     epoch_samples = 0
     epoch_psnr = 0
 
-    for batch_idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
+    for _, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
         zf, gt, y, _ = utils.prepare_batch(batch, vars(args))
         batch_size = len(zf)
 
@@ -94,20 +119,19 @@ def train(network, dataloader, criterion, optimizer, hpsampler, args):
         with torch.set_grad_enabled(True):
 
             hyperparams = hpsampler.sample(batch_size, args.r1, args.r2).to(args.device)
-            print('hyperparams', hyperparams)
+            coeffs = generate_coefficients(hyperparams, len(losses), args.range_restrict)
             if args.hyperparameters is None: # Hypernet
-                preds = network(zf, hyperparams)
+                pred = network(zf, hyperparams)
             else:
-                preds = network(zf) # Baselines
+                pred = network(zf) # Baselines
 
-            loss = criterion(preds, y, hyperparams, None, target=gt)
-
+            loss = compute_loss(pred, gt, y, coeffs, losses, args)
             loss.backward()
             optimizer.step()
 
             epoch_loss += loss.data.cpu().numpy() * batch_size
             epoch_psnr += np.mean(utils.get_metrics(gt.permute(0, 2, 3, 1), \
-                    preds.permute(0, 2, 3, 1), zf.permute(0, 2, 3, 1), \
+                    pred.permute(0, 2, 3, 1), zf.permute(0, 2, 3, 1), \
                     'psnr', take_absval=False)) * batch_size
         epoch_samples += batch_size
 
@@ -115,7 +139,7 @@ def train(network, dataloader, criterion, optimizer, hpsampler, args):
     epoch_psnr /= epoch_samples
     return network, optimizer, epoch_loss, epoch_psnr
 
-def validate(network, dataloader, criterion, hpsampler, args):
+def eval_epoch(network, dataloader, losses, hpsampler, args):
     """Validate for one epoch"""
     network.eval()
 
@@ -123,7 +147,7 @@ def validate(network, dataloader, criterion, hpsampler, args):
     epoch_samples = 0
     epoch_psnr = 0
 
-    for batch_idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
+    for _, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
         zf, gt, y, _ = utils.prepare_batch(batch, vars(args), split='test')
         batch_size = len(zf)
 
@@ -133,14 +157,15 @@ def validate(network, dataloader, criterion, hpsampler, args):
             else:
                 hyperparams = torch.ones((batch_size, args.num_hyperparams)).to(args.device)
 
+            coeffs = generate_coefficients(hyperparams, len(losses), args.range_restrict)
             if args.hyperparameters is None: # Hypernet
-                preds = network(zf, hyperparams)
+                pred = network(zf, hyperparams)
             else:
-                preds = network(zf) # Baselines
-            loss = criterion(preds, y, hyperparams, None, target=gt)
-                
+                pred = network(zf) # Baselines
+
+            loss = compute_loss(pred, gt, y, coeffs, losses, args)
             epoch_loss += loss.data.cpu().numpy() * batch_size
-            metrics = utils.get_metrics(gt.permute(0, 2, 3, 1), preds.permute(0, 2, 3, 1), \
+            metrics = utils.get_metrics(gt.permute(0, 2, 3, 1), pred.permute(0, 2, 3, 1), \
                     zf.permute(0, 2, 3, 1), 'psnr', take_absval=False)
             epoch_psnr += np.mean(metrics) * batch_size
 
@@ -199,7 +224,7 @@ if __name__ == "__main__":
     ##################################################
 
     ##### Model, Optimizer, Sampler, Loss ############
-    args.num_hyperparams = len(args.losses)-1 if args.range_restrict else len(args.losses)
+    args.num_hyperparams = len(args.loss_list)-1 if args.range_restrict else len(args.loss_list)
     if args.hyperparameters is None:
         network = model.HyperUnet(
                          args.num_hyperparams,
@@ -217,8 +242,7 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
     hpsampler = sampler.Sampler(args.num_hyperparams)
-    criterion = hyperloss.AmortizedLoss(args.losses, args.range_restrict, args.sampling, \
-            args.topK, args.device, args.mask)
+    losses = compose_loss_seq(args.loss_list)
     ##################################################
 
     if args.force_lr is not None:
@@ -273,10 +297,10 @@ if __name__ == "__main__":
         print('Sampling bounds [%.2f, %.2f]' % (args.r1, args.r2))
 
         # Train
-        network, optimizer, train_epoch_loss, train_epoch_psnr = train(network, dataloaders['train'], \
-                criterion, optimizer, hpsampler, args)
+        network, optimizer, train_epoch_loss, train_epoch_psnr = train_epoch(network, dataloaders['train'], \
+                losses, optimizer, hpsampler, args)
         # Validate
-        network, val_epoch_loss, val_epoch_psnr = validate(network, dataloaders['val'], criterion, hpsampler, args)
+        network, val_epoch_loss, val_epoch_psnr = eval_epoch(network, dataloaders['val'], losses, hpsampler, args)
         
         epoch_train_time = time.time() - tic
 

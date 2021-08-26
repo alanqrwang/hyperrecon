@@ -7,10 +7,7 @@ For more details, please read:
 import torch
 import torchio as tio
 import numpy as np
-import pickle
-# import parse
-import glob
-from . import test, dataset, model, layers
+from . import test, dataset, layers
 import myutils
 import os
 import matplotlib.pyplot as plt
