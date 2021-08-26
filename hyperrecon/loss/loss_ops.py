@@ -20,15 +20,12 @@ class Data_Consistency(object):
     return dc
 
 class Total_Variation(object):
-  def __init__(self):
-    self.sup = False
   def __call__(self, pred, gt, y, mask):
     """Total variation loss.
 
     x : torch.Tensor (batch_size, img_height, img_width, 2)
       Input image
     """
-    pred = pred.permute(0, 3, 1, 2)
     tv_x = torch.sum((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
     tv_y = torch.sum((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
     if pred.shape[1] == 2:
@@ -42,7 +39,6 @@ class Total_Variation(object):
 class L1_Wavelets(object):
   def __init__(self):
     self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(self.device)
-    self.sup = False
 
   def __call__(self, pred, gt, y, mask):
 
@@ -105,7 +101,6 @@ class L1_Shearlets(object):
 class SSIM(object):
   def __init__(self):
     self.ssim_loss = pytorch_ssim.SSIM(size_average=False)
-    self.sup = True
 
   def __call__(self, pred, gt, y, mask):
     '''
@@ -114,8 +109,6 @@ class SSIM(object):
     brain, 8p3: 0.04896923
     brain, 16p3, dataloader [0,1]: 0.27206547738363346
     '''
-    pred = pred.permute(0, 3, 1, 2)
-    gt = gt.permute(0, 3, 1, 2)
     assert pred.shape[1] == 1 and gt.shape[1] == 1, 'Channel dimension incorrect'
     ssim_out = 1-self.ssim_loss(pred, gt)
     ssim_out = ssim_out / 0.27206547738363346
@@ -127,11 +120,8 @@ class Watson_DFT(object):
     provider = LossProvider()
     self.watson_dft = provider.get_loss_function(
       'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
-    self.sup = True
 
   def __call__(self, pred, gt, y, mask):
-    pred = pred.permute(0, 3, 1, 2)
-    gt = gt.permute(0, 3, 1, 2)
     loss = self.watson_dft(pred, gt)
     return loss
 
@@ -163,10 +153,8 @@ class DICE(object):
     pretrained_segmentation_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
 
     res_dict = segtest.tester(pretrained_segmentation_path,
-                  xdata=recon.permute(
-                    0, 3, 1, 2).cpu().detach().numpy(),
-                  gt_data=gt.permute(
-                    0, 3, 1, 2).cpu().detach().numpy(),
+                  xdata=recon.cpu().detach().numpy(),
+                  gt_data=gt.cpu().detach().numpy(),
                   seg_data=seg.cpu().detach().numpy())
     avg_dice = res_dict['losses_per_roi'].mean(1)
     avg_dice_gt = res_dict['losses_per_roi_gt'].mean(1)

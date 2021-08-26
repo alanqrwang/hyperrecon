@@ -195,7 +195,8 @@ class BaseTrain(object):
         epoch, eval_epoch_loss, eval_epoch_psnr, epoch_train_time))
 
   def compute_loss(self, pred, gt, y, coeffs):
-    '''
+    '''Compute loss.
+
     Args:
       coeffs:  (bs, num_losses)
       losses:  (num_losses)
@@ -219,19 +220,14 @@ class BaseTrain(object):
     return loss
 
   def prepare_batch(self, batch):
-    if type(batch) == list:
-      targets = batch[0].to(self.device).float()
-      segs = batch[1].to(self.device).float()
-
-    else:
-      targets = batch.float().to(self.device)
-      segs = None
+    targets = batch.float().to(self.device)
+    segs = None
 
     under_ksp = utils.undersample(targets, self.mask)
     zf = utils.ifft(under_ksp)
 
     if self.rescale_in:
-      zf = zf.norm(p=2, dim=-1, keepdim=True)
+      zf = zf.norm(p=2, dim=1, keepdim=True)
       zf = utils.rescale(zf)
     else:
       under_ksp, zf = utils.scale(under_ksp, zf)
@@ -239,7 +235,7 @@ class BaseTrain(object):
     return zf, targets, under_ksp, segs
 
   def train_epoch(self):
-    """Train for one epoch"""
+    """Train for one epoch."""
     self.network.train()
 
     epoch_loss = 0

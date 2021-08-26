@@ -18,9 +18,11 @@ def fft(x):
   # complex_x = torch.view_as_complex(x)
   # fft = torch.fft.fft2(complex_x,  norm='ortho')
   # return torch.view_as_real(fft) 
+  x = x.permute(0, 2, 3, 1)
   if x.shape[-1] == 1:
     x = torch.cat((x, torch.zeros_like(x)), dim=3)
   x = torch.fft(x, signal_ndim=2, normalized=True)
+  x = x.permute(0, 3, 1, 2)
   return x
 
 def ifft(x):
@@ -31,15 +33,14 @@ def ifft(x):
   # complex_x = torch.view_as_complex(x)
   # ifft = torch.fft.ifft2(complex_x, norm='ortho')
   # return torch.view_as_real(ifft) 
+  x = x.permute(0, 2, 3, 1)
   x = torch.ifft(x, signal_ndim=2, normalized=True)
+  x = x.permute(0, 3, 1, 2)
   return x
 
 def undersample(fullysampled, mask):
   '''Generate undersampled k-space data with given binary mask'''
-  if fullysampled.shape[-1] == 1:
-    fullysampled = torch.cat((fullysampled, torch.zeros_like(fullysampled)), dim=3)
-
-  mask_expand = mask.unsqueeze(-1)
+  mask_expand = mask.unsqueeze(0)
   ksp = fft(fullysampled)
   under_ksp = ksp * mask_expand
   return under_ksp
@@ -47,15 +48,11 @@ def undersample(fullysampled, mask):
 def absval(arr):
   """
   Takes absolute value of last dimension, if complex.
-  Input dims:  (N, l, w, 2)
+  Input dims:  (N, n_ch, l, w)
   Output dims: (N, l, w)
   """
-  assert arr.shape[-1] == 2 or arr.shape[-1] == 1
-  if torch.is_tensor(arr):
-    arr = arr.norm(dim=-1)
-  else:
-    arr = np.linalg.norm(arr, axis=-1)
-
+  assert arr.shape[1] == 2 or arr.shape[1] == 1
+  arr = arr.norm(dim=1)
   return arr
 
 def scale(y, zf):

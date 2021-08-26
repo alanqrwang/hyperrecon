@@ -65,7 +65,7 @@ class SliceDataset(data.Dataset):
   def __getitem__(self, index):
     # Load data and get label
     path, aseg_path = self.slices[index]
-    x = np.load(path)[..., np.newaxis]
+    x = np.load(path)[np.newaxis]
     y = np.load(aseg_path)[np.newaxis]
     if self.transform is not None:
       x = self.transform(x)

@@ -140,7 +140,6 @@ class Unet(nn.Module):
     
   def forward(self, zf, hyp_out=None):
     x = zf
-    x = x.permute(0, 3, 1, 2)
 
     conv1 = self.dconv_down1(x, hyp_out)
     x = self.maxpool(conv1)
@@ -170,9 +169,8 @@ class Unet(nn.Module):
     else:
       out = self.conv_last(x)
 
-    out = out.permute(0, 2, 3, 1)
     if self.residual:
-      zf = zf.norm(p=2, dim=-1, keepdim=True)
+      zf = zf.norm(p=2, dim=1, keepdim=True)
       out = zf + out 
     
     return out

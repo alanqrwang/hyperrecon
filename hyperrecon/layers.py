@@ -88,12 +88,7 @@ class BatchConv2d(nn.Module):
     return [self.out_channels]
 
 class ClipByPercentile(object):
-  """Divide by 99th percentile and clip values in [0, 1]
-
-  Args:
-    output_size (tuple or int): Desired output size. If int, square crop
-      is made.
-  """
+  """Divide by 99th percentile and clip values in [0, 1]."""
 
   def __call__(self, img):
     perc_99 = np.percentile(img, 99)
