@@ -15,7 +15,7 @@ class Data_Consistency(object):
   def __call__(self, pred, gt, y, mask):
     l2 = torch.nn.MSELoss(reduction='none')
 
-    UFx_hat = utils.undersample(pred, mask)
+    UFx_hat = utils.generate_measurement(pred, mask)
     dc = torch.sum(l2(UFx_hat, y), dim=(1, 2, 3))
     return dc
 

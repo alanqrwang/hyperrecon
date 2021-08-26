@@ -38,7 +38,7 @@ def ifft(x):
   x = x.permute(0, 3, 1, 2)
   return x
 
-def undersample(fullysampled, mask):
+def generate_measurement(fullysampled, mask):
   '''Generate under-sampled k-space data with given binary mask.
   
   Args:

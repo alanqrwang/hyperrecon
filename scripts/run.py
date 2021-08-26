@@ -222,7 +222,7 @@ class BaseTrain(object):
     targets = batch.float().to(self.device)
     segs = None
 
-    under_ksp = utils.undersample(targets, self.mask)
+    under_ksp = utils.generate_measurement(targets, self.mask)
     zf = utils.ifft(under_ksp)
 
     under_ksp, zf = utils.scale(under_ksp, zf)
