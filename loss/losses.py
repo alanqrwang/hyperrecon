@@ -64,5 +64,7 @@ def generate_loss_ops(loss_type):
     tx_op = loss_ops.MSE()
   elif loss_type.lower() == 'dice':
     tx_op = loss_ops.DICE()
+  else:
+    raise NotImplementedError
 
   return functools.partial(tx_op)

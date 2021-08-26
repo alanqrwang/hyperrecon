@@ -107,7 +107,7 @@ class SSIM(object):
         self.ssim_loss = pytorch_ssim.SSIM(size_average=False)
         self.sup = True
 
-    def get_ssim(self, pred, gt, y, mask):
+    def __call__(self, pred, gt, y, mask):
         '''
         Mean ssim loss on test set:
         knee, 8p3: 0.31786856
@@ -136,11 +136,9 @@ class Watson_DFT(object):
         return loss
 
 
-
-
 class L1(object):
     def __init__(self):
-        self.sup = True
+        self.l1 = torch.nn.L1Loss(reduction='none')
     def __call__(self, pred, gt, y, mask):
         '''
         Mean l1 loss on test set:
@@ -155,10 +153,9 @@ class L1(object):
 
 class MSE(object):
     def __init__(self):
-        self.sup = True
+        self.mse_loss = torch.nn.MSELoss(reduction='none')
     def __call__(self, pred, gt, y, mask):
-        mse_loss = torch.nn.MSELoss(reduction='none')
-        return torch.mean(mse_loss(pred, gt), dim=(1, 2, 3))
+        return torch.mean(self.mse_loss(pred, gt), dim=(1, 2, 3))
 
 
 class DICE(object):
