@@ -238,15 +238,9 @@ class BaseTrain(object):
     epoch_psnr = 0
 
     for i, batch in tqdm(enumerate(self.train_loader), total=self.num_steps_per_epoch):
-      zf, gt, y, _ = self.prepare_batch(batch)
-      batch_size = len(zf)
-
-      self.optimizer.zero_grad()
-      with torch.set_grad_enabled(True):
-
-        loss, psnr = self.train_step()
-        epoch_loss += loss.data.cpu().numpy() * batch_size
-        epoch_psnr += bpsnr(gt, pred) * batch_size
+      loss, psnr, batch_size = self.train_step(batch)
+      epoch_loss += loss.data.cpu().numpy() * batch_size
+      epoch_psnr += psnr * batch_size
       epoch_samples += batch_size
       if i == self.num_steps_per_epoch:
         break
@@ -256,6 +250,11 @@ class BaseTrain(object):
     return epoch_loss, epoch_psnr
 
   def train_step(self, batch):
+    zf, gt, y, _ = self.prepare_batch(batch)
+    batch_size = len(zf)
+
+    self.optimizer.zero_grad()
+    with torch.set_grad_enabled(True):
       hyperparams = self.sampler.sample(
         batch_size, self.r1, self.r2).to(self.device)
       coeffs = generate_coefficients(
@@ -268,6 +267,8 @@ class BaseTrain(object):
       loss = self.compute_loss(pred, gt, y, coeffs)
       loss.backward()
       self.optimizer.step()
+    psnr = bpsnr(gt, pred)
+    return loss, psnr, batch_size
 
   def eval_epoch(self):
     """Validate for one epoch."""
