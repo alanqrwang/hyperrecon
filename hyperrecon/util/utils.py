@@ -6,9 +6,8 @@ For more details, please read:
 """
 import torch
 import numpy as np
-from hyperrecon import test, dataset, layers
 import os
-
+from hyperrecon.model import layers
 
 def fft(x):
   """Normalized 2D Fast Fourier Transform

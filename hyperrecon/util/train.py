@@ -1,20 +1,24 @@
 import torch
 from torchvision import transforms
 import numpy as np
-from hyperrecon import dataset, model, sampler, layers
 import os
 import time
 from tqdm import tqdm
 
+from hyperrecon import sampler
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.loss.coefficients import generate_coefficients
 from hyperrecon.util.metric import bpsnr
 from hyperrecon.util import utils
+from hyperrecon.model.unet import HyperUnet, Unet
+from hyperrecon.model.layers import ClipByPercentile
+from hyperrecon.data.mask import get_mask
+from hyperrecon.data.brain import ArrDataset, SliceDataset, get_train_data, get_train_gt
 
 class BaseTrain(object):
   def __init__(self, args):
     # HyperRecon
-    self.mask = dataset.get_mask(
+    self.mask = get_mask(
       '160_224', args.undersampling_rate).to(args.device)
     self.undersampling_rate = args.undersampling_rate
     self.topK = args.topK
@@ -94,17 +98,17 @@ class BaseTrain(object):
 
   def get_dataloader(self):
     if self.legacy_dataset:
-      xdata = dataset.get_train_data(maskname=self.undersampling_rate)
-      gt_data = dataset.get_train_gt()
-      trainset = dataset.Dataset(
+      xdata = get_train_data(maskname=self.undersampling_rate)
+      gt_data = get_train_gt()
+      trainset = ArrDataset(
         xdata[:int(len(xdata)*0.8)], gt_data[:int(len(gt_data)*0.8)])
-      valset = dataset.Dataset(
+      valset = ArrDataset(
         xdata[int(len(xdata)*0.8):], gt_data[int(len(gt_data)*0.8):])
     else:
-      transform = transforms.Compose([layers.ClipByPercentile()])
-      trainset = dataset.SliceDataset(
+      transform = transforms.Compose([ClipByPercentile()])
+      trainset = SliceDataset(
         self.data_path, 'train', total_subjects=50, transform=transform)
-      valset = dataset.SliceDataset(
+      valset = SliceDataset(
         self.data_path, 'validate', total_subjects=5, transform=transform)
 
     params = {'batch_size': self.batch_size,
@@ -117,7 +121,7 @@ class BaseTrain(object):
 
   def get_model(self):
     if self.hyperparameters is None:
-      self.network = model.HyperUnet(
+      self.network = HyperUnet(
         self.num_hyperparams,
         self.hnet_hdim,
         hnet_norm=not self.range_restrict,
@@ -126,7 +130,7 @@ class BaseTrain(object):
         h_ch_main=self.unet_hdim,
       ).to(self.device)
     else:
-      self.network = model.Unet(in_ch=self.n_ch_in,
+      self.network = Unet(in_ch=self.n_ch_in,
                     out_ch=self.n_ch_out,
                     h_ch=self.unet_hdim).to(self.device)
     print('Total parameters:', utils.count_parameters(self.network))
