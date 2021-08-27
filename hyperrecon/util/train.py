@@ -1,4 +1,3 @@
-from operator import is_
 import torch
 from torchvision import transforms
 import numpy as np
