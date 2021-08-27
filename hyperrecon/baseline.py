@@ -25,7 +25,7 @@ class Baseline(BaseTrain):
     print('Baseline')
   
   def inference(self, zf, hyperparams):
-    self.network(zf)
+    return self.network(zf)
 
   def get_model(self):
     self.network = Unet(in_ch=self.n_ch_in,
@@ -34,7 +34,7 @@ class Baseline(BaseTrain):
     utils.summary(self.network)
     return self.network
 
-  def sample_hparams(self, num_samples, is_training):
+  def sample_hparams(self, num_samples, is_training=False):
     hyperparams = torch.ones((num_samples, self.num_hyperparams)).to(
           self.device) * self.hyperparameters
     return hyperparams

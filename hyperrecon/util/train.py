@@ -97,7 +97,7 @@ class BaseTrain(object):
         self.network, load_path, self.optimizer)
 
   def get_dataloader(self):
-    if self.legacy_dataset:
+    if self.arr_dataset:
       xdata = get_train_data(maskname=self.undersampling_rate)
       gt_data = get_train_gt()
       trainset = ArrDataset(
