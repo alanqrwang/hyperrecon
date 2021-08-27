@@ -27,6 +27,7 @@ class BaseTrain(object):
     self.lr = args.lr
     self.force_lr = args.force_lr
     self.batch_size = args.batch_size
+    self.num_steps_per_epoch = args.num_steps_per_epoch
     self.legacy_dataset = args.legacy_dataset
     self.loss_list = args.loss_list
     self.hyperparameters = args.hyperparameters
@@ -140,7 +141,6 @@ class BaseTrain(object):
 
   def train(self):
     for epoch in range(self.cont+1, self.epochs+1):
-      tic = time.time()
 
       if self.hyperparameters is not None:
         self.r1 = self.hyperparameters
@@ -169,18 +169,21 @@ class BaseTrain(object):
       print('Sampling bounds [%.2f, %.2f]' % (self.r1, self.r2))
 
       # Train
+      tic = time.time()
       train_epoch_loss, train_epoch_psnr = self.train_epoch()
+      train_epoch_time = time.time() - tic
       # Validate
-      eval_epoch_loss, eval_epoch_psnr = self.eval_epoch()
+      tic = time.time()
+      val_epoch_loss, val_epoch_psnr = self.eval_epoch()
+      val_epoch_time = time.time() - tic
 
-      epoch_train_time = time.time() - tic
 
       # Save checkpoints
       self.logger['loss_train'].append(train_epoch_loss)
-      self.logger['loss_val'].append(eval_epoch_loss)
+      self.logger['loss_val'].append(val_epoch_loss)
       self.logger['psnr_train'].append(train_epoch_psnr)
-      self.logger['psnr_val'].append(eval_epoch_psnr)
-      self.logger['epoch_train_time'].append(epoch_train_time)
+      self.logger['psnr_val'].append(val_epoch_psnr)
+      self.logger['epoch_train_time'].append(train_epoch_time)
 
       utils.save_loss(self.run_dir, self.logger, 'loss_train', 'loss_val', 'epoch_train_time',
               'psnr_train', 'psnr_val')
@@ -188,10 +191,10 @@ class BaseTrain(object):
         utils.save_checkpoint(epoch, self.network.state_dict(), self.optimizer.state_dict(),
                     self.ckpt_dir)
 
-      print("Epoch {}: train loss: {:.6f}, train psnr: {:.6f}, time: {:.6f}".format(
-        epoch, train_epoch_loss, train_epoch_psnr, epoch_train_time))
-      print("Epoch {}: test loss: {:.6f}, test psnr: {:.6f}, time: {:.6f}".format(
-        epoch, eval_epoch_loss, eval_epoch_psnr, epoch_train_time))
+      print("Epoch {}: train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
+        epoch, train_epoch_loss, train_epoch_psnr, train_epoch_time))
+      print("Epoch {}: val loss={:.6f}, val psnr={:.6f}, val time={:.6f}".format(
+        epoch, val_epoch_loss, val_epoch_psnr, val_epoch_time))
 
   def compute_loss(self, pred, gt, y, coeffs):
     '''Compute loss.
@@ -224,9 +227,7 @@ class BaseTrain(object):
 
     under_ksp = utils.generate_measurement(targets, self.mask)
     zf = utils.ifft(under_ksp)
-
     under_ksp, zf = utils.scale(under_ksp, zf)
-
     return zf, targets, under_ksp, segs
 
   def train_epoch(self):
@@ -237,7 +238,7 @@ class BaseTrain(object):
     epoch_samples = 0
     epoch_psnr = 0
 
-    for _, batch in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
+    for i, batch in tqdm(enumerate(self.train_loader), total=self.num_steps_per_epoch):
       zf, gt, y, _ = self.prepare_batch(batch)
       batch_size = len(zf)
 
@@ -260,13 +261,15 @@ class BaseTrain(object):
         epoch_loss += loss.data.cpu().numpy() * batch_size
         epoch_psnr += bpsnr(gt, pred) * batch_size
       epoch_samples += batch_size
+      if i == self.num_steps_per_epoch:
+        break
 
     epoch_loss /= epoch_samples
     epoch_psnr /= epoch_samples
     return epoch_loss, epoch_psnr
 
   def eval_epoch(self):
-    """Validate for one epoch"""
+    """Validate for one epoch."""
     self.network.eval()
 
     epoch_loss = 0
