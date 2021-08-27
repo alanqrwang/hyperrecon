@@ -22,7 +22,7 @@ class BaseTrain(object):
       '160_224', args.undersampling_rate).to(args.device)
     self.undersampling_rate = args.undersampling_rate
     self.topK = args.topK
-    self.sampling_method = args.sampling_method
+    self.method = args.method
     self.anneal = args.anneal
     self.range_restrict = args.range_restrict
     # ML
@@ -167,7 +167,7 @@ class BaseTrain(object):
       print('\nEpoch %d/%d' % (epoch, self.epochs))
       print('Learning rate:',
           self.lr if self.force_lr is None else self.force_lr)
-      print('DHS sampling' if self.sampling_method ==
+      print('DHS sampling' if self.method ==
           'dhs' else 'UHS sampling')
       print('Sampling bounds [%.2f, %.2f]' % (self.r1, self.r2))
 
@@ -212,7 +212,7 @@ class BaseTrain(object):
       l = self.losses[i]
       loss += c * l(pred, gt, y, self.mask)
 
-    if self.sampling_method == 'uhs':
+    if self.method == 'uhs':
       loss = torch.mean(loss)
     else:
       assert self.topK is not None

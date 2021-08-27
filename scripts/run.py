@@ -1,7 +1,7 @@
 import torch
 import os
 from hyperrecon.argparser import Parser
-from hyperrecon.util.train import BaseTrain
+from hyperrecon import train_and_eval_lib
 
 
 if __name__ == "__main__":
@@ -14,6 +14,6 @@ if __name__ == "__main__":
     args.device = torch.device('cpu')
   os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
 
-  trainer = BaseTrain(args)
+  trainer = train_and_eval_lib.get_trainer(args)
   trainer.config()
   trainer.train()

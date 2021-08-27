@@ -51,7 +51,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
-      '--sampling_method', choices=['uhs', 'dhs'], type=str, help='Sampling method', required=True)
+      '--method', choices=['uhs', 'dhs', 'baseline'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_argument('--hyperparameters', type=float, default=None)
@@ -65,7 +65,7 @@ class Parser(argparse.ArgumentParser):
 
   def parse(self):
     args = self.parse_args()
-    if args.sampling_method == 'dhs':
+    if args.method == 'dhs':
       assert args.topK is not None, 'DHS sampling must set topK'
     if args.date is None:
       date = '{}'.format(time.strftime('%b_%d'))
