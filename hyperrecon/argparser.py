@@ -25,7 +25,7 @@ class Parser(argparse.ArgumentParser):
               help='gpu id to train on')
     self.add_argument('--date', type=str, default=None,
               help='Override date')
-    self.add_bool_arg('legacy_dataset', default=False)
+    self.add_bool_arg('arr_dataset', default=False)
 
     # Machine learning parameters
     self.add_argument('--lr', type=float, default=1e-3,
@@ -73,7 +73,8 @@ class Parser(argparse.ArgumentParser):
       date = args.date
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  '{lr}_{batch_size}_{losses}_{hnet_hdim}_{unet_hdim}_{topK}_{range_restrict}_{hps}'.format(
+                  'rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}'.format(
+                    rate=args.undersampling_rate,
                     lr=args.lr,
                     batch_size=args.batch_size,
                     losses=args.loss_list,

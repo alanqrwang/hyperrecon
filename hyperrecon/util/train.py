@@ -4,7 +4,6 @@ import numpy as np
 import os
 import time
 from tqdm import tqdm
-from pprint import pprint
 
 from hyperrecon import sampler
 from hyperrecon.loss.losses import compose_loss_seq
@@ -25,14 +24,16 @@ class BaseTrain(object):
     self.method = args.method
     self.anneal = args.anneal
     self.range_restrict = args.range_restrict
+    self.loss_list = args.loss_list
+    self.num_hyperparams = len(
+      self.loss_list)-1 if self.range_restrict else len(self.loss_list)
     # ML
     self.num_epochs = args.num_epochs
     self.lr = args.lr
     self.force_lr = args.force_lr
     self.batch_size = args.batch_size
     self.num_steps_per_epoch = args.num_steps_per_epoch
-    self.legacy_dataset = args.legacy_dataset
-    self.loss_list = args.loss_list
+    self.arr_dataset = args.arr_dataset
     self.hyperparameters = args.hyperparameters
     self.hnet_hdim = args.hnet_hdim
     self.unet_hdim = args.unet_hdim
@@ -61,9 +62,6 @@ class BaseTrain(object):
     self.get_dataloader()
 
     # Model, Optimizer, Sampler, Loss
-    self.num_hyperparams = len(
-      self.loss_list)-1 if self.range_restrict else len(self.loss_list)
-
     self.network = self.get_model()
     self.optimizer = self.get_optimizer()
     self.sampler = self.get_sampler()
@@ -141,7 +139,6 @@ class BaseTrain(object):
 
   def train(self):
     for epoch in range(self.cont+1, self.num_epochs+1):
-      pprint(self.logger)
       self.epoch = epoch
 
       self.train_epoch_begin()
