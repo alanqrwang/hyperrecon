@@ -7,6 +7,7 @@ For more details, please read:
 import torch
 import numpy as np
 import os
+import json
 from hyperrecon.model import layers
 
 def fft(x):
@@ -97,8 +98,8 @@ def remove_sequential(network, all_layers):
 
   return all_layers
 
-def count_parameters(network):
-  """Count total parameters in model"""
+def summary(network):
+  """Print model summary."""
   for name, val in network.named_parameters():
     print(name)
 
@@ -107,8 +108,8 @@ def count_parameters(network):
   all_layers = remove_sequential(network, all_layers)
   for l in all_layers:
     main_param_count += np.prod(l.get_weight_shape()) + np.prod(l.get_bias_shape())
-  print('Number of main weights:', main_param_count)
-  return sum(p.numel() for p in network.parameters() if p.requires_grad)
+  print('\nNumber of main weights:', main_param_count)
+  print('Total parameters:', sum(p.numel() for p in network.parameters() if p.requires_grad))
 
 ######### Saving/Loading checkpoints ############
 def load_checkpoint(model, path, optimizer=None, scheduler=None):

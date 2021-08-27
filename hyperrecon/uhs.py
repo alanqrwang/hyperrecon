@@ -11,6 +11,6 @@ class UHS(BaseTrain):
   def process_loss(self, loss):
     return loss.mean()
 
-  def train_epoch_begin(self, epoch):
-      super().train_epoch_begin(epoch)
+  def train_epoch_begin(self):
+      super().train_epoch_begin()
       print('UHS Sampling')

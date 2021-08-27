@@ -18,6 +18,6 @@ class DHS(BaseTrain):
 
     return loss
 
-  def train_epoch_begin(self, epoch):
-      super().train_epoch_begin(epoch)
+  def train_epoch_begin(self):
+      super().train_epoch_begin()
       print('DHS Sampling')
