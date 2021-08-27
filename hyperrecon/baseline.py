@@ -10,9 +10,6 @@ class Baseline(BaseTrain):
   def __init__(self, args):
     super(Baseline, self).__init__(args=args)
 
-  def process_loss(self, loss):
-    return loss.mean()
-
   def train_epoch_begin(self):
     self.r1 = self.hyperparameters
     self.r2 = self.hyperparameters

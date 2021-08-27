@@ -34,9 +34,6 @@ class Predict(BaseTrain):
     self.train_epoch_end(is_eval=True, is_save=False)
     self.train_end(verbose=True)
     
-  def process_loss(self, loss):
-    return loss.mean()
-
 
 # def get_everything(path, device, \
 #            cp=None, n_grid=20, \

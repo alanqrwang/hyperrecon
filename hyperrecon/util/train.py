@@ -234,7 +234,7 @@ class BaseTrain(object):
     Returns:
       Scalar loss value
     '''
-    pass
+    return loss.mean()
 
   def prepare_batch(self, batch):
     targets = batch.float().to(self.device)
