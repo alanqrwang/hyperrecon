@@ -4,6 +4,7 @@ import numpy as np
 import os
 import time
 from tqdm import tqdm
+import json
 
 from hyperrecon import sampler
 from hyperrecon.loss.losses import compose_loss_seq
@@ -42,20 +43,28 @@ class BaseTrain(object):
     # I/O
     self.load = args.load
     self.cont = args.cont
+    self.epoch = self.cont + 1
     self.device = args.device
     self.run_dir = args.run_dir
     self.ckpt_dir = args.ckpt_dir
     self.data_path = args.data_path
     self.log_interval = args.log_interval
 
-    # Logging
-    self.logger = {}
-    self.logger['loss.train'] = []
-    self.logger['loss.val'] = []
-    self.logger['psnr.train'] = []
-    self.logger['psnr.val'] = []
-    self.logger['time.train'] = []
-    self.logger['time.val'] = []
+    self.set_metrics()
+
+  def set_metrics(self):
+    self.list_of_metrics = [
+      'loss.train',
+      'psnr.train',
+      'time.train',
+    ] 
+    self.list_of_eval_metrics = [
+      'loss.val',
+      'psnr.val', 
+      'time.val',
+      # 'ssim.val',
+      # 'hfen.val',
+    ] 
 
   def config(self):
     # Data
@@ -77,24 +86,17 @@ class BaseTrain(object):
     elif self.cont > 0:  # Load from previous checkpoint
       load_path = os.path.join(
         self.run_dir, 'checkpoints', 'model.{epoch:04d}.h5'.format(epoch=self.cont))
-      self.logger['loss.train'] = list(np.loadtxt(
-        os.path.join(self.run_dir, 'loss.train.txt'))[:self.cont])
-      self.logger['loss.val'] = list(np.loadtxt(
-        os.path.join(self.run_dir, 'loss.val.txt'))[:self.cont])
-      self.logger['psnr.train'] = list(np.loadtxt(
-        os.path.join(self.run_dir, 'psnr.train.txt'))[:self.cont])
-      self.logger['psnr.val'] = list(np.loadtxt(
-        os.path.join(self.run_dir, 'psnr.val.txt'))[:self.cont])
-      self.logger['time.train'] = list(np.loadtxt(
-        os.path.join(self.run_dir, 'time.train.txt'))[:self.cont])
-      self.logger['time.val'] = list(np.loadtxt(
-        os.path.join(self.run_dir, 'time.val.txt'))[:self.cont])
+      self.metrics.update({key : list(np.loadtxt(os.path.join(self.run_dir, key + '.txt'))[:self.cont])}
+        for key in self.list_of_metrics)
+      self.eval_metrics.update({key : list(np.loadtxt(os.path.join(self.run_dir, key + '.txt'))[:self.cont])}
+        for key in self.list_of_eval_metrics)
     else:
       load_path = None
 
     if load_path is not None:
       self.network, self.optimizer = utils.load_checkpoint(
         self.network, load_path, self.optimizer)
+    
 
   def get_dataloader(self):
     if self.arr_dataset:
@@ -138,12 +140,51 @@ class BaseTrain(object):
     return sampler.Sampler(self.num_hyperparams)
 
   def train(self):
-    for epoch in range(self.cont+1, self.num_epochs+1):
+    self.train_begin()
+    for epoch in range(self.start_epoch, self.num_epochs+1):
       self.epoch = epoch
 
       self.train_epoch_begin()
       self.train_epoch()
       self.train_epoch_end(is_eval=True, is_save=(self.epoch % self.log_interval == 0))
+    self.train_end(verbose=True)
+
+  def train_begin(self):
+    self.start_epoch = self.cont + 1
+    # Logging
+    self.metrics = {}
+    self.metrics.update({key: [] for key in self.list_of_metrics})
+
+    self.eval_metrics = {}
+    self.eval_metrics.update({key: [] for key in self.list_of_eval_metrics})
+
+  def train_end(self, verbose=False):
+    """Called at the end of training.
+
+    Save summary statistics in json format
+    Print in command line some basic statistics
+
+    Args:
+      verbose: Boolean. Print messages if True.
+    """
+    if verbose:
+      summary_dict = {}
+      summary_dict.update({key : self.eval_metrics[key][-1]
+        for key in self.list_of_eval_metrics})
+      with open(os.path.join(self.run_dir, 'summary_full.json'),
+                'w') as outfile:
+        json.dump(summary_dict, outfile, sort_keys=True, indent=4)
+
+      # Print basic information
+      print('')
+      print('---------------------------------------------------------------')
+      print('Train is done. Below are file path and basic test stats\n')
+      print('File path:\n')
+      print(self.run_dir)
+      print('Eval stats:\n')
+      print(json.dumps(summary_dict, sort_keys=True, indent=4))
+      print('---------------------------------------------------------------')
+      print()
 
   def train_epoch_begin(self):
     self.r1 = 0
@@ -159,9 +200,8 @@ class BaseTrain(object):
     if is_eval:
       self.eval_epoch()
 
-    utils.save_loss(self.run_dir, self.logger, 
-                  'loss.train', 'loss.val', 'psnr.train', 
-                  'psnr.val', 'time.train', 'time.val')
+    utils.save_loss(self.run_dir, self.metrics, *self.list_of_metrics)
+    utils.save_loss(self.run_dir, self.eval_metrics, *self.list_of_eval_metrics)
     if is_save:
       utils.save_checkpoint(self.epoch, self.network.state_dict(), self.optimizer.state_dict(),
           self.ckpt_dir)
@@ -185,7 +225,7 @@ class BaseTrain(object):
       loss += c * l(pred, gt, y, self.mask)
     return loss
   
-  def process_loss(loss):
+  def process_loss(self, loss):
     '''Process loss.
     
     Args:
@@ -259,9 +299,9 @@ class BaseTrain(object):
     epoch_time = time.time() - start_time
     epoch_loss /= epoch_samples
     epoch_psnr /= epoch_samples
-    self.logger['loss.train'].append(epoch_loss)
-    self.logger['psnr.train'].append(epoch_psnr)
-    self.logger['time.train'].append(epoch_time)
+    self.metrics['loss.train'].append(epoch_loss)
+    self.metrics['psnr.train'].append(epoch_psnr)
+    self.metrics['time.train'].append(epoch_time)
 
     print("Epoch {}: train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
         self.epoch, epoch_loss, epoch_psnr, epoch_time))
@@ -284,9 +324,9 @@ class BaseTrain(object):
     epoch_time = time.time() - start_time
     epoch_loss /= epoch_samples
     epoch_psnr /= epoch_samples
-    self.logger['loss.val'].append(epoch_loss)
-    self.logger['psnr.val'].append(epoch_psnr)
-    self.logger['time.val'].append(epoch_time)
+    self.eval_metrics['loss.val'].append(epoch_loss)
+    self.eval_metrics['psnr.val'].append(epoch_psnr)
+    self.eval_metrics['time.val'].append(epoch_time)
 
     print("Epoch {}: val loss={:.6f}, val psnr={:.6f}, val time={:.6f}".format(
       self.epoch, epoch_loss, epoch_psnr, epoch_time))

@@ -14,7 +14,6 @@ class Baseline(BaseTrain):
     return loss.mean()
 
   def train_epoch_begin(self):
-    assert self.hyperparameters is not None
     self.r1 = self.hyperparameters
     self.r2 = self.hyperparameters
 

@@ -4,6 +4,7 @@ from hyperrecon.uhs import UHS
 from hyperrecon.dhs import DHS
 from hyperrecon.uhs_anneal import UHSAnneal
 from hyperrecon.baseline import Baseline
+from hyperrecon.predict import Predict
 
 def get_trainer(args):
   """Get trainer."""
@@ -15,6 +16,8 @@ def get_trainer(args):
     trainer = UHSAnneal(args)
   elif args.method.lower() == 'baseline':
     trainer = Baseline(args)
+  elif args.method.lower() == 'predict':
+    trainer = Predict(args)
   else:
     raise NotImplementedError
   return trainer

@@ -51,7 +51,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
-      '--method', choices=['uhs', 'dhs', 'baseline', 'uhs_anneal'], type=str, help='Training method', required=True)
+      '--method', choices=['uhs', 'dhs', 'baseline', 'uhs_anneal', 'predict'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_argument('--hyperparameters', type=float, default=None)
@@ -63,21 +63,34 @@ class Parser(argparse.ArgumentParser):
     group.add_argument('--no_' + name, dest=name, action='store_false')
     self.set_defaults(**{name: default})
 
-  def parse(self):
-    args = self.parse_args()
+  def validate_args(self, args):
     if args.method == 'dhs':
       assert args.topK is not None, 'DHS sampling must set topK'
+    if args.method == 'baseline':
+      assert args.hyperparameters is not None, 'Baseline must set hyperparameters'
+    if args.range_restrict:
+      assert len(args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
+
+  def parse(self):
+    args = self.parse_args()
+    self.validate_args(args)
     if args.date is None:
       date = '{}'.format(time.strftime('%b_%d'))
     else:
       date = args.date
+
+    def stringify_loss(str_loss_list):
+      str = str_loss_list[0]
+      for i in range(1, len(str_loss_list)):
+        str += '+' + str_loss_list[i]
+      return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
                   'rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}'.format(
                     rate=args.undersampling_rate,
                     lr=args.lr,
                     batch_size=args.batch_size,
-                    losses=args.loss_list,
+                    losses=stringify_loss(args.loss_list),
                     hnet_hdim=args.hnet_hdim,
                     unet_hdim=args.unet_hdim,
                     range_restrict=args.range_restrict,
