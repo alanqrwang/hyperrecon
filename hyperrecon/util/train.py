@@ -26,7 +26,7 @@ class BaseTrain(object):
     self.anneal = args.anneal
     self.range_restrict = args.range_restrict
     # ML
-    self.epochs = args.epochs
+    self.num_epochs = args.num_epochs
     self.lr = args.lr
     self.force_lr = args.force_lr
     self.batch_size = args.batch_size
@@ -143,34 +143,9 @@ class BaseTrain(object):
     return sampler.Sampler(self.num_hyperparams)
 
   def train(self):
-    for epoch in range(self.cont+1, self.epochs+1):
+    for epoch in range(self.cont+1, self.num_epochs+1):
 
-      if self.hyperparameters is not None:
-        self.r1 = self.hyperparameters
-        self.r2 = self.hyperparameters
-      elif not self.anneal:
-        self.r1 = 0
-        self.r2 = 1
-      elif epoch < 500 and self.anneal:
-        self.r1 = 0.5
-        self.r2 = 0.5
-      elif epoch < 1000 and self.anneal:
-        self.r1 = 0.4
-        self.r2 = 0.6
-      elif epoch < 1500 and self.anneal:
-        self.r1 = 0.2
-        self.r2 = 0.8
-      elif epoch < 2000 and self.anneal:
-        self.r1 = 0
-        self.r2 = 1
-
-      print('\nEpoch %d/%d' % (epoch, self.epochs))
-      print('Learning rate:',
-          self.lr if self.force_lr is None else self.force_lr)
-      print('DHS sampling' if self.method ==
-          'dhs' else 'UHS sampling')
-      print('Sampling bounds [%.2f, %.2f]' % (self.r1, self.r2))
-
+      self.train_epoch_begin(epoch)
       # Train
       tic = time.time()
       train_epoch_loss, train_epoch_psnr = self.train_epoch()
@@ -194,10 +169,37 @@ class BaseTrain(object):
         utils.save_checkpoint(epoch, self.network.state_dict(), self.optimizer.state_dict(),
                     self.ckpt_dir)
 
+      print(epoch, train_epoch_loss, train_epoch_psnr, train_epoch_time)
+      print(epoch, val_epoch_loss, val_epoch_psnr, val_epoch_time)
       print("Epoch {}: train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
         epoch, train_epoch_loss, train_epoch_psnr, train_epoch_time))
       print("Epoch {}: val loss={:.6f}, val psnr={:.6f}, val time={:.6f}".format(
         epoch, val_epoch_loss, val_epoch_psnr, val_epoch_time))
+
+  def train_epoch_begin(self, epoch):
+    if self.hyperparameters is not None:
+      self.r1 = self.hyperparameters
+      self.r2 = self.hyperparameters
+    elif not self.anneal:
+      self.r1 = 0
+      self.r2 = 1
+    elif epoch < 500 and self.anneal:
+      self.r1 = 0.5
+      self.r2 = 0.5
+    elif epoch < 1000 and self.anneal:
+      self.r1 = 0.4
+      self.r2 = 0.6
+    elif epoch < 1500 and self.anneal:
+      self.r1 = 0.2
+      self.r2 = 0.8
+    elif epoch < 2000 and self.anneal:
+      self.r1 = 0
+      self.r2 = 1
+
+    print('\nEpoch %d/%d' % (epoch, self.num_epochs))
+    print('Learning rate:',
+        self.lr if self.force_lr is None else self.force_lr)
+    print('Sampling bounds [%.2f, %.2f]' % (self.r1, self.r2))
 
   def compute_loss(self, pred, gt, y, coeffs):
     '''Compute loss.
@@ -211,18 +213,10 @@ class BaseTrain(object):
       c = coeffs[:, i]
       l = self.losses[i]
       loss += c * l(pred, gt, y, self.mask)
-
-    if self.method == 'uhs':
-      loss = torch.mean(loss)
-    else:
-      assert self.topK is not None
-      dc_losses = loss_dict['dc']
-      _, perm = torch.sort(dc_losses) # Sort by DC loss, low to high
-      sort_losses = self.losses[perm] # Reorder total losses by lowest to highest DC loss
-      hyperparams = hyperparams[perm]
-      loss = torch.mean(sort_losses[:self.topK]) # Take only the losses with lowest DC
-
     return loss
+  
+  def process_loss(loss):
+    pass
 
   def prepare_batch(self, batch):
     targets = batch.float().to(self.device)
@@ -269,6 +263,7 @@ class BaseTrain(object):
         pred = self.network(zf)  # Baselines
 
       loss = self.compute_loss(pred, gt, y, coeffs)
+      loss = self.process_loss(loss)
       loss.backward()
       self.optimizer.step()
     psnr = bpsnr(gt, pred)
@@ -302,6 +297,7 @@ class BaseTrain(object):
           pred = self.network(zf)  # Baselines
 
         loss = self.compute_loss(pred, gt, y, coeffs)
+        loss = self.process_loss(loss)
         epoch_loss += loss.data.cpu().numpy() * batch_size
         epoch_psnr += bpsnr(gt, pred) * batch_size
 
