@@ -1,11 +1,63 @@
-import torch
+import os
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import patches
 import glob
-from . import utils, dataset
+from hyperrecon.util import utils
+from hyperrecon.data import brain
 from scipy.spatial.distance import squareform, pdist
+matplotlib.rcParams['lines.linewidth'] = 4
+from matplotlib.pyplot import cm
+
+SMALL_SIZE = 8
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 22
+plt.rc('font', size=BIGGER_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+
+def plotcurves(metric, model_paths, show_legend=True, xlim=None, ylim=None, lines_to_plot=('train', 'val'), vline=None, ax=None):
+  ax = ax or plt.gca()
+  if not isinstance(model_paths, list):
+    model_paths = [model_paths]
+  if not isinstance(lines_to_plot, (tuple, list)):
+    lines_to_plot = (lines_to_plot)
+
+  val_hparams = np.linspace(0, 1, 10)
+  for model_path in model_paths:
+    train_path = os.path.join(model_path, '{}.train.txt'.format(metric))
+    val_paths = [os.path.join(model_path, '{}.val{:02f}.txt'.format(metric, n)) for n in val_hparams]
+
+    loss = np.loadtxt(train_path)
+    val_losses = [np.loadtxt(val_path) for val_path in val_paths]
+
+    colors = cm.cool(np.linspace(0,1,len(val_losses)))
+    xs = np.arange(1, len(loss)+1) 
+    if 'train' in lines_to_plot:
+      ax.plot(xs, loss, label=model_path.split('/')[-4])
+    if 'val' in lines_to_plot:
+      for i, (l, c) in enumerate(zip(val_losses, colors)):
+        ax.plot(xs, l, label=val_hparams[i], color=c, linestyle='dotted')
+
+  if ylim is not None:
+    ax.set_ylim(ylim)
+  if xlim is not None:
+    ax.set_xlim(xlim)
+  ax.set_xlabel('Epoch')
+  ax.set_title(metric)
+  ax.grid()
+  if vline is not None:
+    for x in vline:
+      ax.axvline(x=x, color='k')
+  if show_legend:                     
+    ax.legend(loc='best')
+  return ax
 
 def plot_img(img, title=None, ax=None, rot90=False):
   ax = ax or plt.gca()
@@ -390,7 +442,7 @@ def slices(save=False, supervised=True):
   psnr_map = np.load('/share/sablab/nfs02/users/aw847/data/hypernet/baselines/psnrs.npy')[:, img_idxs]
   dc_map = np.load('/share/sablab/nfs02/users/aw847/data/hypernet/baselines/dcs.npy')[:, img_idxs]
   recons = np.load('/share/sablab/nfs02/users/aw847/data/hypernet/baselines/recons.npy')[:,img_idxs]
-  gt_data = dataset.get_test_gt('256_256')[3:13][img_idxs]
+  gt_data = brain.get_test_gt('256_256')[3:13][img_idxs]
 
   n_grid = int(np.sqrt(len(recons)))
   n_chunks = 2

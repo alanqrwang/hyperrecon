@@ -50,6 +50,7 @@ class BaseTrain(object):
     self.log_interval = args.log_interval
 
     self.set_metrics()
+    self.set_hparams_for_eval()
 
   def set_metrics(self):
     self.list_of_metrics = [
@@ -58,12 +59,23 @@ class BaseTrain(object):
       'time.train',
     ] 
     self.list_of_eval_metrics = [
-      'loss.val',
-      'psnr.val', 
-      'time.val',
+      'loss.val{:02f}'.format(n) for n in torch.linspace(0, 1, 10)
+    ] + [
+      'psnr.val{:02f}'.format(n) for n in torch.linspace(0, 1, 10)
+    ] + [
+      'time.val{:02f}'.format(n) for n in torch.linspace(0, 1, 10)
+    ]
       # 'ssim.val',
       # 'hfen.val',
-    ] 
+    # ] 
+
+  def set_hparams_for_eval(self):
+    if self.range_restrict and len(self.loss_list) == 2:
+      self.val_hparams = torch.linspace(0, 1, 10).view(-1, 1)
+    elif self.range_restrict and len(self.loss_list) == 3:
+      self.val_hparams = torch.linspace(0, 1, 10).view(-1, 1)
+    else:
+      self.val_hparams = torch.linspace(0, 1, 10).view(-1, 1)
 
   def config(self):
     # Data
@@ -79,22 +91,7 @@ class BaseTrain(object):
       for param_group in self.optimizer.param_groups:
         param_group['lr'] = self.force_lr
 
-    # Checkpoint Loading
-    if self.load:  # Load from path
-      load_path = self.load
-    elif self.cont > 0:  # Load from previous checkpoint
-      load_path = os.path.join(
-        self.run_dir, 'checkpoints', 'model.{epoch:04d}.h5'.format(epoch=self.cont))
-      self.metrics.update({key : list(np.loadtxt(os.path.join(self.run_dir, key + '.txt'))[:self.cont])}
-        for key in self.list_of_metrics)
-      self.eval_metrics.update({key : list(np.loadtxt(os.path.join(self.run_dir, key + '.txt'))[:self.cont])}
-        for key in self.list_of_eval_metrics)
-    else:
-      load_path = None
-
-    if load_path is not None:
-      self.network, self.optimizer = utils.load_checkpoint(
-        self.network, load_path, self.optimizer)
+    
     
 
   def get_dataloader(self):
@@ -155,6 +152,21 @@ class BaseTrain(object):
 
     self.eval_metrics = {}
     self.eval_metrics.update({key: [] for key in self.list_of_eval_metrics})
+
+    # Checkpoint Loading
+    if self.load:  # Load from path
+      load_path = self.load
+    elif self.cont > 0:  # Load from previous checkpoint
+      load_path = os.path.join(
+        self.run_dir, 'checkpoints', 'model.{epoch:04d}.h5'.format(epoch=self.cont))
+      self.metrics.update({key : list(np.loadtxt(os.path.join(self.run_dir, key + '.txt')))[:self.cont] for key in self.list_of_metrics})
+      self.eval_metrics.update({key : list(np.loadtxt(os.path.join(self.run_dir, key + '.txt')))[:self.cont] for key in self.list_of_eval_metrics})
+    else:
+      load_path = None
+
+    if load_path is not None:
+      self.network, self.optimizer = utils.load_checkpoint(
+        self.network, load_path, self.optimizer)
 
   def train_end(self, verbose=False):
     """Called at the end of training.
@@ -246,19 +258,14 @@ class BaseTrain(object):
   def inference(self, zf, hyperparams):
     return self.network(zf, hyperparams)
 
-  def sample_hparams(self, num_samples, is_training=True):
+  def sample_hparams(self, num_samples):
     '''Samples hyperparameters from distribution.'''
-    if is_training:
-      hyperparams = self.sampler.sample(
+    hyperparams = self.sampler.sample(
         num_samples, self.r1, self.r2)
-    else:
-      hyperparams = torch.ones(
-        (num_samples, self.num_hyperparams))
     return hyperparams
 
-  def generate_coefficients(self, num_samples, is_training=True):
+  def generate_coefficients(self, samples):
     '''Generates coefficients from samples.'''
-    samples = self.sample_hparams(num_samples, is_training)
     if self.range_restrict and len(self.losses) == 2:
       alpha = samples[:, 0]
       coeffs = torch.stack((1-alpha, alpha), dim=1)
@@ -284,7 +291,7 @@ class BaseTrain(object):
     start_time = time.time()
     for i, batch in tqdm(enumerate(self.train_loader), total=self.num_steps_per_epoch):
       loss, psnr, batch_size = self.train_step(batch)
-      epoch_loss += loss.data.cpu().numpy() * batch_size
+      epoch_loss += loss * batch_size
       epoch_psnr += psnr * batch_size
       epoch_samples += batch_size
       if i == self.num_steps_per_epoch:
@@ -297,33 +304,36 @@ class BaseTrain(object):
     self.metrics['psnr.train'].append(epoch_psnr)
     self.metrics['time.train'].append(epoch_time)
 
-    print("Epoch {}: train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
-        self.epoch, epoch_loss, epoch_psnr, epoch_time))
+    print("train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
+        epoch_loss, epoch_psnr, epoch_time))
+
+
 
   def eval_epoch(self):
-    """Eval for one epoch."""
+    '''Eval for one epoch.'''
     self.network.eval()
 
-    epoch_loss = 0
-    epoch_samples = 0
-    epoch_psnr = 0
+    for hparam in self.val_hparams:
+      print(hparam)
+      epoch_loss = 0
+      epoch_samples = 0
+      epoch_psnr = 0
+      start_time = time.time()
+      for _, batch in tqdm(enumerate(self.val_loader), total=len(self.val_loader)):
+        loss, psnr, batch_size = self.eval_step(batch, hparam)
+        epoch_loss += loss * batch_size
+        epoch_psnr += psnr * batch_size
+        epoch_samples += batch_size
 
-    start_time = time.time()
-    for _, batch in tqdm(enumerate(self.val_loader), total=len(self.val_loader)):
-      loss, psnr, batch_size = self.eval_step(batch)
-      epoch_loss += loss.data.cpu().numpy() * batch_size
-      epoch_psnr += psnr * batch_size
-      epoch_samples += batch_size
+      epoch_time = time.time() - start_time
+      epoch_loss /= epoch_samples
+      epoch_psnr /= epoch_samples
+      self.eval_metrics['loss.val{:02f}'.format(hparam.item())].append(epoch_loss)
+      self.eval_metrics['psnr.val{:02f}'.format(hparam.item())].append(epoch_psnr)
+      self.eval_metrics['time.val{:02f}'.format(hparam.item())].append(epoch_time)
 
-    epoch_time = time.time() - start_time
-    epoch_loss /= epoch_samples
-    epoch_psnr /= epoch_samples
-    self.eval_metrics['loss.val'].append(epoch_loss)
-    self.eval_metrics['psnr.val'].append(epoch_psnr)
-    self.eval_metrics['time.val'].append(epoch_time)
-
-    print("Epoch {}: val loss={:.6f}, val psnr={:.6f}, val time={:.6f}".format(
-      self.epoch, epoch_loss, epoch_psnr, epoch_time))
+      print("val loss={:.6f}, val psnr={:.6f}, val time={:.6f}".format(
+        epoch_loss, epoch_psnr, epoch_time))
 
   def train_step(self, batch):
     '''Train for one step.'''
@@ -332,7 +342,8 @@ class BaseTrain(object):
 
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
-      coeffs = self.generate_coefficients(batch_size)
+      hparams = self.sample_hparams(batch_size)
+      coeffs = self.generate_coefficients(hparams)
       pred = self.inference(zf, coeffs)
 
       loss = self.compute_loss(pred, gt, y, coeffs)
@@ -340,18 +351,19 @@ class BaseTrain(object):
       loss.backward()
       self.optimizer.step()
     psnr = bpsnr(gt, pred)
-    return loss, psnr, batch_size
+    return loss.cpu().detach().numpy(), psnr, batch_size
 
-  def eval_step(self, batch):
+  def eval_step(self, batch, hparams):
     '''Eval for one step.'''
     zf, gt, y, _ = self.prepare_batch(batch)
     batch_size = len(zf)
+    hparams = hparams.repeat(batch_size, 1)
 
     with torch.set_grad_enabled(False):
-      coeffs = self.generate_coefficients(batch_size)
+      coeffs = self.generate_coefficients(hparams)
       pred = self.inference(zf, coeffs)
 
       loss = self.compute_loss(pred, gt, y, coeffs)
       loss = self.process_loss(loss)
     psnr = bpsnr(gt, pred)
-    return loss, psnr, batch_size
+    return loss.cpu().detach().numpy(), psnr, batch_size

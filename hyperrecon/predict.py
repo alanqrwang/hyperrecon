@@ -34,21 +34,6 @@ class Predict(BaseTrain):
     self.train_epoch_end(is_eval=True, is_save=False)
     self.train_end(verbose=True)
     
-  def eval_step(self, batch):
-    '''Eval for one step.'''
-    zf, gt, y, _ = self.prepare_batch(batch)
-    batch_size = len(zf)
-
-    with torch.set_grad_enabled(False):
-      hyperparams = self.sample_hparams(batch_size, is_training=False).to(self.device)
-      coeffs = self.generate_coefficients(
-        hyperparams, len(self.losses), self.range_restrict)
-      pred = self.inference(zf, coeffs)
-
-      loss = self.compute_loss(pred, gt, y, coeffs)
-      loss = self.process_loss(loss)
-    psnr = bpsnr(gt, pred)
-    return loss, psnr, batch_size
 # def test(network, dataloader, args, hps, normalized, out_shape, criterion=None, \
 #     give_recons=False, give_losses=False):
 #   """Testing for a fixed set of hyperparameter setting.
