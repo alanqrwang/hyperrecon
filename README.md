@@ -1,4 +1,4 @@
-# Regularization-Agnostic Compressed Sensing MRI Reconstruction with Hypernetworks
+# HyperRecon: Regularization-Agnostic CS-MRI Reconstruction with Hypernetworks
 ![Network architecture](figs/Hypernet_Arch_v5.png)
 [link to paper](https://arxiv.org/abs/2101.02194)
 
