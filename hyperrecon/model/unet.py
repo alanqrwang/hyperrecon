@@ -13,7 +13,7 @@ class HyperNetwork(nn.Module):
 
   Takes hyperparameters and outputs weights of main U-Net
   """
-  def __init__(self, normalize, in_dim=1, h_dim=32):
+  def __init__(self, in_dim=1, h_dim=32):
     """
     Parameters
     ----------
@@ -26,7 +26,6 @@ class HyperNetwork(nn.Module):
     """
     super(HyperNetwork, self).__init__()
     
-    self.normalize = normalize
     # Network layers
     self.lin1 = nn.Linear(in_dim, h_dim)
     self.lin2 = nn.Linear(h_dim, h_dim)
@@ -43,9 +42,6 @@ class HyperNetwork(nn.Module):
     x : torch.Tensor (batch_size, num_hyperparams)
       Hyperparameter values
     """
-    if self.normalize:
-      x = x / torch.sum(x, dim=1, keepdim=True)
-
     x = self.relu(self.lin1(x))
     x = self.relu(self.lin2(x))
     x = self.relu(self.lin3(x))
@@ -54,7 +50,7 @@ class HyperNetwork(nn.Module):
 
 class HyperUnet(nn.Module):
   """Main U-Net for image reconstruction"""
-  def __init__(self, in_units_hnet, h_units_hnet, hnet_norm, in_ch_main, out_ch_main, h_ch_main, residual=True):
+  def __init__(self, in_units_hnet, h_units_hnet, in_ch_main, out_ch_main, h_ch_main, residual=True):
     """
     Parameters
     ----------
@@ -62,7 +58,6 @@ class HyperUnet(nn.Module):
     num_hyperparams : Number of hyperparameters (i.e. number of regularization functions)
     hnet_hdim : Hidden channel dimension of HyperNetwork
     unet_hdim : Hidden channel dimension of U-Net
-    hnet_norm : Whether or not to normalize hypernet inputs
     n_ch_out : Number of output channels
     residual : Whether or not to use residual U-Net architecture
     """
@@ -71,9 +66,9 @@ class HyperUnet(nn.Module):
     self.residual = residual
 
     # HyperNetwork
-    self.hnet = HyperNetwork(hnet_norm, 
-                 in_dim=in_units_hnet, 
-                 h_dim=h_units_hnet)
+    self.hnet = HyperNetwork(
+                in_dim=in_units_hnet, 
+                h_dim=h_units_hnet)
     self.unet = Unet(in_ch=in_ch_main, 
              out_ch=out_ch_main, 
              h_ch=h_ch_main, 

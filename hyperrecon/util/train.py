@@ -125,7 +125,6 @@ class BaseTrain(object):
     self.network = HyperUnet(
       self.num_hyperparams,
       self.hnet_hdim,
-      hnet_norm=not self.range_restrict,
       in_ch_main=self.n_ch_in,
       out_ch_main=self.n_ch_out,
       h_ch_main=self.unet_hdim,
@@ -339,10 +338,10 @@ class BaseTrain(object):
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
       hyperparams = self.sample_hparams(batch_size).to(self.device)
-      pred = self.inference(zf, hyperparams)
-
       coeffs = self.generate_coefficients(
         hyperparams, len(self.losses), self.range_restrict)
+      pred = self.inference(zf, coeffs)
+
       loss = self.compute_loss(pred, gt, y, coeffs)
       loss = self.process_loss(loss)
       loss.backward()
@@ -357,10 +356,10 @@ class BaseTrain(object):
 
     with torch.set_grad_enabled(False):
       hyperparams = self.sample_hparams(batch_size, is_training=False).to(self.device)
-      pred = self.inference(zf, hyperparams)
-
       coeffs = self.generate_coefficients(
         hyperparams, len(self.losses), self.range_restrict)
+      pred = self.inference(zf, coeffs)
+
       loss = self.compute_loss(pred, gt, y, coeffs)
       loss = self.process_loss(loss)
     psnr = bpsnr(gt, pred)
