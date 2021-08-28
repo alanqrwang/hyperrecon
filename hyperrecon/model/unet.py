@@ -7,59 +7,20 @@ For more details, please read:
 from . import layers
 import torch
 import torch.nn as nn
+from hypernetwork import HyperNetwork
 
-class HyperNetwork(nn.Module):
-  """Hypernetwork architecture and forward pass
-
-  Takes hyperparameters and outputs weights of main U-Net
-  """
-  def __init__(self, in_dim=1, h_dim=32):
-    """
-    Parameters
-    ----------
-    normalize : bool
-      Whether or not to normalize the input; removes a degree of freedom
-    in_dim : int
-      Input dimension
-    h_dim : int
-      Hidden dimension
-    """
-    super(HyperNetwork, self).__init__()
-    
-    # Network layers
-    self.lin1 = nn.Linear(in_dim, h_dim)
-    self.lin2 = nn.Linear(h_dim, h_dim)
-    self.lin3 = nn.Linear(h_dim, h_dim)
-    self.lin4 = nn.Linear(h_dim, h_dim)
-
-    # Activations
-    self.relu = nn.LeakyReLU(inplace=True)
-
-  def forward(self, x):
-    """
-    Parameters
-    ----------
-    x : torch.Tensor (batch_size, num_hyperparams)
-      Hyperparameter values
-    """
-    x = self.relu(self.lin1(x))
-    x = self.relu(self.lin2(x))
-    x = self.relu(self.lin3(x))
-    x = self.relu(self.lin4(x))
-    return x
 
 class HyperUnet(nn.Module):
-  """Main U-Net for image reconstruction"""
+  """HyperUnet for hyperparameter-agnostic image reconstruction"""
   def __init__(self, in_units_hnet, h_units_hnet, in_ch_main, out_ch_main, h_ch_main, residual=True):
     """
-    Parameters
-    ----------
-    device : PyTorch device, 'cpu' or 'cuda:<gpu_id>'
-    num_hyperparams : Number of hyperparameters (i.e. number of regularization functions)
-    hnet_hdim : Hidden channel dimension of HyperNetwork
-    unet_hdim : Hidden channel dimension of U-Net
-    n_ch_out : Number of output channels
-    residual : Whether or not to use residual U-Net architecture
+    Args:
+      in_units_hnet : Input dimension for hypernetwork
+      h_units_hnet : Hidden dimension for hypernetwork
+      in_ch_main : Input channels for Unet
+      out_ch_main : Output channels for Unet
+      h_ch_main : Hidden channels for Unet
+      residual : Whether or not to use residual U-Net architecture
     """
     super(HyperUnet, self).__init__()
 
@@ -76,13 +37,9 @@ class HyperUnet(nn.Module):
 
   def forward(self, x, hyperparams):
     """
-    Parameters
-    ----------
-    zf : torch.Tensor (batch_size, 2, img_height, img_width)
-      Zero-filled reconstruction of under-sampled measurement
-    hyperparams : torch.Tensor (batch_size, num_hyperparams)
-      Hyperparameter values
-
+    Args:
+      x : Input (batch_size, 2, img_height, img_width)
+      hyperparams : Hyperparameter values (batch_size, num_hyperparams)
     """
     hyp_out = self.hnet(hyperparams)
     out = self.unet(x, hyp_out)
@@ -91,8 +48,9 @@ class HyperUnet(nn.Module):
 
 class Unet(nn.Module):
   def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True):
-    '''
-    hnet_hdim activates hypernetwork for Unet
+    '''Main Unet architecture.
+    
+    hnet_hdim activates hypernetwork for Unet.
     '''
     super(Unet, self).__init__()
         
