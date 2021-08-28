@@ -247,6 +247,7 @@ class BaseTrain(object):
     return self.network(zf, hyperparams)
 
   def sample_hparams(self, num_samples, is_training=True):
+    '''Samples hyperparameters from distribution.'''
     if is_training:
       hyperparams = self.sampler.sample(
         num_samples, self.r1, self.r2)
@@ -255,24 +256,22 @@ class BaseTrain(object):
         (num_samples, self.num_hyperparams))
     return hyperparams
 
-  def generate_coefficients(self, samples, num_losses, range_restrict):
+  def generate_coefficients(self, num_samples, is_training=True):
     '''Generates coefficients from samples.'''
-    if range_restrict and num_losses == 2:
+    samples = self.sample_hparams(num_samples, is_training)
+    if self.range_restrict and len(self.losses) == 2:
       alpha = samples[:, 0]
       coeffs = torch.stack((1-alpha, alpha), dim=1)
 
-    elif range_restrict and num_losses == 3:
+    elif self.range_restrict and len(self.losses) == 3:
       alpha = samples[:, 0]
       beta = samples[:, 1]
       coeffs = torch.stack((alpha, (1-alpha)*beta, (1-alpha)*(1-beta)), dim=1)
 
     else:
-      coeffs = None
-      for i in range(num_losses):
-        coeffs = samples[:,i:i+1] if coeffs is None else torch.cat((coeffs, samples[:,i:i+1]), dim=1)
-      coeffs = coeffs / torch.sum(samples, dim=1)
+      coeffs = samples / torch.sum(samples, dim=1)
 
-    return coeffs
+    return coeffs.to(self.device)
 
   def train_epoch(self):
     """Train for one epoch."""
@@ -333,9 +332,7 @@ class BaseTrain(object):
 
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
-      hyperparams = self.sample_hparams(batch_size).to(self.device)
-      coeffs = self.generate_coefficients(
-        hyperparams, len(self.losses), self.range_restrict)
+      coeffs = self.generate_coefficients(batch_size)
       pred = self.inference(zf, coeffs)
 
       loss = self.compute_loss(pred, gt, y, coeffs)
@@ -351,9 +348,7 @@ class BaseTrain(object):
     batch_size = len(zf)
 
     with torch.set_grad_enabled(False):
-      hyperparams = self.sample_hparams(batch_size, is_training=False).to(self.device)
-      coeffs = self.generate_coefficients(
-        hyperparams, len(self.losses), self.range_restrict)
+      coeffs = self.generate_coefficients(batch_size)
       pred = self.inference(zf, coeffs)
 
       loss = self.compute_loss(pred, gt, y, coeffs)

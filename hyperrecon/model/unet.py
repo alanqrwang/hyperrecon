@@ -4,11 +4,10 @@ For more details, please read:
   Alan Q. Wang, Adrian V. Dalca, and Mert R. Sabuncu. 
   "Regularization-Agnostic Compressed Sensing MRI with Hypernetworks" 
 """
-from . import layers
 import torch
 import torch.nn as nn
-from hypernetwork import HyperNetwork
-
+from . import layers
+from .hypernetwork import HyperNetwork
 
 class HyperUnet(nn.Module):
   """HyperUnet for hyperparameter-agnostic image reconstruction"""

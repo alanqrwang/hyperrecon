@@ -7,9 +7,9 @@ For more details, please read:
 """
 from glob import glob
 import os
+import torch
 
 from hyperrecon.util.train import BaseTrain
-
 from hyperrecon.util import utils
 
 class Predict(BaseTrain):
@@ -34,101 +34,21 @@ class Predict(BaseTrain):
     self.train_epoch_end(is_eval=True, is_save=False)
     self.train_end(verbose=True)
     
+  def eval_step(self, batch):
+    '''Eval for one step.'''
+    zf, gt, y, _ = self.prepare_batch(batch)
+    batch_size = len(zf)
 
-# def get_everything(path, device, \
-#            cp=None, n_grid=20, \
-#            gt_data=None, xdata=None, seg_data=None, 
-#            normalized=True, split='test', legacy_dataset=False,
-#            num_subjects=10, give_recons=False):
-  
-#   # Forward through latest available model
-#   if cp is None:
-#     glob_path = path.replace('[', '[()').replace(']', '()]').replace('()', '[]')
-#     model_paths = sorted(glob.glob(os.path.join(glob_path, 'checkpoints/model.*.h5')))
-#     model_path = model_paths[-1]
-#   # Or forward through specified epoch
-#   else:
-#     model_path = os.path.join(path, 'checkpoints/model.{epoch:04d}.h5'.format(epoch=cp))
-    
-#   args_txtfile = os.path.join(path, 'args.txt')
-#   if os.path.exists(args_txtfile):
-#     with open(args_txtfile) as json_file:
-#       args = json.load(json_file)
-#   else:
-#     raise Exception('no args found')
-#   args['normalized'] = normalized
+    with torch.set_grad_enabled(False):
+      hyperparams = self.sample_hparams(batch_size, is_training=False).to(self.device)
+      coeffs = self.generate_coefficients(
+        hyperparams, len(self.losses), self.range_restrict)
+      pred = self.inference(zf, coeffs)
 
-#   if args['legacy_dataset']:
-#     N = 32
-#     xdata = dataset.get_test_data(maskname='16p3')[:N]
-#     gt_data = dataset.get_test_gt()[:N]
-#     testset = dataset.Dataset(xdata, gt_data)
-#     params = {'batch_size': args['batch_size'],
-#        'shuffle': False,
-#        'num_workers': 0, 
-#        'pin_memory': True}
-#     out_shape = xdata.shape
-
-#   else:
-#     transform = transforms.Compose([layers.ClipByPercentile()])
-#     testset = dataset.SliceDataset(args['data_path'], 'test', total_subjects=num_subjects, 
-#                   transform=transform, include_seg=True)
-#     params = {'batch_size': 192,
-#        'shuffle': False,
-#        'num_workers': 0, 
-#        'pin_memory': True}
-#     out_shape = [len(testset), 160, 224, 1]
-
-#   dataloader = torch.utils.data.DataLoader(testset, **params)
-
-#   losses = args['losses']
-#   range_restrict = args['range_restrict']
-#   topK = args['topK']
-#   hyperparameters = args['hyperparameters']
-#   maskname = args['undersampling_rate']
-
-#   num_hyperparams = len(losses)-1 if range_restrict else len(losses)
-
-#   if hyperparameters is not None:
-#     hps = torch.tensor([hyperparameters]).unsqueeze(1).float().to(device)
-#   elif len(losses) == 3:
-#     alphas = np.linspace(0, 1, n_grid)
-#     betas = np.linspace(0, 1, n_grid)
-#     hps = torch.tensor(np.stack(np.meshgrid(alphas, betas), -1).reshape(-1,2)).float().to(device)
-#     if not range_restrict:
-#       hps = utils.oldloss2newloss(hps)
-#   elif len(losses) == 2:
-#     hps = torch.linspace(0, 1, n_grid).view(-1, 1).float().to(device)
-#     if not range_restrict:
-#       hps = utils.oldloss2newloss(hps)
-
-
-#   args['mask'] = dataset.get_mask('160_224', maskname).to(device)
-#   args['device'] = device
-#   n_ch_in = 2
-
-#   if args['hyperparameters'] is None:
-#     network = model.HyperUnet(
-#              num_hyperparams,
-#              args['hnet_hdim'],
-#              hnet_norm=not args['range_restrict'],
-#              in_ch_main=n_ch_in,
-#              out_ch_main=args['n_ch_out'],
-#              h_ch_main=args['unet_hdim'], 
-#              ).to(args['device'])
-#   else:
-#     network = model.Unet(in_ch=n_ch_in,
-#                out_ch=args['n_ch_out'], 
-#                h_ch=args['unet_hdim']).to(args['device'])
-#   # print('Total parameters:', utils.count_parameters(network))
-
-#   network = utils.load_checkpoint(network, model_path)
-#   criterion = losslayer.AmortizedLoss(losses, range_restrict, args['sampling'], topK, device, args['mask'], take_avg=False)
-
-#   gr = give_recons
-#   gl = True
-#   return test(network, dataloader, args, hps, args['normalized'], out_shape, criterion=criterion, give_recons=gr, give_losses=gl)
-
+      loss = self.compute_loss(pred, gt, y, coeffs)
+      loss = self.process_loss(loss)
+    psnr = bpsnr(gt, pred)
+    return loss, psnr, batch_size
 # def test(network, dataloader, args, hps, normalized, out_shape, criterion=None, \
 #     give_recons=False, give_losses=False):
 #   """Testing for a fixed set of hyperparameter setting.
