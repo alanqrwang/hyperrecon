@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import patches
-import glob
+from glob import glob
 from hyperrecon.util import utils
 from hyperrecon.data import brain
 from scipy.spatial.distance import squareform, pdist
@@ -29,10 +29,9 @@ def plotcurves(metric, model_paths, show_legend=True, xlim=None, ylim=None, line
   if not isinstance(lines_to_plot, (tuple, list)):
     lines_to_plot = (lines_to_plot)
 
-  val_hparams = np.linspace(0, 1, 10)
   for model_path in model_paths:
     train_path = os.path.join(model_path, '{}.train.txt'.format(metric))
-    val_paths = [os.path.join(model_path, '{}.val{:02f}.txt'.format(metric, n)) for n in val_hparams]
+    val_paths = glob(os.path.join(model_path, '{}.val*.txt'.format(metric)))
 
     loss = np.loadtxt(train_path)
     val_losses = [np.loadtxt(val_path) for val_path in val_paths]
@@ -43,7 +42,7 @@ def plotcurves(metric, model_paths, show_legend=True, xlim=None, ylim=None, line
       ax.plot(xs, loss, label=model_path.split('/')[-4])
     if 'val' in lines_to_plot:
       for i, (l, c) in enumerate(zip(val_losses, colors)):
-        ax.plot(xs, l, label=val_hparams[i], color=c, linestyle='dotted')
+        ax.plot(xs, l, label=val_paths[i].split('/')[-1], color=c, linestyle='dotted')
 
   if ylim is not None:
     ax.set_ylim(ylim)

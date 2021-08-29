@@ -1,4 +1,6 @@
 import torch
+import time
+from tqdm import tqdm
 
 from hyperrecon.util.train import BaseTrain
 from hyperrecon.util import utils
@@ -30,7 +32,26 @@ class Baseline(BaseTrain):
     utils.summary(self.network)
     return self.network
 
-  def sample_hparams(self, num_samples, is_training=False):
-    hyperparams = torch.ones((num_samples, self.num_hyperparams)).to(
-          self.device) * self.hyperparameters
+  def sample_hparams(self, num_samples):
+    hyperparams = torch.ones((num_samples, self.num_hyperparams)) * self.hyperparameters
     return hyperparams
+  
+  def set_hparams_for_eval(self):
+    self.val_hparams = torch.tensor(self.hyperparameters).view(-1, 1)
+  
+  def set_metrics(self):
+    self.list_of_metrics = [
+      'loss.train',
+      'psnr.train',
+      'time.train',
+    ] 
+    self.list_of_eval_metrics = [
+      'loss.val{:02f}'.format(self.hyperparameters)
+    ] + [
+      'psnr.val{:02f}'.format(self.hyperparameters) 
+    ] + [
+      'time.val{:02f}'.format(self.hyperparameters) 
+    ]
+      # 'ssim.val',
+      # 'hfen.val',
+    # ] 

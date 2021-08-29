@@ -128,11 +128,11 @@ def load_checkpoint(model, path, optimizer=None, scheduler=None):
   else:
     return model
 
-def save_checkpoint(epoch, model_state, optimizer_state, model_folder, scheduler=None):
+def save_checkpoint(epoch, model, optimizer, model_folder, scheduler=None):
   state = {
     'epoch': epoch,
-    'state_dict': model_state,
-    'optimizer' : optimizer_state
+    'state_dict': model.state_dict(),
+    'optimizer' : optimizer.state_dict()
   }
   if scheduler is not None:
     state['scheduler'] = scheduler.state_dict()

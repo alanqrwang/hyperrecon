@@ -84,6 +84,7 @@ class BaseTrain(object):
     # Model, Optimizer, Sampler, Loss
     self.network = self.get_model()
     self.optimizer = self.get_optimizer()
+    self.scheduler = self.get_scheduler()
     self.sampler = self.get_sampler()
     self.losses = compose_loss_seq(self.loss_list)
 
@@ -91,8 +92,6 @@ class BaseTrain(object):
       for param_group in self.optimizer.param_groups:
         param_group['lr'] = self.force_lr
 
-    
-    
 
   def get_dataloader(self):
     if self.arr_dataset:
@@ -131,6 +130,9 @@ class BaseTrain(object):
   def get_optimizer(self):
     return torch.optim.Adam(self.network.parameters(), lr=self.lr)
 
+  def get_scheduler(self):
+    return torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=30, gamma=0.5)
+
   def get_sampler(self):
     return sampler.Sampler(self.num_hyperparams)
 
@@ -153,6 +155,9 @@ class BaseTrain(object):
     self.eval_metrics = {}
     self.eval_metrics.update({key: [] for key in self.list_of_eval_metrics})
 
+    self.monitor = {
+      'learning_rate' : []
+    }
     # Checkpoint Loading
     if self.load:  # Load from path
       load_path = self.load
@@ -201,8 +206,7 @@ class BaseTrain(object):
     self.r2 = 1
 
     print('\nEpoch %d/%d' % (self.epoch, self.num_epochs))
-    print('Learning rate:',
-        self.lr if self.force_lr is None else self.force_lr)
+    print('Learning rate:', self.scheduler.get_last_lr())
     print('Sampling bounds [%.2f, %.2f]' % (self.r1, self.r2))
 
   def train_epoch_end(self, is_eval=False, is_save=False):
@@ -213,8 +217,8 @@ class BaseTrain(object):
     utils.save_loss(self.run_dir, self.metrics, *self.list_of_metrics)
     utils.save_loss(self.run_dir, self.eval_metrics, *self.list_of_eval_metrics)
     if is_save:
-      utils.save_checkpoint(self.epoch, self.network.state_dict(), self.optimizer.state_dict(),
-          self.ckpt_dir)
+      utils.save_checkpoint(self.epoch, self.network, self.optimizer,
+          self.ckpt_dir, self.scheduler)
 
   def compute_loss(self, pred, gt, y, coeffs):
     '''Compute loss.
@@ -296,6 +300,7 @@ class BaseTrain(object):
       epoch_samples += batch_size
       if i == self.num_steps_per_epoch:
         break
+    self.scheduler.step()
 
     epoch_time = time.time() - start_time
     epoch_loss /= epoch_samples
@@ -303,6 +308,7 @@ class BaseTrain(object):
     self.metrics['loss.train'].append(epoch_loss)
     self.metrics['psnr.train'].append(epoch_psnr)
     self.metrics['time.train'].append(epoch_time)
+    self.monitor['learning_rate'].append(self.scheduler.get_last_lr())
 
     print("train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
         epoch_loss, epoch_psnr, epoch_time))
@@ -314,7 +320,7 @@ class BaseTrain(object):
     self.network.eval()
 
     for hparam in self.val_hparams:
-      print(hparam)
+      print('Evaluating with hparam', hparam)
       epoch_loss = 0
       epoch_samples = 0
       epoch_psnr = 0
