@@ -43,6 +43,10 @@ class Parser(argparse.ArgumentParser):
               help='Hypernetwork architecture', default=64)
     self.add_argument('--n_ch_out', type=int,
               help='Number of output channels of main network', default=1)
+    self.add_argument('--scheduler_step_size', type=int,
+              default=32, help='Step size for scheduler')
+    self.add_argument('--scheduler_gamma', type=int,
+              default=0.5, help='Multiplicative factor for scheduler')
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
@@ -69,7 +73,8 @@ class Parser(argparse.ArgumentParser):
     if args.method == 'baseline':
       assert args.hyperparameters is not None, 'Baseline must set hyperparameters'
     if args.range_restrict:
-      assert len(args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
+      assert len(
+        args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
 
   def parse(self):
     args = self.parse_args()
