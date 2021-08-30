@@ -101,16 +101,22 @@ def remove_sequential(network, all_layers):
 
 def summary(network):
   """Print model summary."""
+  print('')
+  print('Model Summary')
+  print('---------------------------------------------------------------')
   for name, val in network.named_parameters():
     print(name)
 
+  print('---------------------------------------------------------------')
   main_param_count = 0
   all_layers = []
   all_layers = remove_sequential(network, all_layers)
   for l in all_layers:
     main_param_count += np.prod(l.get_weight_shape()) + np.prod(l.get_bias_shape())
-  print('\nNumber of main weights:', main_param_count)
+  print('Number of main weights:', main_param_count)
   print('Total parameters:', sum(p.numel() for p in network.parameters() if p.requires_grad))
+  print('---------------------------------------------------------------')
+  print('')
 
 ######### Saving/Loading checkpoints ############
 def load_checkpoint(model, path, optimizer=None, scheduler=None):

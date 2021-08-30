@@ -26,6 +26,10 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--date', type=str, default=None,
               help='Override date')
     self.add_bool_arg('arr_dataset', default=False)
+    self.add_argument('--num_train_subjects', type=int, default=50,
+              help='Number of subjects to train on')
+    self.add_argument('--num_val_subjects', type=int, default=5,
+              help='Number of subjects to validate on')
 
     # Machine learning parameters
     self.add_argument('--lr', type=float, default=1e-3,

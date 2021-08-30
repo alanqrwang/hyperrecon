@@ -31,7 +31,7 @@ def bpsnr(bimg1, bimg2):
     img1 = img1.cpu().detach().numpy()
     img2 = img2.cpu().detach().numpy()
     metrics.append(psnr(img1, img2))
-  return np.array(metrics).mean()
+  return float(np.array(metrics).mean())
 
 def ssim(img1, img2):
   '''PSNR of two images.  
@@ -62,7 +62,7 @@ def bssim(bimg1, bimg2):
     img1 = img1.cpu().detach().numpy()
     img2 = img2.cpu().detach().numpy()
     metrics.append(ssim(img1, img2))
-  return np.array(metrics).mean()
+  return float(np.array(metrics).mean())
 
 def hfen(img, gt, window_size=15, sigma=1.5):
   '''High-frequency error norm.'''
@@ -90,4 +90,4 @@ def bhfen(bimg1, bimg2):
     img1 = img1.cpu().detach().numpy()
     img2 = img2.cpu().detach().numpy()
     metrics.append(hfen(img1, img2))
-  return np.array(metrics).mean()
+  return float(np.array(metrics).mean())

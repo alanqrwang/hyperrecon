@@ -34,3 +34,4 @@ class Baseline(BaseTrain):
   
   def set_val_hparams(self):
     self.val_hparams = torch.tensor(self.hyperparameters).view(-1, 1)
+    self.test_hparams = torch.tensor(self.hyperparameters).view(-1, 1)

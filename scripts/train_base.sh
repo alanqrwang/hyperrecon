@@ -2,7 +2,7 @@
 
 source activate aw847-torch
 
-python -u run.py -fp no_scheduler \
+python -u run.py -fp separate_by_subjects_test \
   --method baseline \
   --batch_size 32 \
   --lr 1e-3 \
@@ -10,6 +10,5 @@ python -u run.py -fp no_scheduler \
   --hnet_hdim 64 \
   --undersampling_rate 16p3 \
   --loss_list l1 ssim \
-  --hyperparameters $A \
-  --scheduler_gamma 1
+  --hyperparameters $A 
 

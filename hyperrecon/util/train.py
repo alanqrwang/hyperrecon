@@ -7,10 +7,9 @@ from tqdm import tqdm
 import json
 from glob import glob
 
-from hyperrecon.util import sampler
+from hyperrecon.util import sampler, utils
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen
-from hyperrecon.util import utils
 from hyperrecon.model.unet import HyperUnet
 from hyperrecon.model.layers import ClipByPercentile
 from hyperrecon.data.mask import get_mask
@@ -51,27 +50,36 @@ class BaseTrain(object):
     self.run_dir = args.run_dir
     self.data_path = args.data_path
     self.log_interval = args.log_interval
+    self.num_train_subjects = args.num_train_subjects
+    self.num_val_subjects = args.num_val_subjects
 
     self.set_val_hparams()
     self.set_metrics()
 
   def set_val_hparams(self):
     self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
+    self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
 
   def set_metrics(self):
     self.list_of_metrics = [
       'loss.train',
       'psnr.train',
-      'time.train',
     ]
-    self.list_of_eval_metrics = [
+    self.list_of_val_metrics = [
       'loss.val' + self.stringify_list(l.tolist()) for l in self.val_hparams
     ] + [
       'psnr.val' + self.stringify_list(l.tolist()) for l in self.val_hparams
-    ] + [
-      'ssim.val' + self.stringify_list(l.tolist()) for l in self.val_hparams
     # ] + [
-    #   'hfen.val' + self.stringify_list(l.tolist()) for l in self.val_hparams
+      # 'hfen.val' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.val_hparams for s in np.arange(self.num_val_subjects)
+    ]
+    self.list_of_test_metrics = [
+      'loss.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'psnr.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'ssim.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'hfen.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ]
 
   def config(self):
@@ -100,9 +108,11 @@ class BaseTrain(object):
     else:
       transform = transforms.Compose([ClipByPercentile()])
       trainset = SliceDataset(
-        self.data_path, 'train', total_subjects=50, transform=transform)
-      valset = SliceVolDataset(
-        self.data_path, 'validate', total_subjects=5, transform=transform)
+        self.data_path, 'train', total_subjects=self.num_train_subjects, transform=transform)
+      valset = SliceDataset(
+        self.data_path, 'validate', total_subjects=self.num_val_subjects, transform=transform)
+      testset = SliceVolDataset(
+        self.data_path, 'validate', total_subjects=self.num_val_subjects, transform=transform)
 
     self.train_loader = torch.utils.data.DataLoader(trainset, 
           batch_size=self.batch_size,
@@ -110,6 +120,11 @@ class BaseTrain(object):
           num_workers=0,
           pin_memory=True)
     self.val_loader = torch.utils.data.DataLoader(valset,
+          batch_size=self.batch_size*2,
+          shuffle=False,
+          num_workers=0,
+          pin_memory=True)
+    self.test_loader = torch.utils.data.DataLoader(testset,
           batch_size=1,
           shuffle=False,
           num_workers=0,
@@ -141,16 +156,16 @@ class BaseTrain(object):
     self.train_begin()
     if self.num_epochs == 0:
       self.train_epoch_begin()
-      self.train_epoch_end(is_eval=True, is_save=False, save_preds=True)
+      self.train_epoch_end(is_val=False, is_save=False)
     else:
       for epoch in range(self.start_epoch, self.num_epochs+1):
         self.epoch = epoch
 
         self.train_epoch_begin()
         self.train_epoch()
-        self.train_epoch_end(is_eval=True, is_save=(
+        self.train_epoch_end(is_val=True, is_save=(
           self.epoch % self.log_interval == 0))
-      self.train_epoch_end(is_eval=True, is_save=True, save_preds=True)
+      self.train_epoch_end(is_val=False, is_save=True)
     self.train_end(verbose=True)
 
   def manage_checkpoint(self):
@@ -174,7 +189,7 @@ class BaseTrain(object):
     else: # Try to load from latest checkpoint
       model_paths = sorted(glob(os.path.join(self.ckpt_dir, '*')))
       if len(model_paths) == 0:
-        print('Not loading pretrained model')
+        print('Randomly initialized model')
       else:
         load_path = model_paths[-1]
         cont_epoch = int(load_path.split('.')[-2])
@@ -182,12 +197,15 @@ class BaseTrain(object):
     if cont_epoch is not None:
       load_path = os.path.join(
         self.ckpt_dir, 'model.{epoch:04d}.h5'.format(epoch=cont_epoch))
+
       self.metrics.update({key: list(np.loadtxt(os.path.join(
         self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_metrics})
-      self.eval_metrics.update({key: list(np.loadtxt(os.path.join(
-        self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_eval_metrics})
+      self.val_metrics.update({key: list(np.loadtxt(os.path.join(
+        self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
       self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
         self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
+      self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
+        self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
     if load_path is not None:
       self.network, self.optimizer, self.scheduler = utils.load_checkpoint(
         self.network, load_path, self.optimizer, self.scheduler)
@@ -198,12 +216,16 @@ class BaseTrain(object):
     self.metrics = {}
     self.metrics.update({key: [] for key in self.list_of_metrics})
 
-    self.eval_metrics = {}
-    self.eval_metrics.update({key: []
-                  for key in self.list_of_eval_metrics})
+    self.val_metrics = {}
+    self.val_metrics.update({key: []
+                  for key in self.list_of_val_metrics})
 
+    self.test_metrics = {}
+    self.test_metrics.update({key: []
+                  for key in self.list_of_test_metrics})
     self.monitor = {
-      'learning_rate': []
+      'learning_rate': [],
+      'time.train': [],
     }
 
     # Directories to save information
@@ -234,8 +256,11 @@ class BaseTrain(object):
     """
     if verbose:
       summary_dict = {}
-      summary_dict.update({key: self.eval_metrics[key][-1]
-                 for key in self.list_of_eval_metrics})
+      summary_dict.update({key: self.val_metrics[key][-1]
+                 for key in self.list_of_val_metrics})
+      summary_dict.update({key: self.test_metrics[key][-1]
+                 for key in self.list_of_test_metrics})
+      
       with open(os.path.join(self.run_dir, 'summary_full.json'),
             'w') as outfile:
         json.dump(summary_dict, outfile, sort_keys=True, indent=4)
@@ -259,14 +284,13 @@ class BaseTrain(object):
     print('Learning rate:', self.scheduler.get_last_lr())
     print('Sampling bounds [%.2f, %.2f]' % (self.r1, self.r2))
 
-  def train_epoch_end(self, is_eval=False, is_save=False, save_preds=False):
+  def train_epoch_end(self, is_val=True, is_save=False):
     '''Save loss and checkpoints. Evaluate if necessary.'''
-    if is_eval:
-      self.eval_epoch(save_preds)
+    self.eval_epoch(is_val)
 
     utils.save_metrics(self.metric_dir, self.metrics, *self.list_of_metrics)
-    utils.save_metrics(self.metric_dir, self.eval_metrics,
-               *self.list_of_eval_metrics)
+    utils.save_metrics(self.metric_dir, self.val_metrics,
+               *self.list_of_val_metrics)
     utils.save_metrics(self.monitor_dir, self.monitor, 'learning_rate')
     if is_save:
       utils.save_checkpoint(self.epoch, self.network, self.optimizer,
@@ -362,8 +386,8 @@ class BaseTrain(object):
     epoch_psnr /= epoch_samples
     self.metrics['loss.train'].append(epoch_loss)
     self.metrics['psnr.train'].append(epoch_psnr)
-    self.metrics['time.train'].append(epoch_time)
     self.monitor['learning_rate'].append(self.scheduler.get_last_lr())
+    self.monitor['time.train'].append(epoch_time)
 
     print("train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
       epoch_loss, epoch_psnr, epoch_time))
@@ -386,7 +410,7 @@ class BaseTrain(object):
     psnr = bpsnr(gt, pred)
     return loss.cpu().detach().numpy(), psnr, batch_size
 
-  def eval_epoch(self, save_preds=False):
+  def eval_epoch(self, is_val):
     '''Eval for one epoch.
     
     For each hyperparameter, computes all reconstructions for that 
@@ -394,49 +418,79 @@ class BaseTrain(object):
     '''
     self.network.eval()
 
+    if is_val:
+      self.validate()
+    else:
+      self.test(save_preds=True)
+  
+  def validate(self):
+    # Evaluate metrics
     for hparam in self.val_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
+      print('Validating with hparam', hparam_str)
       zf, gt, y, pred, coeffs = self.get_predictions(hparam)
-
-      # Save predictions to disk
-      if save_preds:
-        np.save(os.path.join(self.img_dir, 'pred'+hparam_str+'.npy'), pred.cpu().detach().numpy())
-        if not os.path.exists(os.path.join(self.img_dir, 'gt.npy')):
-          np.save(os.path.join(self.img_dir, 'gt.npy'), gt.cpu().detach().numpy())
-        if not os.path.exists(os.path.join(self.img_dir, 'zf.npy')):
-          np.save(os.path.join(self.img_dir, 'zf.npy'), zf.cpu().detach().numpy())
-      
-      # Evaluate metrics
-      for key in self.eval_metrics:
+      for key in self.val_metrics:
         if 'loss' in key and hparam_str in key:
           loss = self.compute_loss(pred, gt, y, coeffs)
           loss = self.process_loss(loss).item()
-          self.eval_metrics[key].append(loss)
+          self.val_metrics[key].append(loss)
         elif 'psnr' in key and hparam_str in key:
-          self.eval_metrics[key].append(bpsnr(gt, pred))
+          self.val_metrics[key].append(bpsnr(gt, pred))
         elif 'ssim' in key and hparam_str in key:
-          self.eval_metrics[key].append(bssim(gt, pred))
+          self.val_metrics[key].append(bssim(gt, pred))
         elif 'hfen' in key and hparam_str in key:
-          self.eval_metrics[key].append(bhfen(gt, pred))
+          self.val_metrics[key].append(bhfen(gt, pred))
 
-  def get_predictions(self, hparam):
-    print('Evaluating with hparam', hparam)
-    zfs = None
-    ys = None
-    gts = None
-    preds = None
-    coeffs = None
+  def test(self, save_preds=False):
+    
+    # Evaluate metrics
+    for hparam in self.test_hparams:
+      hparam_str = self.stringify_list(hparam.tolist())
+      print('Testing with hparam', hparam_str)
+      zf, gt, y, pred, coeffs = self.get_predictions(hparam, by_subject=True)
+      for i in range(len(zf)):
+        # Save predictions to disk
+        if save_preds:
+          np.save(os.path.join(self.img_dir, 'pred'+hparam_str+'sub{}'.format(i) + '.npy'), pred[i].cpu().detach().numpy())
+          if not os.path.exists(os.path.join(self.img_dir, 'gt' + 'sub{}'.format(i) + '.npy')):
+            np.save(os.path.join(self.img_dir, 'gt.npy'), gt[i].cpu().detach().numpy())
+          if not os.path.exists(os.path.join(self.img_dir, 'zf' + 'sub{}'.format(i) + '.npy')):
+            np.save(os.path.join(self.img_dir, 'zf.npy'), zf[i].cpu().detach().numpy())
+        for key in self.test_metrics:
+          if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
+            loss = self.compute_loss(pred[i], gt[i], y[i], coeffs[i])
+            loss = self.process_loss(loss).item()
+            self.test_metrics[key].append(loss)
+          elif 'psnr' in key and hparam_str in key and 'sub{}'.format(i) in key:
+            self.test_metrics[key].append(bpsnr(gt[i], pred[i]))
+          elif 'ssim' in key and hparam_str in key and 'sub{}'.format(i) in key:
+            self.test_metrics[key].append(bssim(gt[i], pred[i]))
+          elif 'hfen' in key and hparam_str in key and 'sub{}'.format(i) in key:
+            self.test_metrics[key].append(bhfen(gt[i], pred[i]))
 
-    for _, batch in tqdm(enumerate(self.val_loader), total=len(self.val_loader)):
+  def get_predictions(self, hparam, by_subject=False):
+    '''Get predictions, optionally separated by subject'''
+    zfs = []
+    ys = []
+    gts = []
+    preds = []
+    coeffs = []
+
+    loader = self.test_loader if by_subject else self.val_loader
+    for _, batch in tqdm(enumerate(loader), total=len(loader)):
       zf, y, gt, pred, coeff = self.eval_step(batch, hparam)
 
-      zfs = self.smart_concat(zfs, zf)
-      ys = self.smart_concat(ys, y)
-      gts = self.smart_concat(gts, gt)
-      preds = self.smart_concat(preds, pred)
-      coeffs = self.smart_concat(coeffs, coeff)
+      zfs.append(zf)
+      ys.append(y)
+      gts.append(gt)
+      preds.append(pred)
+      coeffs.append(coeff)
 
-    return zfs, gts, ys, preds, coeffs
+    if by_subject:
+      return zfs, gts, ys, preds, coeffs
+    else:
+      return torch.cat(zfs, dim=0), torch.cat(gts, dim=0), torch.cat(ys, dim=0), torch.cat(preds, dim=0), torch.cat(coeffs, dim=0)
+
 
   def eval_step(self, batch, hparams):
     '''Eval for one step.'''
@@ -458,21 +512,3 @@ class BaseTrain(object):
     for i in range(1, len(l)):
       s += '_' + str(l[i])
     return s
-
-  @staticmethod
-  def smart_concat(var1, var2):
-    """Smart concat."""
-
-    def _smart_concat(var1, var2):
-      return var2 if var1 is None else torch.cat((var1, var2), dim=0)
-
-    if isinstance(var2, list):
-      if var1 is not None:
-        assert isinstance(var1, list)
-        return [_smart_concat(v1, v2) for v1, v2 in zip(var1, var2)]
-      else:
-        return var2
-    else:
-      if var1 is not None:
-        assert not isinstance(var1, list)
-      return _smart_concat(var1, var2)

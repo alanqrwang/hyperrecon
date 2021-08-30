@@ -2,7 +2,7 @@
 
 source activate aw847-torch
 
-python -u run.py -fp scheduler_step64 \
+python -u run.py -fp separate_by_subjects_test \
   --method uhs \
   --batch_size 32 \
   --lr 1e-3 \
