@@ -13,17 +13,10 @@ class Baseline(BaseTrain):
     super(Baseline, self).__init__(args=args)
 
   def train_epoch_begin(self):
-    self.r1 = self.hyperparameters
-    self.r2 = self.hyperparameters
-
     print('\nEpoch %d/%d' % (self.epoch, self.num_epochs))
-    print('Learning rate:',
-        self.lr if self.force_lr is None else self.force_lr)
-    print('Sampling bounds [%.2f, %.2f]' % (self.r1, self.r2))
+    print('Learning rate:', self.scheduler.get_last_lr())
     print('Baseline')
   
-  def inference(self, zf, hyperparams):
-    return self.network(zf)
 
   def get_model(self):
     self.network = Unet(in_ch=self.n_ch_in,
@@ -32,26 +25,12 @@ class Baseline(BaseTrain):
     utils.summary(self.network)
     return self.network
 
+  def inference(self, zf, hyperparams):
+    return self.network(zf)
+
   def sample_hparams(self, num_samples):
     hyperparams = torch.ones((num_samples, self.num_hyperparams)) * self.hyperparameters
     return hyperparams
   
-  def set_hparams_for_eval(self):
+  def set_val_hparams(self):
     self.val_hparams = torch.tensor(self.hyperparameters).view(-1, 1)
-  
-  def set_metrics(self):
-    self.list_of_metrics = [
-      'loss.train',
-      'psnr.train',
-      'time.train',
-    ] 
-    self.list_of_eval_metrics = [
-      'loss.val{:02f}'.format(self.hyperparameters)
-    ] + [
-      'psnr.val{:02f}'.format(self.hyperparameters) 
-    ] + [
-      'time.val{:02f}'.format(self.hyperparameters) 
-    ]
-      # 'ssim.val',
-      # 'hfen.val',
-    # ] 

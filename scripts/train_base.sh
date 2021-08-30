@@ -2,9 +2,8 @@
 
 source activate aw847-torch
 
-python -u run.py -fp base_scheduler \
+python -u run.py -fp scheduler_step64 \
   --method baseline \
-  --num_epochs 256 \
   --batch_size 32 \
   --lr 1e-3 \
   --unet_hdim 32 \

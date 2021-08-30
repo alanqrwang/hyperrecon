@@ -36,7 +36,7 @@ class Parser(argparse.ArgumentParser):
               default=32, help='Batch size')
     self.add_argument('--num_steps_per_epoch', type=int,
               default=256, help='Batch size')
-    self.add_argument('--num_epochs', type=int, default=100,
+    self.add_argument('--num_epochs', type=int, default=256,
               help='Total training epochs')
     self.add_argument('--unet_hdim', type=int, default=32)
     self.add_argument('--hnet_hdim', type=int,
