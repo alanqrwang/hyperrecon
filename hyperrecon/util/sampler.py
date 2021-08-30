@@ -21,7 +21,7 @@ class Sampler(nn.Module):
     self.num_hyperparams = num_hyperparams
     self.binary = binary
 
-  def sample(self, batch_size, r1=0,r2=1):
+  def sample(self, batch_size, r1=0, r2=1):
     """Uniform sampling
 
     Parameters

@@ -52,3 +52,6 @@ docs/_build/
 *.gitignore
 *.err
 *.out
+
+# VSCode
+.vscode/

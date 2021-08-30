@@ -12,12 +12,11 @@ import os
 from glob import glob
 
 class SliceDataset(data.Dataset):
-  def __init__(self, data_path, split, total_subjects=None, transform=None, include_seg=False):
+  def __init__(self, data_path, split, total_subjects=None, transform=None):
     super(SliceDataset, self).__init__()
     self.data_path = data_path
     self.split = split
     self.transform = transform
-    self.include_seg = include_seg
     self.total_subjects = total_subjects
 
     print('Gathering subjects for dataloader')
@@ -32,15 +31,16 @@ class SliceDataset(data.Dataset):
     slices = [] # Save slice paths
 
     for path in paths:
-      # Check if number of subjects exceeds total subjects
       path_name = path.split('/')[-1][:-4] # e.g. <>.npy
       subject_name, subject_slice = path_name[:-9], path_name[-5:] # e.g. '<>_orig_0000'
       dir_name = os.path.dirname(path)
       subject_names.add(subject_name)
+      # Check if number of subjects exceeds total subjects
       if len(subject_names) > self.total_subjects:
         break
       elif os.path.isfile(path):
         aseg_path = os.path.join(dir_name, 'asegs', subject_name + 'aseg' + subject_slice + '.npy')
+        assert aseg_path in aseg_paths, 'Invalid aseg path name'
         slices.append((path, aseg_path))
 
     return slices
@@ -56,10 +56,62 @@ class SliceDataset(data.Dataset):
     if self.transform is not None:
       x = self.transform(x)
 
-    if self.include_seg:
-      return x, y
-    else:
-      return x
+    return x, y
+
+class SliceVolDataset(data.Dataset):
+  def __init__(self, data_path, split, total_subjects=None, transform=None):
+    super(SliceVolDataset, self).__init__()
+    self.data_path = data_path
+    self.split = split
+    self.transform = transform
+    self.total_subjects = total_subjects
+
+    print('Gathering subjects for dataloader')
+    self.vols = self._gather_vols()
+    print('done')
+
+  def _gather_vols(self):
+    paths = sorted(glob(os.path.join(self.data_path, self.split, '*.npy')))
+    aseg_paths = sorted(glob(os.path.join(self.data_path, self.split, 'asegs', '*.npy')))
+
+    subject_names = set() # Save subject names for purposes of limiting total subjects
+    vols = {} # Save slice paths
+
+    for path in paths:
+      # Check if number of subjects exceeds total subjects
+      path_name = path.split('/')[-1][:-4] # e.g. <>.npy
+      subject_name, subject_slice = path_name[:-9], path_name[-5:] # e.g. '<>_orig_0000'
+      dir_name = os.path.dirname(path)
+      subject_names.add(subject_name)
+      if len(subject_names) > self.total_subjects:
+        break
+      elif os.path.isfile(path):
+        aseg_path = os.path.join(dir_name, 'asegs', subject_name + 'aseg' + subject_slice + '.npy')
+        assert aseg_path in aseg_paths, 'Invalid aseg path name'
+        if subject_name in vols:
+          vols[subject_name].append((path, aseg_path))
+        else:
+          vols[subject_name] = [(path, aseg_path)]
+
+    return list(vols.values())
+
+  def __len__(self):
+    return len(self.vols)
+
+  def __getitem__(self, index):
+    # Load data and get label
+    xs, ys = None, None
+    vol = self.vols[index]
+    for path, aseg_path in vol:
+      x = np.load(path)[np.newaxis]
+      y = np.load(aseg_path)[np.newaxis]
+      if self.transform is not None:
+        x = self.transform(x)
+      
+      xs = x if xs is None else np.concatenate((xs, x), axis=0)
+      ys = y if ys is None else np.concatenate((ys, y), axis=0)
+
+    return xs, ys
 
 class VolumeDataset(data.Dataset):
   def __init__(self, data_path, split, total_subjects=None, transform=None, include_seg=False):

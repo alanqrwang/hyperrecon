@@ -7,14 +7,14 @@ from tqdm import tqdm
 import json
 from glob import glob
 
-from hyperrecon import sampler
+from hyperrecon.util import sampler
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen
 from hyperrecon.util import utils
 from hyperrecon.model.unet import HyperUnet
 from hyperrecon.model.layers import ClipByPercentile
 from hyperrecon.data.mask import get_mask
-from hyperrecon.data.brain import ArrDataset, SliceDataset, get_train_data, get_train_gt
+from hyperrecon.data.brain import ArrDataset, SliceDataset, SliceVolDataset, get_train_data, get_train_gt
 
 
 class BaseTrain(object):
@@ -101,7 +101,7 @@ class BaseTrain(object):
       transform = transforms.Compose([ClipByPercentile()])
       trainset = SliceDataset(
         self.data_path, 'train', total_subjects=50, transform=transform)
-      valset = SliceDataset(
+      valset = SliceVolDataset(
         self.data_path, 'validate', total_subjects=5, transform=transform)
 
     self.train_loader = torch.utils.data.DataLoader(trainset, 
@@ -110,7 +110,7 @@ class BaseTrain(object):
           num_workers=0,
           pin_memory=True)
     self.val_loader = torch.utils.data.DataLoader(valset,
-          batch_size=self.batch_size,
+          batch_size=1,
           shuffle=False,
           num_workers=0,
           pin_memory=True)
@@ -180,8 +180,6 @@ class BaseTrain(object):
         cont_epoch = int(load_path.split('.')[-2])
 
     if cont_epoch is not None:
-      print(self.list_of_eval_metrics)
-      print(os.path.join(self.metric_dir, self.list_of_eval_metrics[0] + '.txt'))
       load_path = os.path.join(
         self.ckpt_dir, 'model.{epoch:04d}.h5'.format(epoch=cont_epoch))
       self.metrics.update({key: list(np.loadtxt(os.path.join(
@@ -304,9 +302,11 @@ class BaseTrain(object):
     '''
     return loss.mean()
 
-  def prepare_batch(self, batch):
-    targets = batch.float().to(self.device)
-    segs = None
+  def prepare_batch(self, batch, is_training=True):
+    targets, segs = batch[0].float().to(self.device), batch[1].float().to(self.device)
+    if not is_training:
+      targets = targets.view(-1, 1, *targets.shape[-2:])
+      segs = segs.view(-1, 1, *targets.shape[-2:])
 
     under_ksp = utils.generate_measurement(targets, self.mask)
     zf = utils.ifft(under_ksp)
@@ -440,7 +440,7 @@ class BaseTrain(object):
 
   def eval_step(self, batch, hparams):
     '''Eval for one step.'''
-    zf, gt, y, _ = self.prepare_batch(batch)
+    zf, gt, y, _ = self.prepare_batch(batch, is_training=False)
     batch_size = len(zf)
     hparams = hparams.repeat(batch_size, 1)
 
