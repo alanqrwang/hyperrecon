@@ -44,7 +44,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--n_ch_out', type=int,
               help='Number of output channels of main network', default=1)
     self.add_argument('--scheduler_step_size', type=int,
-              default=32, help='Step size for scheduler')
+              default=64, help='Step size for scheduler')
     self.add_argument('--scheduler_gamma', type=int,
               default=0.5, help='Multiplicative factor for scheduler')
 
@@ -102,10 +102,8 @@ class Parser(argparse.ArgumentParser):
                     topK=args.topK,
                     hps=args.hyperparameters,
                   ))
-
-    args.ckpt_dir = os.path.join(args.run_dir, 'checkpoints')
-    if not os.path.isdir(args.ckpt_dir):
-      os.makedirs(args.ckpt_dir)
+    if not os.path.exists(args.run_dir):
+      os.makedirs(args.run_dir)
 
     # Print args and save to file
     print('Arguments:')
