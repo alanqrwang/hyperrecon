@@ -43,6 +43,7 @@ class BaseTrain(object):
     self.n_ch_out = args.n_ch_out
     self.scheduler_step_size = args.scheduler_step_size
     self.scheduler_gamma = args.scheduler_gamma
+    self.seed = args.seed
     # I/O
     self.load = args.load
     self.cont = args.cont
