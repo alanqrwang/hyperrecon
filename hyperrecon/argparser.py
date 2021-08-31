@@ -51,6 +51,8 @@ class Parser(argparse.ArgumentParser):
               default=64, help='Step size for scheduler')
     self.add_argument('--scheduler_gamma', type=int,
               default=0.5, help='Multiplicative factor for scheduler')
+    self.add_argument('--seed', type=int,
+              default=0, help='Seed')
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)

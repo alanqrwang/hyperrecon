@@ -2,7 +2,7 @@
 
 source activate aw847-torch
 
-python -u run.py -fp separate_by_subjects_test \
+python -u run.py -fp set_seed \
   --method baseline \
   --batch_size 32 \
   --lr 1e-3 \
@@ -10,5 +10,6 @@ python -u run.py -fp separate_by_subjects_test \
   --hnet_hdim 64 \
   --undersampling_rate 16p3 \
   --loss_list l1 ssim \
-  --hyperparameters $A 
+  --hyperparameters $A \
+  --seed 1
 

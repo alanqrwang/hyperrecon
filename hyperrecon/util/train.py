@@ -6,6 +6,7 @@ import time
 from tqdm import tqdm
 import json
 from glob import glob
+import random
 
 from hyperrecon.util import sampler, utils
 from hyperrecon.loss.losses import compose_loss_seq
@@ -69,8 +70,6 @@ class BaseTrain(object):
       'loss.val' + self.stringify_list(l.tolist()) for l in self.val_hparams
     ] + [
       'psnr.val' + self.stringify_list(l.tolist()) for l in self.val_hparams
-    # ] + [
-      # 'hfen.val' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.val_hparams for s in np.arange(self.num_val_subjects)
     ]
     self.list_of_test_metrics = [
       'loss.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
@@ -82,7 +81,15 @@ class BaseTrain(object):
       'hfen.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ]
 
+  def set_random_seed(self):
+    seed = self.seed
+    if seed > 0:
+      random.seed(seed)
+      np.random.seed(seed)
+      torch.manual_seed(seed)
+
   def config(self):
+    self.set_random_seed()
     # Data
     self.get_dataloader()
 
