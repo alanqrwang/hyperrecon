@@ -21,6 +21,50 @@ plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
+def viz_all(hyp_path, base_paths, slices, hparams, subject):
+  hyp_gt, hyp_zf, hyp_preds = get_hypernet(hyp_path, hparams, subject)
+  base_gt, base_zf, base_preds = get_base(base_paths, subject)
+  for s in slices:
+    fig, axes = plt.subplots(2, 7, figsize=(20, 6))
+    plot_img(hyp_gt[s,0], ax=axes[0,0], rot90=True, title='GT', ylabel='Hypernet')
+    plot_img(hyp_zf[s], ax=axes[0,1], rot90=True, title='ZF')
+    for j in range(len(hparams)):
+      plot_img(hyp_preds[j][s,0], ax=axes[0,j+2], rot90=True, title=hparams[j])
+
+    plot_img(base_gt[s,0], ax=axes[1,0], rot90=True, title='GT', ylabel='Base')
+    plot_img(base_zf[s], ax=axes[1,1], rot90=True, title='ZF')
+    for j in range(len(hparams)):
+      plot_img(base_preds[j][s,0], ax=axes[1,j+2], rot90=True, title=hparams[j])
+
+def get_hypernet(model_path, hparams, subject):
+  gt_path = os.path.join(model_path, 'img/gt.npy')
+  zf_path = os.path.join(model_path, 'img/zf.npy')
+  gt = np.load(gt_path)
+  zf = np.linalg.norm(np.load(zf_path), axis=1)
+  preds = []
+  for hparam in hparams:
+    pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
+    preds.append(np.load(pred_path))
+
+  return gt, zf, preds
+
+def get_base(model_paths, subject):
+  if not isinstance(model_paths, (list, tuple)):
+    model_paths = [model_paths]
+  gt_path = os.path.join(model_paths[0], 'img/gt.npy')
+  zf_path = os.path.join(model_paths[0], 'img/zf.npy')
+  gt = np.load(gt_path)
+  zf = np.linalg.norm(np.load(zf_path), axis=1)
+  preds = []
+  for model_path in model_paths:
+    hparam = model_path.split('_hp')[-1]
+    preds.append(get_pred_img(model_path, hparam, subject))
+
+  return gt, zf, preds
+
+def get_pred_img(model_path, hparam, subject):
+  pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
+  return np.load(pred_path)
 
 def plotcurves(metric, model_paths,
          show_legend=True, xlim=None, ylim=None, lines_to_plot=('train', 'val'), vline=None, ax=None):
@@ -69,7 +113,7 @@ def plotcurves(metric, model_paths,
   return ax
 
 
-def plot_img(img, title=None, ax=None, rot90=False):
+def plot_img(img, title=None, ax=None, rot90=False, ylabel=None):
   ax = ax or plt.gca()
   if rot90:
     img = np.rot90(img, k=1)
@@ -79,6 +123,8 @@ def plot_img(img, title=None, ax=None, rot90=False):
     ax.set_title(title, fontsize=16)
   ax.get_xaxis().set_visible(False)
   ax.get_yaxis().set_visible(False)
+  if ylabel is not None:
+    ax.set_ylabel(ylabel)
   # plt.colorbar(im, ax=ax)
   return ax, im
 

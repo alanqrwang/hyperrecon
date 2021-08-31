@@ -459,11 +459,15 @@ class BaseTrain(object):
       for i in range(len(zf)):
         # Save predictions to disk
         if save_preds:
-          np.save(os.path.join(self.img_dir, 'pred'+hparam_str+'sub{}'.format(i) + '.npy'), pred[i].cpu().detach().numpy())
-          if not os.path.exists(os.path.join(self.img_dir, 'gt' + 'sub{}'.format(i) + '.npy')):
-            np.save(os.path.join(self.img_dir, 'gt.npy'), gt[i].cpu().detach().numpy())
-          if not os.path.exists(os.path.join(self.img_dir, 'zf' + 'sub{}'.format(i) + '.npy')):
-            np.save(os.path.join(self.img_dir, 'zf.npy'), zf[i].cpu().detach().numpy())
+          gt_path = os.path.join(self.img_dir, 'gt' + 'sub{}'.format(i) + '.npy')
+          zf_path = os.path.join(self.img_dir, 'zf' + 'sub{}'.format(i) + '.npy')
+          pred_path = os.path.join(self.img_dir, 'pred'+hparam_str+'sub{}'.format(i) + '.npy')
+          if not os.path.exists(pred_path):
+            np.save(pred_path, pred[i].cpu().detach().numpy())
+          if not os.path.exists(gt_path):
+            np.save(gt_path, gt[i].cpu().detach().numpy())
+          if not os.path.exists(zf_path):
+            np.save(zf_path, zf[i].cpu().detach().numpy())
         for key in self.test_metrics:
           if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
             loss = self.compute_loss(pred[i], gt[i], y[i], coeffs[i])
