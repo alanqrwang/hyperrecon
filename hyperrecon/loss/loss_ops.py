@@ -9,17 +9,17 @@ from perceptualloss.loss_provider import LossProvider
 import pytorch_ssim
 
 class Data_Consistency(object):
-  def __init__(self):
-    self.sup = False
-  def __call__(self, pred, gt, y, mask, seg):
+  def __init__(self, mask):
+    self.mask = mask
+  def __call__(self, pred, gt, y):
     l2 = torch.nn.MSELoss(reduction='none')
 
-    UFx_hat = utils.generate_measurement(pred, mask)
+    UFx_hat = utils.generate_measurement(pred, self.mask)
     dc = torch.sum(l2(UFx_hat, y), dim=(1, 2, 3))
     return dc
 
 class Total_Variation(object):
-  def __call__(self, pred, gt, y, mask, seg):
+  def __call__(self, pred, gt, y):
     """Total variation loss.
 
     x : torch.Tensor (batch_size, img_height, img_width, 2)
@@ -36,10 +36,10 @@ class Total_Variation(object):
 
 
 class L1_Wavelets(object):
-  def __init__(self):
-    self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(self.device)
+  def __init__(self, device):
+    self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(device)
 
-  def __call__(self, pred, gt, y, mask, seg):
+  def __call__(self, pred, gt, y):
 
     def nextPowerOf2(n):
       """Get next power of 2"""
@@ -53,7 +53,7 @@ class L1_Wavelets(object):
 
     """L1-penalty on wavelets.
 
-    x : torch.Tensor (batch_size, img_height, img_width, 2)
+    x : torch.Tensor (batch_size, 2, img_height, img_width)
       Input image
 
     """
@@ -85,11 +85,11 @@ class L1_Wavelets(object):
 
 
 class L1_Shearlets(object):
-  def __init__(self):
+  def __init__(self, mask):
     scales = [0.5] * 2
     self.shearlet = ShearletTransform(*mask.shape, scales)
 
-  def __call__(self, pred, gt, y, mask, seg):
+  def __call__(self, pred, gt, y):
     pred = pred.norm(dim=-1) # Absolute value of complex image
     shears = self.shearlet.forward(pred)
     l1_shear = torch.sum(
@@ -101,7 +101,7 @@ class SSIM(object):
   def __init__(self):
     self.ssim_loss = pytorch_ssim.SSIM(size_average=False)
 
-  def __call__(self, pred, gt, y, mask, seg):
+  def __call__(self, pred, gt, y):
     '''
     Mean ssim loss on test set:
     knee, 8p3: 0.31786856
@@ -115,12 +115,12 @@ class SSIM(object):
 
 
 class Watson_DFT(object):
-  def __init__(self):
+  def __init__(self, device):
     provider = LossProvider()
     self.watson_dft = provider.get_loss_function(
-      'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to('cuda:0')
+      'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
 
-  def __call__(self, pred, gt, y, mask, seg):
+  def __call__(self, pred, gt, y):
     loss = self.watson_dft(pred, gt)
     return loss
 
@@ -128,7 +128,7 @@ class Watson_DFT(object):
 class L1(object):
   def __init__(self):
     self.l1 = torch.nn.L1Loss(reduction='none')
-  def __call__(self, pred, gt, y, mask, seg):
+  def __call__(self, pred, gt, y):
     '''
     Mean l1 loss on test set:
     knee, 8p3: 0.045254722
@@ -143,5 +143,5 @@ class L1(object):
 class MSE(object):
   def __init__(self):
     self.mse_loss = torch.nn.MSELoss(reduction='none')
-  def __call__(self, pred, gt, y, mask, seg):
+  def __call__(self, pred, gt, y):
     return torch.mean(self.mse_loss(pred, gt), dim=(1, 2, 3))

@@ -101,7 +101,7 @@ class BaseTrain(object):
     self.optimizer = self.get_optimizer()
     self.scheduler = self.get_scheduler()
     self.sampler = self.get_sampler()
-    self.losses = compose_loss_seq(self.loss_list)
+    self.losses = compose_loss_seq(self.loss_list, self.mask, self.device)
 
     if self.force_lr is not None:
       for param_group in self.optimizer.param_groups:
@@ -322,7 +322,7 @@ class BaseTrain(object):
     for i in range(len(self.losses)):
       c = coeffs[:, i]
       l = self.losses[i]
-      loss += c * l(pred, gt, y, self.mask, None)
+      loss += c * l(pred, gt, y, self.mask)
     return loss
 
   def process_loss(self, loss):
@@ -434,7 +434,6 @@ class BaseTrain(object):
       self.test(save_preds=True)
   
   def validate(self):
-    # Evaluate metrics
     for hparam in self.val_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Validating with hparam', hparam_str)
@@ -452,8 +451,6 @@ class BaseTrain(object):
           self.val_metrics[key].append(bhfen(gt, pred))
 
   def test(self, save_preds=False):
-    
-    # Evaluate metrics
     for hparam in self.test_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Testing with hparam', hparam_str)
