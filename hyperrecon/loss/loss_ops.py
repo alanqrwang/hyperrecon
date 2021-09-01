@@ -118,7 +118,7 @@ class Watson_DFT(object):
   def __init__(self):
     provider = LossProvider()
     self.watson_dft = provider.get_loss_function(
-      'Watson-DFT', colorspace='grey', pretrained=True, reduction='none')
+      'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to('cuda:0')
 
   def __call__(self, pred, gt, y, mask, seg):
     loss = self.watson_dft(pred, gt)

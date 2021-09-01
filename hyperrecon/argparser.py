@@ -39,8 +39,8 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--batch_size', type=int,
               default=32, help='Batch size')
     self.add_argument('--num_steps_per_epoch', type=int,
-              default=256, help='Batch size')
-    self.add_argument('--num_epochs', type=int, default=256,
+              default=256, help='Num steps per epoch')
+    self.add_argument('--num_epochs', type=int, default=1024,
               help='Total training epochs')
     self.add_argument('--unet_hdim', type=int, default=32)
     self.add_argument('--hnet_hdim', type=int,
@@ -48,7 +48,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--n_ch_out', type=int,
               help='Number of output channels of main network', default=1)
     self.add_argument('--scheduler_step_size', type=int,
-              default=64, help='Step size for scheduler')
+              default=128, help='Step size for scheduler')
     self.add_argument('--scheduler_gamma', type=int,
               default=0.5, help='Multiplicative factor for scheduler')
     self.add_argument('--seed', type=int,

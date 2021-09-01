@@ -2,11 +2,7 @@
 
 source activate aw847-torch
 
-python -u run.py -fp separate_by_subjects_test \
+python -u run.py -fp epoch1024_schedstep128 \
   --method uhs \
-  --batch_size 32 \
-  --lr 1e-3 \
-  --unet_hdim 32 \
-  --hnet_hdim 64 \
   --undersampling_rate 16p3 \
-  --loss_list l1 ssim 
+  --loss_list l1 ssim
