@@ -7,12 +7,11 @@ from pytorch_wavelets import DWTForward
 from torch_radon.shearlet import ShearletTransform
 from perceptualloss.loss_provider import LossProvider
 import pytorch_ssim
-from unetsegmentation import test as segtest
 
 class Data_Consistency(object):
   def __init__(self):
     self.sup = False
-  def __call__(self, pred, gt, y, mask):
+  def __call__(self, pred, gt, y, mask, seg):
     l2 = torch.nn.MSELoss(reduction='none')
 
     UFx_hat = utils.generate_measurement(pred, mask)
@@ -20,7 +19,7 @@ class Data_Consistency(object):
     return dc
 
 class Total_Variation(object):
-  def __call__(self, pred, gt, y, mask):
+  def __call__(self, pred, gt, y, mask, seg):
     """Total variation loss.
 
     x : torch.Tensor (batch_size, img_height, img_width, 2)
@@ -40,7 +39,7 @@ class L1_Wavelets(object):
   def __init__(self):
     self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(self.device)
 
-  def __call__(self, pred, gt, y, mask):
+  def __call__(self, pred, gt, y, mask, seg):
 
     def nextPowerOf2(n):
       """Get next power of 2"""
@@ -90,7 +89,7 @@ class L1_Shearlets(object):
     scales = [0.5] * 2
     self.shearlet = ShearletTransform(*mask.shape, scales)
 
-  def __call__(self, pred, gt, y, mask):
+  def __call__(self, pred, gt, y, mask, seg):
     pred = pred.norm(dim=-1) # Absolute value of complex image
     shears = self.shearlet.forward(pred)
     l1_shear = torch.sum(
@@ -102,7 +101,7 @@ class SSIM(object):
   def __init__(self):
     self.ssim_loss = pytorch_ssim.SSIM(size_average=False)
 
-  def __call__(self, pred, gt, y, mask):
+  def __call__(self, pred, gt, y, mask, seg):
     '''
     Mean ssim loss on test set:
     knee, 8p3: 0.31786856
@@ -119,9 +118,9 @@ class Watson_DFT(object):
   def __init__(self):
     provider = LossProvider()
     self.watson_dft = provider.get_loss_function(
-      'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
+      'Watson-DFT', colorspace='grey', pretrained=True, reduction='none')
 
-  def __call__(self, pred, gt, y, mask):
+  def __call__(self, pred, gt, y, mask, seg):
     loss = self.watson_dft(pred, gt)
     return loss
 
@@ -129,7 +128,7 @@ class Watson_DFT(object):
 class L1(object):
   def __init__(self):
     self.l1 = torch.nn.L1Loss(reduction='none')
-  def __call__(self, pred, gt, y, mask):
+  def __call__(self, pred, gt, y, mask, seg):
     '''
     Mean l1 loss on test set:
     knee, 8p3: 0.045254722
@@ -144,18 +143,5 @@ class L1(object):
 class MSE(object):
   def __init__(self):
     self.mse_loss = torch.nn.MSELoss(reduction='none')
-  def __call__(self, pred, gt, y, mask):
+  def __call__(self, pred, gt, y, mask, seg):
     return torch.mean(self.mse_loss(pred, gt), dim=(1, 2, 3))
-
-
-class DICE(object):
-  def __call__(self, recon, gt, seg):
-    pretrained_segmentation_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
-
-    res_dict = segtest.tester(pretrained_segmentation_path,
-                  xdata=recon.cpu().detach().numpy(),
-                  gt_data=gt.cpu().detach().numpy(),
-                  seg_data=seg.cpu().detach().numpy())
-    avg_dice = res_dict['losses_per_roi'].mean(1)
-    avg_dice_gt = res_dict['losses_per_roi_gt'].mean(1)
-    return avg_dice, avg_dice_gt, res_dict['preds'], res_dict['preds_gt'], res_dict['targets']

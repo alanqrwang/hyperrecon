@@ -15,6 +15,7 @@ from hyperrecon.model.unet import HyperUnet
 from hyperrecon.model.layers import ClipByPercentile
 from hyperrecon.data.mask import get_mask
 from hyperrecon.data.brain import ArrDataset, SliceDataset, SliceVolDataset, get_train_data, get_train_gt
+from hyperrecon.loss.loss_ops import DICE
 
 
 class BaseTrain(object):
@@ -55,31 +56,33 @@ class BaseTrain(object):
     self.num_train_subjects = args.num_train_subjects
     self.num_val_subjects = args.num_val_subjects
 
-    self.set_val_hparams()
+    self.set_eval_hparams()
     self.set_metrics()
 
-  def set_val_hparams(self):
+  def set_eval_hparams(self):
     self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
     self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
 
   def set_metrics(self):
     self.list_of_metrics = [
-      'loss.train',
-      'psnr.train',
+      'loss:train',
+      'psnr:train',
     ]
     self.list_of_val_metrics = [
-      'loss.val' + self.stringify_list(l.tolist()) for l in self.val_hparams
+      'loss:val:' + self.stringify_list(l.tolist()) for l in self.val_hparams
     ] + [
-      'psnr.val' + self.stringify_list(l.tolist()) for l in self.val_hparams
+      'psnr:val:' + self.stringify_list(l.tolist()) for l in self.val_hparams
     ]
     self.list_of_test_metrics = [
-      'loss.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+      'loss:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ] + [
-      'psnr.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+      'psnr:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ] + [
-      'ssim.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+      'ssim:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ] + [
-      'hfen.test' + self.stringify_list(l.tolist()) + 'sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+      'hfen:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'dice:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ]
 
   def set_random_seed(self):
@@ -206,14 +209,14 @@ class BaseTrain(object):
       load_path = os.path.join(
         self.ckpt_dir, 'model.{epoch:04d}.h5'.format(epoch=cont_epoch))
 
-      self.metrics.update({key: list(np.loadtxt(os.path.join(
-        self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_metrics})
-      self.val_metrics.update({key: list(np.loadtxt(os.path.join(
-        self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
-      self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
-        self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
-      self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
-        self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
+      # self.metrics.update({key: list(np.loadtxt(os.path.join(
+      #   self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_metrics})
+      # self.val_metrics.update({key: list(np.loadtxt(os.path.join(
+      #   self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
+      # self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
+      #   self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
+      # self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
+      #   self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
     if load_path is not None:
       self.network, self.optimizer, self.scheduler = utils.load_checkpoint(
         self.network, load_path, self.optimizer, self.scheduler)
@@ -264,8 +267,8 @@ class BaseTrain(object):
     """
     if verbose:
       summary_dict = {}
-      summary_dict.update({key: self.val_metrics[key][-1]
-                 for key in self.list_of_val_metrics})
+      # summary_dict.update({key: self.val_metrics[key][-1]
+      #            for key in self.list_of_val_metrics})
       summary_dict.update({key: self.test_metrics[key][-1]
                  for key in self.list_of_test_metrics})
       
@@ -320,7 +323,7 @@ class BaseTrain(object):
     for i in range(len(self.losses)):
       c = coeffs[:, i]
       l = self.losses[i]
-      loss += c * l(pred, gt, y, self.mask)
+      loss += c * l(pred, gt, y, self.mask, None)
     return loss
 
   def process_loss(self, loss):
@@ -455,7 +458,7 @@ class BaseTrain(object):
     for hparam in self.test_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Testing with hparam', hparam_str)
-      zf, gt, y, pred, coeffs = self.get_predictions(hparam, by_subject=True)
+      zf, gt, y, pred, seg, coeffs = self.get_predictions(hparam, by_subject=True)
       for i in range(len(zf)):
         # Save predictions to disk
         if save_preds:
@@ -479,6 +482,9 @@ class BaseTrain(object):
             self.test_metrics[key].append(bssim(gt[i], pred[i]))
           elif 'hfen' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bhfen(gt[i], pred[i]))
+          elif 'dice' in key and hparam_str in key and 'sub{}'.format(i) in key:
+            dice, dice_gt, _,_,_ = DICE()(pred[i], gt[i], None, None, seg[i])
+            self.test_metrics[key].append(float(dice.mean()))
 
   def get_predictions(self, hparam, by_subject=False):
     '''Get predictions, optionally separated by subject'''
@@ -486,27 +492,31 @@ class BaseTrain(object):
     ys = []
     gts = []
     preds = []
+    segs = []
     coeffs = []
 
     loader = self.test_loader if by_subject else self.val_loader
     for _, batch in tqdm(enumerate(loader), total=len(loader)):
-      zf, y, gt, pred, coeff = self.eval_step(batch, hparam)
+      zf, y, gt, pred, seg, coeff = self.eval_step(batch, hparam)
 
       zfs.append(zf)
       ys.append(y)
       gts.append(gt)
       preds.append(pred)
+      segs.append(seg)
       coeffs.append(coeff)
 
     if by_subject:
-      return zfs, gts, ys, preds, coeffs
+      return zfs, gts, ys, preds, segs, coeffs
     else:
-      return torch.cat(zfs, dim=0), torch.cat(gts, dim=0), torch.cat(ys, dim=0), torch.cat(preds, dim=0), torch.cat(coeffs, dim=0)
+      return torch.cat(zfs, dim=0), torch.cat(gts, dim=0),  \
+             torch.cat(ys, dim=0), torch.cat(preds, dim=0), \
+             torch.cat(segs, dim=0), torch.cat(coeffs, dim=0)
 
 
   def eval_step(self, batch, hparams):
     '''Eval for one step.'''
-    zf, gt, y, _ = self.prepare_batch(batch, is_training=False)
+    zf, gt, y, seg = self.prepare_batch(batch, is_training=False)
     batch_size = len(zf)
     hparams = hparams.repeat(batch_size, 1)
 
@@ -514,7 +524,7 @@ class BaseTrain(object):
       coeffs = self.generate_coefficients(hparams)
       pred = self.inference(zf, coeffs)
 
-    return zf, y, gt, pred, coeffs
+    return zf, y, gt, pred, seg, coeffs
 
   @staticmethod
   def stringify_list(l):

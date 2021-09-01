@@ -1,4 +1,5 @@
 from matplotlib.pyplot import cm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 import numpy as np
 import matplotlib
@@ -9,6 +10,8 @@ from hyperrecon.util import utils
 from hyperrecon.data import brain
 from scipy.spatial.distance import squareform, pdist
 matplotlib.rcParams['lines.linewidth'] = 4
+from . import metric
+import json
 
 SMALL_SIZE = 8
 MEDIUM_SIZE = 14
@@ -22,49 +25,47 @@ plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 def viz_all(hyp_path, base_paths, slices, hparams, subject):
-  hyp_gt, hyp_zf, hyp_preds = get_hypernet(hyp_path, hparams, subject)
-  base_gt, base_zf, base_preds = get_base(base_paths, subject)
+  hyp_gt, hyp_zf, hyp_preds = _get_hypernet(hyp_path, hparams, subject)
+  _, _, base_preds = _get_base(base_paths, subject)
   for s in slices:
-    fig, axes = plt.subplots(2, 7, figsize=(20, 6))
-    plot_img(hyp_gt[s,0], ax=axes[0,0], rot90=True, title='GT', ylabel='Hypernet')
-    plot_img(hyp_zf[s], ax=axes[0,1], rot90=True, title='ZF')
+    gt_slice = hyp_gt[s,0]
+    zf_slice = hyp_zf[s]
+    zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice))
+
+    fig, axes = plt.subplots(2, len(hparams)+2, figsize=(17, 7))
+    _plot_img(gt_slice, ax=axes[0,0], rot90=True, title='GT', ylabel='Hypernet')
+    _plot_img(zf_slice, ax=axes[0,1], rot90=True, title='ZF', xlabel=zf_psnr)
     for j in range(len(hparams)):
-      plot_img(hyp_preds[j][s,0], ax=axes[0,j+2], rot90=True, title=hparams[j])
+      pred_slice = hyp_preds[j][s,0]
+      pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice))
+      _plot_img(pred_slice, ax=axes[0,j+2], rot90=True, title=hparams[j], xlabel=pred_psnr)
 
-    plot_img(base_gt[s,0], ax=axes[1,0], rot90=True, title='GT', ylabel='Base')
-    plot_img(base_zf[s], ax=axes[1,1], rot90=True, title='ZF')
+    _plot_img(gt_slice, ax=axes[1,0], rot90=True, ylabel='Base')
+    _plot_img(zf_slice, ax=axes[1,1], rot90=True, xlabel=zf_psnr)
     for j in range(len(hparams)):
-      plot_img(base_preds[j][s,0], ax=axes[1,j+2], rot90=True, title=hparams[j])
+      base_slice = base_preds[j][s,0]
+      base_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, base_slice))
+      _plot_img(base_preds[j][s,0], ax=axes[1,j+2], rot90=True, xlabel=base_psnr)
+  
+  fig.tight_layout()
 
-def get_hypernet(model_path, hparams, subject):
-  gt_path = os.path.join(model_path, 'img/gt.npy')
-  zf_path = os.path.join(model_path, 'img/zf.npy')
-  gt = np.load(gt_path)
-  zf = np.linalg.norm(np.load(zf_path), axis=1)
-  preds = []
-  for hparam in hparams:
-    pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
-    preds.append(np.load(pred_path))
+def plot_over_hyperparams(model_path, metric_of_interest, flip=False):
+  parsed = _parse_summary_json(model_path, metric_of_interest)
+  xs = [float(n) for n in parsed.keys()]
+  ys = np.array([np.mean(l) for l in parsed.values()])
+  if flip:
+    ys = 1 - ys
+  _plot_1d(ys, xs, title=metric_of_interest)
+  plt.show()
 
-  return gt, zf, preds
-
-def get_base(model_paths, subject):
-  if not isinstance(model_paths, (list, tuple)):
-    model_paths = [model_paths]
-  gt_path = os.path.join(model_paths[0], 'img/gt.npy')
-  zf_path = os.path.join(model_paths[0], 'img/zf.npy')
-  gt = np.load(gt_path)
-  zf = np.linalg.norm(np.load(zf_path), axis=1)
-  preds = []
-  for model_path in model_paths:
-    hparam = model_path.split('_hp')[-1]
-    preds.append(get_pred_img(model_path, hparam, subject))
-
-  return gt, zf, preds
-
-def get_pred_img(model_path, hparam, subject):
-  pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
-  return np.load(pred_path)
+def plot_over_hyperparams_per_subject(model_path, metric_of_interest, flip=False):
+  parsed = _parse_summary_json(model_path, metric_of_interest)
+  xs = [float(n) for n in parsed.keys()]
+  ys = np.array([[n for n in l] for l in parsed.values()]).T
+  if flip:
+    ys = 1 - ys
+  _plot_1d(ys, xs, title=metric_of_interest, labels=['subject {}'.format(n) for n in range(ys.shape[0])])
+  plt.show()
 
 def plotcurves(metric, model_paths,
          show_legend=True, xlim=None, ylim=None, lines_to_plot=('train', 'val'), vline=None, ax=None):
@@ -112,8 +113,55 @@ def plotcurves(metric, model_paths,
     ax.legend(loc='best')
   return ax
 
+def _get_hypernet(model_path, hparams, subject):
+  gt_path = os.path.join(model_path, 'img/gt.npy')
+  zf_path = os.path.join(model_path, 'img/zf.npy')
+  gt = np.load(gt_path)
+  zf = np.linalg.norm(np.load(zf_path), axis=1)
+  preds = []
+  for hparam in hparams:
+    pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
+    preds.append(np.load(pred_path))
+  return gt, zf, preds
 
-def plot_img(img, title=None, ax=None, rot90=False, ylabel=None):
+def _get_base(model_paths, subject):
+  if not isinstance(model_paths, (list, tuple)):
+    model_paths = [model_paths]
+  gt_path = os.path.join(model_paths[0], 'img/gt.npy')
+  zf_path = os.path.join(model_paths[0], 'img/zf.npy')
+  gt = np.load(gt_path)
+  zf = np.linalg.norm(np.load(zf_path), axis=1)
+  preds = []
+  for model_path in model_paths:
+    hparam = model_path.split('_hp')[-1]
+    pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
+    preds.append(np.load(pred_path))
+  return gt, zf, preds
+
+def _parse_summary_json(model_path, metric_of_interest, split='test'):
+  # Opening JSON file
+  with open(os.path.join(model_path, 'summary_full.json')) as json_file:
+    data = json.load(json_file)
+    parsed = {}
+  
+    for key in data:
+      if split in key and metric_of_interest in key:
+        parts = key.split(':')
+        if len(parts) > 1:
+          metr, split, hp, sub = parts[0], parts[1], parts[2], parts[3]
+        else:
+          metr = key.split('.')[0]
+          sub = key.split('sub')[-1]
+          hp = key.split('sub')[0].split(split)[-1]
+
+        if hp in parsed:
+          parsed[hp].append(data[key])
+        else:
+          parsed[hp] = [data[key]]
+  return parsed
+
+
+def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None):
   ax = ax or plt.gca()
   if rot90:
     img = np.rot90(img, k=1)
@@ -121,18 +169,54 @@ def plot_img(img, title=None, ax=None, rot90=False, ylabel=None):
   # im = ax.imshow(img, cmap='gray')
   if title is not None:
     ax.set_title(title, fontsize=16)
-  ax.get_xaxis().set_visible(False)
-  ax.get_yaxis().set_visible(False)
+  ax.set_xticks([])
+  ax.set_yticks([])
   if ylabel is not None:
     ax.set_ylabel(ylabel)
+  if xlabel is not None:
+    ax.set_xlabel(xlabel)
   # plt.colorbar(im, ax=ax)
   return ax, im
 
 
-def plot_over_hyperparams(vals, xticks, yticks=None, title=None, ax=None, vlim=None, colorbar=True,
+def _plot_1d(vals, xticks, yticks=None, title=None, ax=None, vlim=None, colorbar=True,
               xlabel=None, ylabel=None, labels=None, all_ticks=None, annotate_max=True, cmap='coolwarm',
               white_text=None, contours=None, point=None):
-  from mpl_toolkits.axes_grid1 import make_axes_locatable
+  ax = ax or plt.gca()
+  vals = np.array(vals)
+  if len(vals.shape) == 1:
+    vals = [vals]
+
+  for i in range(len(vals)):
+    h = ax.plot(xticks, vals[i], '.--')
+    if annotate_max:
+      n_max = vals[i].argmax()
+      xmax, ymax = xticks[n_max], vals[i][n_max]
+      ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
+
+  ax.set_xlabel('alpha', fontsize=16)
+  if vlim:
+    ax.set_ylim(vlim)
+  ax.grid()
+
+  if title is not None:
+    ax.set_title(title, fontsize=20)
+  if xlabel is not None:
+    ax.set_xlabel(xlabel, fontsize=28)
+  if ylabel is not None:
+    ax.set_ylabel(ylabel, fontsize=28, rotation=0)
+  if labels is not None:
+    ax.legend(labels)
+  if white_text is not None:
+    ax.text(0.10, 0.9, white_text, color='white', fontsize=20,
+        horizontalalignment='left',
+        verticalalignment='center',
+        transform=ax.transAxes)
+  return h[0]
+
+def _plot_2d(vals, xticks, yticks=None, title=None, ax=None, vlim=None, colorbar=True,
+              xlabel=None, ylabel=None, labels=None, all_ticks=None, annotate_max=True, cmap='coolwarm',
+              white_text=None, contours=None, point=None):
   ax = ax or plt.gca()
   vals = np.array(vals)
 
@@ -140,72 +224,60 @@ def plot_over_hyperparams(vals, xticks, yticks=None, title=None, ax=None, vlim=N
     cm = plt.cm.coolwarm
   else:
     cm = plt.cm.viridis
-  if yticks is not None:
-    grid = vals.reshape(len(yticks), len(xticks))
-    if contours:
-      X, Y = np.meshgrid(np.arange(len(yticks)), np.arange(len(xticks)))
-      c1 = ax.contour(X, Y, grid, contours, colors=[
-              'cyan', 'fuchsia', 'lime'], linewidths=1.5, linestyles='--')
 
-    if annotate_max:
-      ymax, xmax = np.unravel_index(grid.argmax(), grid.shape)
-      ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
+  grid = vals.reshape(len(yticks), len(xticks))
+  if contours:
+    X, Y = np.meshgrid(np.arange(len(yticks)), np.arange(len(xticks)))
+    c1 = ax.contour(X, Y, grid, contours, colors=[
+            'cyan', 'fuchsia', 'lime'], linewidths=1.5, linestyles='--')
 
-    if point is not None:
-      ax.scatter([point[0]], [point[1]],
-             marker='*', s=100, color='black')
+  if annotate_max:
+    ymax, xmax = np.unravel_index(grid.argmax(), grid.shape)
+    ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
 
-    if vlim is not None:
-      h = ax.imshow(grid, vmin=vlim[0], vmax=vlim[1], cmap=cm)
-    else:
-      h = ax.imshow(grid, cmap=cm)
-    if colorbar:
-      divider = make_axes_locatable(ax)
-      cax = divider.append_axes('right', size='5%', pad=0.05)
-      cbar = plt.colorbar(h, cax=cax, orientation='vertical')
-      cbar.ax.tick_params(labelsize=16)
+  if point is not None:
+    ax.scatter([point[0]], [point[1]],
+            marker='*', s=100, color='black')
 
-    if all_ticks == 'all':
-      ax.set_xticks(np.arange(len(xticks)))
-      ax.set_xticklabels(np.round(xticks, 5), rotation=25, fontsize=16)
-      ax.set_yticks(np.arange(len(yticks)))
-      ax.set_yticklabels(np.round(yticks, 5), fontsize=16)
-    elif all_ticks == 'ends':
-      ax.set_xticks([0-0.5, len(xticks)-1+0.5])
-      # ax.set_xticklabels([np.round(xticks[0], 0), np.round(xticks[-1], 0)], fontsize=16)
-      ax.set_xticklabels([r'$0$', r'$1$'], fontsize=20)
-      ax.set_yticks([0-0.5, len(yticks)-1+0.5])
-      # ax.set_yticklabels([np.round(yticks[0], 0), np.round(yticks[-1], 0)], fontsize=16)
-      ax.set_yticklabels([r'$0$', r'$1$'], fontsize=20)
-    elif all_ticks == 'x_only':
-      ax.set_xticks([0-0.5, len(xticks)-1+0.5])
-      # ax.set_xticklabels([np.round(xticks[0], 0), np.round(xticks[-1], 0)], fontsize=16)
-      ax.set_xticklabels([r'$0$', r'$1$'], fontsize=20)
-      ax.set_yticks([])
-    elif all_ticks == 'y_only':
-      ax.set_xticks([])
-      ax.set_yticks([0-0.5, len(yticks)-1+0.5])
-      # ax.set_yticklabels([np.round(yticks[0], 0), np.round(yticks[-1], 0)], fontsize=16)
-      ax.set_yticklabels([r'$0$', r'$1$'], fontsize=20)
-    else:
-      ax.set_xticks([])
-      ax.set_yticks([])
-    if xlabel is not None:
-      ax.set_xlabel(xlabel, fontsize=28)
-    if ylabel is not None:
-      ax.set_ylabel(ylabel, fontsize=28, rotation=0)
-
+  if vlim is not None:
+    h = ax.imshow(grid, vmin=vlim[0], vmax=vlim[1], cmap=cm)
   else:
-    if len(vals.shape) > 1:
-      for i in range(len(vals)):
-        h = ax.plot(xticks, vals[i], '.--')
-    else:
-      h = ax.plot(xticks, vals, '.--')
+    h = ax.imshow(grid, cmap=cm)
+  if colorbar:
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = plt.colorbar(h, cax=cax, orientation='vertical')
+    cbar.ax.tick_params(labelsize=16)
 
-    ax.set_xlabel('alpha', fontsize=16)
-    if vlim:
-      ax.set_ylim(vlim)
-    ax.grid()
+  if all_ticks == 'all':
+    ax.set_xticks(np.arange(len(xticks)))
+    ax.set_xticklabels(np.round(xticks, 5), rotation=25, fontsize=16)
+    ax.set_yticks(np.arange(len(yticks)))
+    ax.set_yticklabels(np.round(yticks, 5), fontsize=16)
+  elif all_ticks == 'ends':
+    ax.set_xticks([0-0.5, len(xticks)-1+0.5])
+    # ax.set_xticklabels([np.round(xticks[0], 0), np.round(xticks[-1], 0)], fontsize=16)
+    ax.set_xticklabels([r'$0$', r'$1$'], fontsize=20)
+    ax.set_yticks([0-0.5, len(yticks)-1+0.5])
+    # ax.set_yticklabels([np.round(yticks[0], 0), np.round(yticks[-1], 0)], fontsize=16)
+    ax.set_yticklabels([r'$0$', r'$1$'], fontsize=20)
+  elif all_ticks == 'x_only':
+    ax.set_xticks([0-0.5, len(xticks)-1+0.5])
+    # ax.set_xticklabels([np.round(xticks[0], 0), np.round(xticks[-1], 0)], fontsize=16)
+    ax.set_xticklabels([r'$0$', r'$1$'], fontsize=20)
+    ax.set_yticks([])
+  elif all_ticks == 'y_only':
+    ax.set_xticks([])
+    ax.set_yticks([0-0.5, len(yticks)-1+0.5])
+    # ax.set_yticklabels([np.round(yticks[0], 0), np.round(yticks[-1], 0)], fontsize=16)
+    ax.set_yticklabels([r'$0$', r'$1$'], fontsize=20)
+  else:
+    ax.set_xticks([])
+    ax.set_yticks([])
+  if xlabel is not None:
+    ax.set_xlabel(xlabel, fontsize=28)
+  if ylabel is not None:
+    ax.set_ylabel(ylabel, fontsize=28, rotation=0)
 
   if title is not None:
     ax.set_title(title, fontsize=20)
@@ -216,7 +288,6 @@ def plot_over_hyperparams(vals, xticks, yticks=None, title=None, ax=None, vlim=N
         verticalalignment='center',
         transform=ax.transAxes)
   return h[0]
-
 
 def plot_prior_maps(path, ax=None, xlabel=None, ylabel=None, ticks='ends'):
   ax = ax or plt.gca()
