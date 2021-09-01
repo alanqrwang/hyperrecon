@@ -37,14 +37,14 @@ def generate_loss_ops(loss_type, mask, device):
     tx_op = loss_ops.Total_Variation()
   elif loss_type.lower() == 'wave':
     tx_op = loss_ops.L1_Wavelets(device)
-  elif loss_type.lower(mask) == 'shear':
-    tx_op = loss_ops.L1_Shearlets()
+  elif loss_type.lower() == 'shear':
+    tx_op = loss_ops.L1_Shearlets(mask)
   elif loss_type.lower() == 'ssim':
     tx_op = loss_ops.SSIM()
   elif loss_type.lower() == 'watson-dft':
     tx_op = loss_ops.Watson_DFT(device)
-  elif loss_type.lower(mask) == 'dc':
-    tx_op = loss_ops.Data_Consistency()
+  elif loss_type.lower() == 'dc':
+    tx_op = loss_ops.Data_Consistency(mask)
   elif loss_type.lower() == 'l1':
     tx_op = loss_ops.L1()
   elif loss_type.lower() == 'mse':

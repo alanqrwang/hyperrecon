@@ -166,16 +166,16 @@ class BaseTrain(object):
     self.train_begin()
     if self.num_epochs == 0:
       self.train_epoch_begin()
-      self.train_epoch_end(is_val=False, is_save=False)
+      self.train_epoch_end(is_val=False, save_metrics=False, save_ckpt=False)
     else:
       for epoch in range(self.start_epoch, self.num_epochs+1):
         self.epoch = epoch
 
         self.train_epoch_begin()
         self.train_epoch()
-        self.train_epoch_end(is_val=True, is_save=(
+        self.train_epoch_end(is_val=True, save_metrics=True, save_ckpt=(
           self.epoch % self.log_interval == 0))
-      self.train_epoch_end(is_val=False, is_save=True)
+      self.train_epoch_end(is_val=False, save_metrics=True, save_ckpt=True)
     self.train_end(verbose=True)
 
   def manage_checkpoint(self):
@@ -198,11 +198,13 @@ class BaseTrain(object):
       cont_epoch = self.cont
     else: # Try to load from latest checkpoint
       model_paths = sorted(glob(os.path.join(self.ckpt_dir, '*')))
-      if len(model_paths) == 0:
+      if len(model_paths) == 0 and self.num_epochs > 0:
         print('Randomly initialized model')
-      else:
+      elif len(model_paths) > 0:
         load_path = model_paths[-1]
         cont_epoch = int(load_path.split('.')[-2])
+      else:
+        raise ValueError('No model found for prediction')
 
     if cont_epoch is not None:
       load_path = os.path.join(
@@ -214,8 +216,8 @@ class BaseTrain(object):
         self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
       self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
         self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
-      self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
-        self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
+      # self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
+      #   self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
     if load_path is not None:
       self.network, self.optimizer, self.scheduler = utils.load_checkpoint(
         self.network, load_path, self.optimizer, self.scheduler)
@@ -294,15 +296,16 @@ class BaseTrain(object):
     print('Learning rate:', self.scheduler.get_last_lr())
     print('Sampling bounds [%.2f, %.2f]' % (self.r1, self.r2))
 
-  def train_epoch_end(self, is_val=True, is_save=False):
+  def train_epoch_end(self, is_val=True, save_metrics=False, save_ckpt=False):
     '''Save loss and checkpoints. Evaluate if necessary.'''
     self.eval_epoch(is_val)
 
-    utils.save_metrics(self.metric_dir, self.metrics, *self.list_of_metrics)
-    utils.save_metrics(self.metric_dir, self.val_metrics,
-               *self.list_of_val_metrics)
-    utils.save_metrics(self.monitor_dir, self.monitor, 'learning_rate')
-    if is_save:
+    if save_metrics:
+      utils.save_metrics(self.metric_dir, self.metrics, *self.list_of_metrics)
+      utils.save_metrics(self.metric_dir, self.val_metrics,
+                *self.list_of_val_metrics)
+      utils.save_metrics(self.monitor_dir, self.monitor, 'learning_rate', 'time:train')
+    if save_ckpt:
       utils.save_checkpoint(self.epoch, self.network, self.optimizer,
                   self.ckpt_dir, self.scheduler)
 
@@ -322,7 +325,7 @@ class BaseTrain(object):
     for i in range(len(self.losses)):
       c = coeffs[:, i]
       l = self.losses[i]
-      loss += c * l(pred, gt, y, self.mask)
+      loss += c * l(pred, gt, y)
     return loss
 
   def process_loss(self, loss):

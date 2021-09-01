@@ -49,7 +49,13 @@ def viz_all(hyp_path, base_paths, slices, hparams, subject):
   
   fig.tight_layout()
 
-def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False):
+def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False, ax=None):
+  ax = ax or plt.gca()
+  if metric_of_interest in ['psnr', 'ssim', 'dice']:
+    ann_min, ann_max = False, True
+  elif metric_of_interest in ['loss', 'hfen']:
+    ann_min, ann_max = True, False
+
   hyp_parsed = _parse_summary_json(model_path, metric_of_interest)
 
   base_xs, base_ys = [], []
@@ -64,29 +70,66 @@ def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False
     ys = 1 - ys
     base_ys = 1 - np.array(base_ys)
 
-  _plot_1d(xs, ys, color='blue', label='hyp', linestyle='-')
-  _plot_1d(base_xs, base_ys, color='orange', label='base', linestyle='.--')
-  plt.title(metric_of_interest)
-  plt.legend()
-  plt.grid()
-  plt.show()
+  _plot_1d(xs, ys, color='blue', label='hyp', linestyle='-', annotate_min=ann_min, annotate_max=ann_max, ax=ax)
+  _plot_1d(base_xs, base_ys, color='orange', label='base', linestyle='.--', annotate_min=ann_min, annotate_max=ann_max, ax=ax)
+  ax.set_title(metric_of_interest)
+  ax.set_xlabel('alpha')
+  ax.legend()
+  ax.grid()
 
-def plot_over_hyperparams_per_subject(model_path, metric_of_interest, flip=False):
-  parsed = _parse_summary_json(model_path, metric_of_interest)
-  xs = [float(n) for n in parsed.keys()]
-  ys = np.array([[n for n in l] for l in parsed.values()]).T
+def plot_over_hyperparams_per_subject(model_path, base_paths, metric_of_interest, flip=False, ax=None):
+  ax = ax or plt.gca()
+  if metric_of_interest in ['psnr', 'ssim', 'dice']:
+    ann_min, ann_max = False, True
+  elif metric_of_interest in ['loss', 'hfen']:
+    ann_min, ann_max = True, False
+
+  hyp_parsed = _parse_summary_json(model_path, metric_of_interest)
+  base_xs, base_ys = [], []
+  for base_path in base_paths:
+    base_parsed = _parse_summary_json(base_path, metric_of_interest)
+    key = [n for n in base_parsed.keys()][0]
+    base_xs.append(float(key))
+    base_ys.append(base_parsed[key])
+
+  base_ys = np.array(base_ys).T
+  xs = [float(n) for n in hyp_parsed.keys()]
+  ys = np.array([[n for n in l] for l in hyp_parsed.values()]).T
   if flip:
     ys = 1 - ys
+    base_ys = 1 - np.array(base_ys)
 
-  labels=['subject {}'.format(n) for n in range(ys.shape[0])]
-  for y, l in zip(ys, labels):
-    _plot_1d(xs, y, label=l)
-  plt.title(metric_of_interest)
-  plt.legend()
-  plt.grid()
-  plt.show()
+  num_subjects = ys.shape[0]
+  labels=['subject {}'.format(n) for n in range(num_subjects)]
+  colors = cm.cool(np.linspace(0, 1, num_subjects))
+  for y, base_y, l, c in zip(ys, base_ys, labels, colors):
+    _plot_1d(xs, y, label=l, color=c, annotate_min=ann_min, annotate_max=ann_max, ax=ax)
+    _plot_1d(base_xs, base_y, label=l, color=c, annotate_min=ann_min, annotate_max=ann_max, linestyle='--', ax=ax)
+  ax.set_title(metric_of_interest + ' per subject')
+  ax.set_xlabel('alpha')
+  ax.legend()
+  ax.grid()
 
-def plotmetrics(metric, model_paths,
+def plot_monitor(monitor, model_paths, ax=None):
+  ax = ax or plt.gca()
+  if not isinstance(model_paths, list):
+    model_paths = [model_paths]
+
+  for model_path in model_paths:
+    train_path = os.path.join(model_path, 'monitor', '{}.txt'.format(monitor))
+
+    if os.path.exists(train_path):
+      loss = np.loadtxt(train_path) 
+    else:
+      raise ValueError('Invalid train path found')
+    _plot_1d(np.arange(len(loss)), loss, label=model_path.split('/')[-4], ax=ax)
+
+  ax.set_xlabel('Epoch')
+  ax.set_title(monitor)
+  ax.grid()
+  return ax
+
+def plot_metrics(metric, model_paths,
          show_legend=True, xlim=None, ylim=None, lines_to_plot=('train', 'val'), vline=None, ax=None):
   ax = ax or plt.gca()
   if not isinstance(model_paths, list):
@@ -104,16 +147,18 @@ def plotmetrics(metric, model_paths,
     val_paths = glob(os.path.join(
       model_path, 'metrics', '{}:val*.txt'.format(metric)))
 
-    loss = np.loadtxt(train_path) if os.path.exists(train_path) else None
+    if os.path.exists(train_path):
+      loss = np.loadtxt(train_path) 
+    else:
+      raise ValueError('Invalid train path found')
     val_losses = [np.loadtxt(val_path)
             for val_path in val_paths if os.path.exists(val_path)]
 
+    xs = np.arange(1, len(loss)+1)
     color_t = next(ax._get_lines.prop_cycler)['color']
-    if 'train' in lines_to_plot and loss is not None:
-      xs = np.arange(1, len(loss)+1)
+    if 'train' in lines_to_plot:
       _plot_1d(xs, loss, label=model_path.split('/')[-4], color=color_t, linestyle='-', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
     if 'val' in lines_to_plot:
-      xs = np.arange(1, len(val_losses[0])+1)
       if len(val_losses) == 1:
         _plot_1d(xs, val_losses[0], label=val_paths[0].split(
           '/')[-1], color=color_t, linestyle='.', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
@@ -138,8 +183,8 @@ def plotmetrics(metric, model_paths,
   return ax
 
 def _get_hypernet(model_path, hparams, subject):
-  gt_path = os.path.join(model_path, 'img/gt.npy')
-  zf_path = os.path.join(model_path, 'img/zf.npy')
+  gt_path = os.path.join(model_path, 'img/gtsub{}.npy'.format(subject))
+  zf_path = os.path.join(model_path, 'img/zfsub{}.npy'.format(subject))
   gt = np.load(gt_path)
   zf = np.linalg.norm(np.load(zf_path), axis=1)
   preds = []
@@ -151,8 +196,8 @@ def _get_hypernet(model_path, hparams, subject):
 def _get_base(model_paths, subject):
   if not isinstance(model_paths, (list, tuple)):
     model_paths = [model_paths]
-  gt_path = os.path.join(model_paths[0], 'img/gt.npy')
-  zf_path = os.path.join(model_paths[0], 'img/zf.npy')
+  gt_path = os.path.join(model_paths[0], 'img/gtsub{}.npy'.format(subject))
+  zf_path = os.path.join(model_paths[0], 'img/zfsub{}.npy'.format(subject))
   gt = np.load(gt_path)
   zf = np.linalg.norm(np.load(zf_path), axis=1)
   preds = []
@@ -203,21 +248,21 @@ def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None):
   return ax, im
 
 
-def _plot_1d(xs, vals, linestyle='--', color='blue', label=None, ax=None,
-              annotate_max=True, annotate_min=False):
+def _plot_1d(xs, vals, linestyle='-', color='blue', label=None, ax=None,
+              annotate_max=False, annotate_min=False):
   '''Plot line.'''
   ax = ax or plt.gca()
 
   vals = np.array(vals)
-  h = ax.plot(xs, vals, linestyle, color=color, label=label)
+  h = ax.plot(xs, vals, linestyle, color=color, label=label, zorder=1)
   if annotate_max:
     n_max = vals.argmax()
     xmax, ymax = xs[n_max], vals[n_max]
-    ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
+    ax.scatter([xmax], [ymax], marker='*', s=100, color='black', zorder=2)
   if annotate_min:
     n_min = vals.argmin()
     xmin, ymin = xs[n_min], vals[n_min]
-    ax.scatter([xmin], [ymin], marker='*', s=100, color='black')
+    ax.scatter([xmin], [ymin], marker='*', s=100, color='black', zorder=2)
 
   return h[0]
 
