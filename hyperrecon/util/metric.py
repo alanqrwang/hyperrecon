@@ -93,18 +93,17 @@ def bhfen(bimg1, bimg2):
     metrics.append(hfen(img1, img2))
   return float(np.array(metrics).mean())
 
-class DICE(object):
+def dice(recon, gt, seg):
   '''Compute Dice score against segmentation labels of clean images.
-  
+
   TODO: segtest.tester currently only supports performing testing on
     full volumes, not slices.
   '''
-  def __call__(self, recon, gt, y, mask, seg):
-    pretrained_segmentation_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
+  pretrained_segmentation_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
 
-    roi_loss, roi_loss_gt, preds, preds_gt, targets = segtest.tester(pretrained_segmentation_path,
-                  xdata=recon.cpu().detach().numpy(),
-                  gt_data=gt.cpu().detach().numpy(),
-                  seg_data=seg.cpu().detach().numpy())
-    
-    return roi_loss, roi_loss_gt, preds, preds_gt, targets
+  roi_loss, roi_loss_gt, preds, preds_gt, targets = segtest.tester(pretrained_segmentation_path,
+                xdata=recon.cpu().detach().numpy(),
+                gt_data=gt.cpu().detach().numpy(),
+                seg_data=seg.cpu().detach().numpy())
+  
+  return roi_loss, roi_loss_gt, preds, preds_gt, targets

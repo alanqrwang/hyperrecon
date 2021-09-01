@@ -10,12 +10,11 @@ import random
 
 from hyperrecon.util import sampler, utils
 from hyperrecon.loss.losses import compose_loss_seq
-from hyperrecon.util.metric import bpsnr, bssim, bhfen
+from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice
 from hyperrecon.model.unet import HyperUnet
 from hyperrecon.model.layers import ClipByPercentile
 from hyperrecon.data.mask import get_mask
 from hyperrecon.data.brain import ArrDataset, SliceDataset, SliceVolDataset, get_train_data, get_train_gt
-from hyperrecon.loss.loss_ops import DICE
 
 
 class BaseTrain(object):
@@ -209,14 +208,14 @@ class BaseTrain(object):
       load_path = os.path.join(
         self.ckpt_dir, 'model.{epoch:04d}.h5'.format(epoch=cont_epoch))
 
-      # self.metrics.update({key: list(np.loadtxt(os.path.join(
-      #   self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_metrics})
-      # self.val_metrics.update({key: list(np.loadtxt(os.path.join(
-      #   self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
-      # self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
-      #   self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
-      # self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
-      #   self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
+      self.metrics.update({key: list(np.loadtxt(os.path.join(
+        self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_metrics})
+      self.val_metrics.update({key: list(np.loadtxt(os.path.join(
+        self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
+      self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
+        self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
+      self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
+        self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
     if load_path is not None:
       self.network, self.optimizer, self.scheduler = utils.load_checkpoint(
         self.network, load_path, self.optimizer, self.scheduler)
@@ -267,8 +266,8 @@ class BaseTrain(object):
     """
     if verbose:
       summary_dict = {}
-      # summary_dict.update({key: self.val_metrics[key][-1]
-      #            for key in self.list_of_val_metrics})
+      summary_dict.update({key: self.val_metrics[key][-1]
+                 for key in self.list_of_val_metrics})
       summary_dict.update({key: self.test_metrics[key][-1]
                  for key in self.list_of_test_metrics})
       
@@ -483,8 +482,8 @@ class BaseTrain(object):
           elif 'hfen' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bhfen(gt[i], pred[i]))
           elif 'dice' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            dice, dice_gt, _,_,_ = DICE()(pred[i], gt[i], None, None, seg[i])
-            self.test_metrics[key].append(float(dice.mean()))
+            loss_roi, _,_,_,_ = dice(pred[i], gt[i], seg[i])
+            self.test_metrics[key].append(float(loss_roi.mean()))
 
   def get_predictions(self, hparam, by_subject=False):
     '''Get predictions, optionally separated by subject'''

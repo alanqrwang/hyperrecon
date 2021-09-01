@@ -49,13 +49,23 @@ def viz_all(hyp_path, base_paths, slices, hparams, subject):
   
   fig.tight_layout()
 
-def plot_over_hyperparams(model_path, metric_of_interest, flip=False):
-  parsed = _parse_summary_json(model_path, metric_of_interest)
-  xs = [float(n) for n in parsed.keys()]
-  ys = np.array([np.mean(l) for l in parsed.values()])
+def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False):
+  hyp_parsed = _parse_summary_json(model_path, metric_of_interest)
+
+  base_xs, base_ys = [], []
+  for base_path in base_paths:
+    base_parsed = _parse_summary_json(base_path, metric_of_interest)
+    base_xs.append([float(n) for n in base_parsed.keys()][0])
+    base_ys.append([np.mean(l) for l in base_parsed.values()][0])
+
+  xs = [float(n) for n in hyp_parsed.keys()]
+  ys = np.array([np.mean(l) for l in hyp_parsed.values()])
   if flip:
     ys = 1 - ys
+    base_ys = 1 - np.array(base_ys)
+
   _plot_1d(ys, xs, title=metric_of_interest)
+  _plot_1d(base_ys, base_xs, title=metric_of_interest)
   plt.show()
 
 def plot_over_hyperparams_per_subject(model_path, metric_of_interest, flip=False):
@@ -684,8 +694,8 @@ def slices(save=False, supervised=True):
       arrow = patches.Arrow(56, 33, -5, 5, width=5.0, color='r')
     if img_idx == 2:
       arrow = patches.Arrow(40, 55, 5, 5, width=5.0, color='r')
-    plot_img(utils.absval(gt_img), ax=axes[0, 2*img_idx], rot90=True)
-    plot_img(utils.absval(gt_img[100:175, 100:175, :]),
+    _plot_img(utils.absval(gt_img), ax=axes[0, 2*img_idx], rot90=True)
+    _plot_img(utils.absval(gt_img[100:175, 100:175, :]),
          ax=axes[0, 2*img_idx+1], rot90=True)
     rect = patches.Rectangle(
       (85, 100), 75, 75, linewidth=1, edgecolor='r', facecolor='none')
@@ -695,9 +705,9 @@ def slices(save=False, supervised=True):
 
     indices = get_indices_l2_dist(sorted_psnrs, sorted_recons)
     for i, flat_ind in enumerate(indices):
-      plot_img(utils.absval(
+      _plot_img(utils.absval(
         sorted_recons[flat_ind]), ax=axes[i+1, 2*img_idx], rot90=True)
-      plot_img(utils.absval(
+      _plot_img(utils.absval(
         sorted_recons[flat_ind, 100:175, 100:175, :]), ax=axes[i+1, 2*img_idx+1], rot90=True)
 
       new_psnr = sorted_psnrs[flat_ind]
