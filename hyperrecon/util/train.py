@@ -235,7 +235,7 @@ class BaseTrain(object):
                   for key in self.list_of_test_metrics})
     self.monitor = {
       'learning_rate': [],
-      'time.train': [],
+      'time:train': [],
     }
 
     # Directories to save information
@@ -394,10 +394,10 @@ class BaseTrain(object):
     epoch_time = time.time() - start_time
     epoch_loss /= epoch_samples
     epoch_psnr /= epoch_samples
-    self.metrics['loss.train'].append(epoch_loss)
-    self.metrics['psnr.train'].append(epoch_psnr)
+    self.metrics['loss:train'].append(epoch_loss)
+    self.metrics['psnr:train'].append(epoch_psnr)
     self.monitor['learning_rate'].append(self.scheduler.get_last_lr())
-    self.monitor['time.train'].append(epoch_time)
+    self.monitor['time:train'].append(epoch_time)
 
     print("train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
       epoch_loss, epoch_psnr, epoch_time))
@@ -438,7 +438,7 @@ class BaseTrain(object):
     for hparam in self.val_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Validating with hparam', hparam_str)
-      zf, gt, y, pred, coeffs = self.get_predictions(hparam)
+      zf, gt, y, pred, segs, coeffs = self.get_predictions(hparam)
       for key in self.val_metrics:
         if 'loss' in key and hparam_str in key:
           loss = self.compute_loss(pred, gt, y, coeffs)

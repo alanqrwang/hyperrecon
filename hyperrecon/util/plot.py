@@ -9,7 +9,7 @@ from glob import glob
 from hyperrecon.util import utils
 from hyperrecon.data import brain
 from scipy.spatial.distance import squareform, pdist
-matplotlib.rcParams['lines.linewidth'] = 4
+matplotlib.rcParams['lines.linewidth'] = 3
 from . import metric
 import json
 
@@ -64,8 +64,11 @@ def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False
     ys = 1 - ys
     base_ys = 1 - np.array(base_ys)
 
-  _plot_1d(ys, xs, title=metric_of_interest)
-  _plot_1d(base_ys, base_xs, title=metric_of_interest)
+  _plot_1d(xs, ys, color='blue', label='hyp', linestyle='-')
+  _plot_1d(base_xs, base_ys, color='orange', label='base', linestyle='.--')
+  plt.title(metric_of_interest)
+  plt.legend()
+  plt.grid()
   plt.show()
 
 def plot_over_hyperparams_per_subject(model_path, metric_of_interest, flip=False):
@@ -74,10 +77,16 @@ def plot_over_hyperparams_per_subject(model_path, metric_of_interest, flip=False
   ys = np.array([[n for n in l] for l in parsed.values()]).T
   if flip:
     ys = 1 - ys
-  _plot_1d(ys, xs, title=metric_of_interest, labels=['subject {}'.format(n) for n in range(ys.shape[0])])
+
+  labels=['subject {}'.format(n) for n in range(ys.shape[0])]
+  for y, l in zip(ys, labels):
+    _plot_1d(xs, y, label=l)
+  plt.title(metric_of_interest)
+  plt.legend()
+  plt.grid()
   plt.show()
 
-def plotcurves(metric, model_paths,
+def plotmetrics(metric, model_paths,
          show_legend=True, xlim=None, ylim=None, lines_to_plot=('train', 'val'), vline=None, ax=None):
   ax = ax or plt.gca()
   if not isinstance(model_paths, list):
@@ -85,10 +94,15 @@ def plotcurves(metric, model_paths,
   if not isinstance(lines_to_plot, (tuple, list)):
     lines_to_plot = (lines_to_plot)
 
+  if metric in ['psnr', 'ssim', 'dice']:
+    ann_min, ann_max = False, True
+  elif metric in ['loss', 'hfen']:
+    ann_min, ann_max = True, False
+
   for model_path in model_paths:
-    train_path = os.path.join(model_path, '{}.train.txt'.format(metric))
+    train_path = os.path.join(model_path, 'metrics', '{}:train.txt'.format(metric))
     val_paths = glob(os.path.join(
-      model_path, '{}.val*.txt'.format(metric)))
+      model_path, 'metrics', '{}:val*.txt'.format(metric)))
 
     loss = np.loadtxt(train_path) if os.path.exists(train_path) else None
     val_losses = [np.loadtxt(val_path)
@@ -97,17 +111,17 @@ def plotcurves(metric, model_paths,
     color_t = next(ax._get_lines.prop_cycler)['color']
     if 'train' in lines_to_plot and loss is not None:
       xs = np.arange(1, len(loss)+1)
-      ax.plot(xs, loss, label=model_path.split('/')[-4], color=color_t)
+      _plot_1d(xs, loss, label=model_path.split('/')[-4], color=color_t, linestyle='-', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
     if 'val' in lines_to_plot:
       xs = np.arange(1, len(val_losses[0])+1)
       if len(val_losses) == 1:
-        ax.plot(xs, val_losses[0], label=val_paths[0].split(
-          '/')[-1], color=color_t, linestyle='dotted')
+        _plot_1d(xs, val_losses[0], label=val_paths[0].split(
+          '/')[-1], color=color_t, linestyle='.', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
       else:
         colors = cm.cool(np.linspace(0, 1, len(val_losses)))
         for i, (l, c) in enumerate(zip(val_losses, colors)):
-          ax.plot(xs, l, label=val_paths[i].split(
-            '/')[-1], color=c, linestyle='dotted')
+          _plot_1d(xs, l, label=val_paths[i].split(
+            '/')[-1], color=c, linestyle='.', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
 
   if ylim is not None:
     ax.set_ylim(ylim)
@@ -189,39 +203,22 @@ def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None):
   return ax, im
 
 
-def _plot_1d(vals, xticks, yticks=None, title=None, ax=None, vlim=None, colorbar=True,
-              xlabel=None, ylabel=None, labels=None, all_ticks=None, annotate_max=True, cmap='coolwarm',
-              white_text=None, contours=None, point=None):
+def _plot_1d(xs, vals, linestyle='--', color='blue', label=None, ax=None,
+              annotate_max=True, annotate_min=False):
+  '''Plot line.'''
   ax = ax or plt.gca()
+
   vals = np.array(vals)
-  if len(vals.shape) == 1:
-    vals = [vals]
+  h = ax.plot(xs, vals, linestyle, color=color, label=label)
+  if annotate_max:
+    n_max = vals.argmax()
+    xmax, ymax = xs[n_max], vals[n_max]
+    ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
+  if annotate_min:
+    n_min = vals.argmin()
+    xmin, ymin = xs[n_min], vals[n_min]
+    ax.scatter([xmin], [ymin], marker='*', s=100, color='black')
 
-  for i in range(len(vals)):
-    h = ax.plot(xticks, vals[i], '.--')
-    if annotate_max:
-      n_max = vals[i].argmax()
-      xmax, ymax = xticks[n_max], vals[i][n_max]
-      ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
-
-  ax.set_xlabel('alpha', fontsize=16)
-  if vlim:
-    ax.set_ylim(vlim)
-  ax.grid()
-
-  if title is not None:
-    ax.set_title(title, fontsize=20)
-  if xlabel is not None:
-    ax.set_xlabel(xlabel, fontsize=28)
-  if ylabel is not None:
-    ax.set_ylabel(ylabel, fontsize=28, rotation=0)
-  if labels is not None:
-    ax.legend(labels)
-  if white_text is not None:
-    ax.text(0.10, 0.9, white_text, color='white', fontsize=20,
-        horizontalalignment='left',
-        verticalalignment='center',
-        transform=ax.transAxes)
   return h[0]
 
 def _plot_2d(vals, xticks, yticks=None, title=None, ax=None, vlim=None, colorbar=True,

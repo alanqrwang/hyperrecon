@@ -57,7 +57,7 @@ class Parser(argparse.ArgumentParser):
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
     self.add_argument('--undersampling_rate', type=str, default='4p2',
-              choices=['4p2', '8p25', '8p3', '16p2', '16p3'])
+              choices=['4p2', '8p2', '8p3', '16p2', '16p3'])
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
