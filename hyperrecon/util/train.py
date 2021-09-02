@@ -19,10 +19,13 @@ from hyperrecon.data.brain import ArrDataset, SliceDataset, SliceVolDataset, get
 
 class BaseTrain(object):
   def __init__(self, args):
+    self.device = args.device
+    self.image_dims = args.image_dims
     # HyperRecon
-    self.mask = get_mask(
-      '160_224', args.undersampling_rate).to(args.device)
+    self.mask_type = args.mask_type
     self.undersampling_rate = args.undersampling_rate
+    self.mask = get_mask(self.mask_type,
+      self.image_dims, self.undersampling_rate).to(self.device)
     self.topK = args.topK
     self.method = args.method
     self.anneal = args.anneal
@@ -48,7 +51,6 @@ class BaseTrain(object):
     self.load = args.load
     self.cont = args.cont
     self.epoch = self.cont + 1
-    self.device = args.device
     self.run_dir = args.run_dir
     self.data_path = args.data_path
     self.log_interval = args.log_interval

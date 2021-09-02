@@ -24,6 +24,45 @@ plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
+def viz_errors(hyp_path, base_paths, slices, hparams, subject):
+  _, _, hyp_preds = _get_hypernet(hyp_path, hparams, subject)
+  _, _, base_preds = _get_base(base_paths, subject)
+  for s in slices:
+    hyps = []
+    for j in range(len(hparams)):
+      pred_slice = hyp_preds[j][s,0]
+      hyps.append(pred_slice)
+
+    fig, axes = plt.subplots(len(hyps), len(hyps), figsize=(10, 15))
+    [ax.set_axis_off() for ax in axes.ravel()]
+    for j in range(len(hyps)):
+      for i in range(j, len(hyps)):
+        if i == j:
+          _plot_img(hyps[i], ax=axes[i, j], rot90=True)
+        else:
+          error = np.abs(hyps[i] - hyps[j])
+          error_ksp = np.fft.fftshift(np.log(np.abs(np.fft.fft2(error))))
+          _plot_img(error_ksp, ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
+    fig.show()
+
+    bases = []
+    for j in range(len(hparams)):
+      base_slice = base_preds[j][s,0]
+      bases.append(base_slice)
+  
+    fig, axes = plt.subplots(len(hyps), len(hyps), figsize=(10, 15))
+    [ax.set_axis_off() for ax in axes.ravel()]
+    for j in range(len(bases)):
+      for i in range(j, len(bases)):
+        if i == j:
+          _plot_img(bases[i], ax=axes[i, j], rot90=True)
+        else:
+          error = np.abs(bases[i] - bases[j])
+          error_ksp = np.fft.fftshift(np.log(np.abs(np.fft.fft2(error))))
+          _plot_img(error_ksp, ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
+    fig.show()
+    # fig.tight_layout()
+
 def viz_all(hyp_path, base_paths, slices, hparams, subject):
   hyp_gt, hyp_zf, hyp_preds = _get_hypernet(hyp_path, hparams, subject)
   _, _, base_preds = _get_base(base_paths, subject)
@@ -230,12 +269,13 @@ def _parse_summary_json(model_path, metric_of_interest, split='test'):
   return parsed
 
 
-def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None):
+def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, vlim=None):
   ax = ax or plt.gca()
   if rot90:
     img = np.rot90(img, k=1)
-  im = ax.imshow(img, vmin=0, vmax=1, cmap='gray')
-  # im = ax.imshow(img, cmap='gray')
+
+  # im = ax.imshow(img, vmin=0, vmax=1, cmap='gray')
+  im = ax.imshow(img, cmap='gray')
   if title is not None:
     ax.set_title(title, fontsize=16)
   ax.set_xticks([])

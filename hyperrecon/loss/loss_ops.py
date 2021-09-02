@@ -85,9 +85,9 @@ class L1_Wavelets(object):
 
 
 class L1_Shearlets(object):
-  def __init__(self, mask):
+  def __init__(self, dims):
     scales = [0.5] * 2
-    self.shearlet = ShearletTransform(*mask.shape, scales)
+    self.shearlet = ShearletTransform(*dims, scales)
 
   def __call__(self, pred, gt, y):
     pred = pred.norm(dim=-1) # Absolute value of complex image
@@ -121,7 +121,7 @@ class Watson_DFT(object):
       'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
 
   def __call__(self, pred, gt, y):
-    loss = self.watson_dft(pred, gt)
+    loss = self.watson_dft(pred, gt) / 64352.55078125
     return loss
 
 

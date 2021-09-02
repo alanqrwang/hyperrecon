@@ -32,6 +32,8 @@ class Parser(argparse.ArgumentParser):
               help='Number of subjects to validate on')
 
     # Machine learning parameters
+    self.add_argument('--image_dims', type=tuple, default=(160, 224),
+              help='Image dimensions')
     self.add_argument('--lr', type=float, default=1e-3,
               help='Learning rate')
     self.add_argument('--force_lr', type=float,
@@ -57,7 +59,9 @@ class Parser(argparse.ArgumentParser):
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
     self.add_argument('--undersampling_rate', type=str, default='4p2',
-              choices=['4p2', '8p2', '8p3', '16p2', '16p3'])
+              choices=['4', '8', '4p2', '8p2', '8p3', '16p2', '16p3'])
+    self.add_argument('--mask_type', type=str, default='poisson',
+              choices=['poisson', 'epi_horizontal', 'epi_vertical'])
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
@@ -81,6 +85,10 @@ class Parser(argparse.ArgumentParser):
     if args.range_restrict:
       assert len(
         args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
+    if args.mask_type == 'poisson':
+      assert 'p' in args.undersampling_rate, 'Invalid undersampling rate for poisson'
+    elif 'epi' in args.mask_type:
+      assert 'p' not in args.undersampling_rate, 'Invalid undersampling rate for epi'
 
   def parse(self):
     args = self.parse_args()

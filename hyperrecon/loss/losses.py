@@ -38,7 +38,7 @@ def generate_loss_ops(loss_type, mask, device):
   elif loss_type.lower() == 'wave':
     tx_op = loss_ops.L1_Wavelets(device)
   elif loss_type.lower() == 'shear':
-    tx_op = loss_ops.L1_Shearlets(mask)
+    tx_op = loss_ops.L1_Shearlets(mask.shape)
   elif loss_type.lower() == 'ssim':
     tx_op = loss_ops.SSIM()
   elif loss_type.lower() == 'watson-dft':
