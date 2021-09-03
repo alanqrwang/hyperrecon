@@ -2,7 +2,7 @@
 
 source activate aw847-torch
 
-python -u run.py -fp epoch1024_schedstep128_vert \
+python -u run.py -fp example \
   --method baseline \
   --undersampling_rate 4 \
   --mask_type epi_vertical \

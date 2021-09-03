@@ -1,7 +1,7 @@
 #!/bin/bash
 
 source activate aw847-torch
-NAME="epoch1024_schedstep128_vert"
+NAME="example"
 
 python -u run.py -fp $NAME \
   --method uhs \
@@ -9,7 +9,6 @@ python -u run.py -fp $NAME \
   --loss_list l1 ssim \
   --num_epochs 0 \
   --mask_type epi_vertical \
-  --date Sep_02 \
   --seed 1; 
 
 
@@ -22,6 +21,5 @@ python -u run.py -fp $NAME \
   --hyperparameters $i \
   --seed 1 \
   --num_epochs 0 \
-  --mask_type epi_vertical \
-  --date Sep_02; 
+  --mask_type epi_vertical; 
 done
