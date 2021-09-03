@@ -41,8 +41,9 @@ def viz_errors(hyp_path, base_paths, slices, hparams, subject):
           _plot_img(hyps[i], ax=axes[i, j], rot90=True)
         else:
           error = np.abs(hyps[i] - hyps[j])
-          error_ksp = np.fft.fftshift(np.log(np.abs(np.fft.fft2(error))))
-          _plot_img(error_ksp, ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
+          error_ksp = np.abs(np.fft.fft2(error))
+          _plot_img(np.fft.fftshift(np.log(error_ksp)), ax=axes[i, j], rot90=True, title=np.round(np.mean(error_ksp), 3))
+          _plot_img(error, ax=axes[j, i], rot90=True, title=np.round(np.mean(error), 3))
     fig.show()
 
     bases = []
@@ -58,8 +59,9 @@ def viz_errors(hyp_path, base_paths, slices, hparams, subject):
           _plot_img(bases[i], ax=axes[i, j], rot90=True)
         else:
           error = np.abs(bases[i] - bases[j])
-          error_ksp = np.fft.fftshift(np.log(np.abs(np.fft.fft2(error))))
-          _plot_img(error_ksp, ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
+          error_ksp = np.abs(np.fft.fft2(error))
+          _plot_img(np.fft.fftshift(np.log(error_ksp)), ax=axes[i, j], rot90=True, title=np.round(np.mean(error_ksp), 3))
+          _plot_img(error, ax=axes[j, i], rot90=True, title=np.round(np.mean(error), 3))
     fig.show()
     # fig.tight_layout()
 

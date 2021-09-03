@@ -24,8 +24,6 @@ class BaseTrain(object):
     # HyperRecon
     self.mask_type = args.mask_type
     self.undersampling_rate = args.undersampling_rate
-    self.mask = get_mask(self.mask_type,
-      self.image_dims, self.undersampling_rate).to(self.device)
     self.topK = args.topK
     self.method = args.method
     self.anneal = args.anneal
@@ -97,6 +95,8 @@ class BaseTrain(object):
     self.set_random_seed()
     # Data
     self.get_dataloader()
+    self.mask = get_mask(self.mask_type,
+      self.image_dims, self.undersampling_rate).to(self.device)
 
     # Model, Optimizer, Sampler, Loss
     self.network = self.get_model()
@@ -206,7 +206,7 @@ class BaseTrain(object):
         load_path = model_paths[-1]
         cont_epoch = int(load_path.split('.')[-2])
       else:
-        raise ValueError('No model found for prediction')
+        raise ValueError('No model found for prediction', self.run_dir)
 
     if cont_epoch is not None:
       load_path = os.path.join(
@@ -218,8 +218,8 @@ class BaseTrain(object):
         self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
       self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
         self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
-      # self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
-      #   self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
+      self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
+        self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
     if load_path is not None:
       self.network, self.optimizer, self.scheduler = utils.load_checkpoint(
         self.network, load_path, self.optimizer, self.scheduler)
