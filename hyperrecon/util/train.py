@@ -45,6 +45,7 @@ class BaseTrain(object):
     self.scheduler_step_size = args.scheduler_step_size
     self.scheduler_gamma = args.scheduler_gamma
     self.seed = args.seed
+    self.use_batchnorm = args.use_batchnorm
     # I/O
     self.load = args.load
     self.cont = args.cont
@@ -149,6 +150,7 @@ class BaseTrain(object):
       in_ch_main=self.n_ch_in,
       out_ch_main=self.n_ch_out,
       h_ch_main=self.unet_hdim,
+      use_batchnorm=self.use_batchnorm
     ).to(self.device)
     utils.summary(self.network)
     return self.network

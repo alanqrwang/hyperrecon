@@ -55,6 +55,7 @@ class Parser(argparse.ArgumentParser):
               default=0.5, help='Multiplicative factor for scheduler')
     self.add_argument('--seed', type=int,
               default=0, help='Seed')
+    self.add_bool_arg('use_batchnorm', default=False)
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)

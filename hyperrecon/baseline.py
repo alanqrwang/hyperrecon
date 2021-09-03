@@ -19,9 +19,12 @@ class Baseline(BaseTrain):
   
 
   def get_model(self):
-    self.network = Unet(in_ch=self.n_ch_in,
-                    out_ch=self.n_ch_out,
-                    h_ch=self.unet_hdim).to(self.device)
+    self.network = Unet(
+                      in_ch=self.n_ch_in,
+                      out_ch=self.n_ch_out,
+                      h_ch=self.unet_hdim,
+                      use_batchnorm=self.use_batchnorm
+                   ).to(self.device)
     utils.summary(self.network)
     return self.network
 

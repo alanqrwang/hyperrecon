@@ -11,7 +11,7 @@ from .hypernetwork import HyperNetwork
 
 class HyperUnet(nn.Module):
   """HyperUnet for hyperparameter-agnostic image reconstruction"""
-  def __init__(self, in_units_hnet, h_units_hnet, in_ch_main, out_ch_main, h_ch_main, residual=True):
+  def __init__(self, in_units_hnet, h_units_hnet, in_ch_main, out_ch_main, h_ch_main, residual=True, use_batchnorm=False):
     """
     Args:
       in_units_hnet : Input dimension for hypernetwork
@@ -27,12 +27,16 @@ class HyperUnet(nn.Module):
 
     # HyperNetwork
     self.hnet = HyperNetwork(
-                in_dim=in_units_hnet, 
-                h_dim=h_units_hnet)
-    self.unet = Unet(in_ch=in_ch_main, 
-             out_ch=out_ch_main, 
-             h_ch=h_ch_main, 
-             hnet_hdim=h_units_hnet)
+                    in_dim=in_units_hnet, 
+                    h_dim=h_units_hnet
+                )
+    self.unet = Unet(
+                    in_ch=in_ch_main, 
+                    out_ch=out_ch_main, 
+                    h_ch=h_ch_main, 
+                    hnet_hdim=h_units_hnet,
+                    use_batchnorm=use_batchnorm
+                )
 
   def forward(self, x, hyperparams):
     """
@@ -46,7 +50,7 @@ class HyperUnet(nn.Module):
     return out
 
 class Unet(nn.Module):
-  def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True):
+  def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True, use_batchnorm=False):
     '''Main Unet architecture.
     
     hnet_hdim activates hypernetwork for Unet.
@@ -55,6 +59,7 @@ class Unet(nn.Module):
         
     self.residual = residual
     self.hnet_hdim = hnet_hdim
+    self.use_batchnorm = use_batchnorm
 
     self.dconv_down1 = self.double_conv(in_ch, h_ch)
     self.dconv_down2 = self.double_conv(h_ch, h_ch)
@@ -76,19 +81,39 @@ class Unet(nn.Module):
 
   def double_conv(self, in_channels, out_channels):
     if self.hnet_hdim is not None:
-      return layers.MultiSequential(
-        layers.BatchConv2d(in_channels, out_channels, self.hnet_hdim, padding=1),
-        nn.ReLU(inplace=True),
-        layers.BatchConv2d(out_channels, out_channels, self.hnet_hdim, padding=1),
-        nn.ReLU(inplace=True)
-      )   
+      if self.use_batchnorm:
+        return layers.MultiSequential(
+          layers.BatchConv2d(in_channels, out_channels, self.hnet_hdim, padding=1),
+          nn.BatchNorm2d(out_channels),
+          nn.ReLU(inplace=True),
+          layers.BatchConv2d(out_channels, out_channels, self.hnet_hdim, padding=1),
+          nn.BatchNorm2d(out_channels),
+          nn.ReLU(inplace=True)
+        )   
+      else:
+        return layers.MultiSequential(
+          layers.BatchConv2d(in_channels, out_channels, self.hnet_hdim, padding=1),
+          nn.ReLU(inplace=True),
+          layers.BatchConv2d(out_channels, out_channels, self.hnet_hdim, padding=1),
+          nn.ReLU(inplace=True)
+        )   
     else:
-      return layers.MultiSequential(
-        nn.Conv2d(in_channels, out_channels, 3, padding=1),
-        nn.ReLU(inplace=True),
-        nn.Conv2d(out_channels, out_channels, 3, padding=1),
-        nn.ReLU(inplace=True)
-      )   
+      if self.use_batchnorm:
+        return layers.MultiSequential(
+          nn.Conv2d(in_channels, out_channels, 3, padding=1),
+          nn.BatchNorm2d(out_channels),
+          nn.ReLU(inplace=True),
+          nn.Conv2d(out_channels, out_channels, 3, padding=1),
+          nn.BatchNorm2d(out_channels),
+          nn.ReLU(inplace=True)
+        )   
+      else:
+        return layers.MultiSequential(
+          nn.Conv2d(in_channels, out_channels, 3, padding=1),
+          nn.ReLU(inplace=True),
+          nn.Conv2d(out_channels, out_channels, 3, padding=1),
+          nn.ReLU(inplace=True)
+        )   
     
   def forward(self, zf, hyp_out=None):
     x = zf
