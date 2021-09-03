@@ -1,7 +1,0 @@
-{
-  "editor.detectIndentation": false,
-  "editor.tabwidth": 2,
-  "python.formatting.provider": "autopep8",
-  "editor.tabSize": 2,
-  "prettier.useEditorConfig": false
-}
