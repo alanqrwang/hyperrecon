@@ -2,24 +2,34 @@ import numpy as np
 import torch
 
 def get_mask(mask_type, mask_dims, undersampling_rate, as_tensor=True, centered=False):
+  '''Load mask.
+
+  Args:
+    mask_type: Type of mask
+    mask_dims: Dimension of mask
+    undersampling_rate: Undersampling rate of mask
+    as_tensor: Whether or not to return as torch tensor
+    centered: Center low-frequency in image. Should be un-centered for everything,
+      use centered for visualization only.
+  '''
   if mask_type == 'poisson':
-    mask = vds_poisson(mask_dims, undersampling_rate, as_tensor, centered)
+    mask = vds_poisson(mask_dims, undersampling_rate)
   elif mask_type == 'epi_horizontal':
     mask = epi_horizontal(mask_dims, undersampling_rate)
   elif mask_type == 'epi_vertical':
     mask = epi_vertical(mask_dims, undersampling_rate)
 
+  if not centered:
+    mask = np.fft.fftshift(mask)
   if as_tensor:
     mask = torch.tensor(mask, requires_grad=False).float()
   return mask
 
-def vds_poisson(mask_dims, undersampling_rate, centered=False):
+def vds_poisson(mask_dims, undersampling_rate):
   path = '/share/sablab/nfs02/users/aw847/data/masks/poisson_disk_{maskname}_{dim1}_{dim2}.npy'.format(maskname=undersampling_rate, dim1=mask_dims[0], dim2=mask_dims[1])
   print('Loading mask:', path)
   mask = np.load(path)
 
-  if not centered:
-    mask = np.fft.fftshift(mask)
   return mask
   
 def epi_horizontal(mask_dims, undersampling_rate):
