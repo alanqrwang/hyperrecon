@@ -24,7 +24,12 @@ plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-def viz_errors(hyp_path, base_paths, slices, hparams, subject):
+def _overlay_error(img, error):
+  img_rgb = np.dstack((img, img, img))
+  img_rgb[..., 0] += error * 10
+  return img_rgb
+
+def viz_range(hyp_path, base_paths, slices, hparams, subject):
   _, _, hyp_preds = _get_hypernet(hyp_path, hparams, subject)
   _, _, base_preds = _get_base(base_paths, subject)
   for s in slices:
@@ -33,37 +38,51 @@ def viz_errors(hyp_path, base_paths, slices, hparams, subject):
       pred_slice = hyp_preds[j][s,0]
       hyps.append(pred_slice)
 
-    fig, axes = plt.subplots(len(hyps), len(hyps), figsize=(10, 15))
-    [ax.set_axis_off() for ax in axes.ravel()]
-    for j in range(len(hyps)):
-      for i in range(j, len(hyps)):
-        if i == j:
-          _plot_img(hyps[i], ax=axes[i, j], rot90=True)
-        else:
-          error = np.abs(hyps[i] - hyps[j])
-          error_ksp = np.abs(np.fft.fft2(error))
-          _plot_img(np.fft.fftshift(np.log(error_ksp)), ax=axes[i, j], rot90=True, title=np.round(np.mean(error_ksp), 3))
-          _plot_img(error, ax=axes[j, i], rot90=True, title=np.round(np.mean(error), 3))
-    fig.show()
-
     bases = []
     for j in range(len(hparams)):
       base_slice = base_preds[j][s,0]
       bases.append(base_slice)
-  
-    fig, axes = plt.subplots(len(hyps), len(hyps), figsize=(10, 15))
+
+    hyps = np.array(hyps)
+    bases = np.array(bases)
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 6))
     [ax.set_axis_off() for ax in axes.ravel()]
-    for j in range(len(bases)):
-      for i in range(j, len(bases)):
-        if i == j:
-          _plot_img(bases[i], ax=axes[i, j], rot90=True)
-        else:
-          error = np.abs(bases[i] - bases[j])
-          error_ksp = np.abs(np.fft.fft2(error))
-          _plot_img(np.fft.fftshift(np.log(error_ksp)), ax=axes[i, j], rot90=True, title=np.round(np.mean(error_ksp), 3))
-          _plot_img(error, ax=axes[j, i], rot90=True, title=np.round(np.mean(error), 3))
+    error = np.ptp(hyps, axis=0)
+    _plot_img(_overlay_error(hyps[0], error), ax=axes[0], rot90=True, title='Hypernet')
+    axes[0].set_title('Hypernet')
+    error = np.ptp(bases, axis=0)
+    _plot_img(_overlay_error(bases[0], error), ax=axes[1], rot90=True, title='Base')
+    fig.suptitle('Pixel-wise range across hparams')
     fig.show()
-    # fig.tight_layout()
+
+def viz_errors(hyp_path, base_paths, slices, hparams, subject):
+  _, _, hyp_preds = _get_hypernet(hyp_path, hparams, subject)
+  _, _, base_preds = _get_base(base_paths, subject)
+  for s in slices:
+    hyps = []
+    for j in range(len(hparams)):
+      pred_slice = hyp_preds[j][s,0]
+      hyps.append(pred_slice)
+    bases = []
+    for j in range(len(hparams)):
+      base_slice = base_preds[j][s,0]
+      bases.append(base_slice)
+
+    fig, axes = plt.subplots(len(hyps), len(hyps)*2, figsize=(20, 15))
+    [ax.set_axis_off() for ax in axes.ravel()]
+
+    for i in range(len(hyps)):
+      for j in range(i, len(hyps)):
+        if i == j:
+          _plot_img(hyps[i], ax=axes[i, j], rot90=True)
+          _plot_img(bases[i], ax=axes[i, len(hyps)+j], rot90=True)
+        else:
+          error = np.abs(hyps[i] - hyps[j])
+          _plot_img(_overlay_error(hyps[i], error), ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
+          error = np.abs(bases[i] - bases[j])
+          _plot_img(_overlay_error(bases[i], error), ax=axes[i, len(hyps)+j], rot90=True, title=np.round(np.mean(error), 3))
+    fig.show()
 
 def viz_all(hyp_path, base_paths, slices, hparams, subject):
   hyp_gt, hyp_zf, hyp_preds = _get_hypernet(hyp_path, hparams, subject)
@@ -151,6 +170,41 @@ def plot_over_hyperparams_per_subject(model_path, base_paths, metric_of_interest
   ax.legend()
   ax.grid()
 
+def plot_over_hyperparams_2d(model_path, metric_of_interest, flip=False, ax=None):
+  ax = ax or plt.gca()
+  if metric_of_interest in ['psnr', 'ssim', 'dice']:
+    ann_min, ann_max = False, True
+  elif metric_of_interest in ['loss', 'hfen']:
+    ann_min, ann_max = True, False
+
+  hyp_parsed = _parse_summary_json(model_path, metric_of_interest)
+
+  # Gather values and unique x, y values
+  x_idx = set()
+  y_idx = set()
+  values = []
+  keys = []
+  for key in sorted(hyp_parsed):
+    x_idx.add(float(key.split('_')[0]))
+    y_idx.add(float(key.split('_')[1]))
+    values.append(np.mean(hyp_parsed[key]))
+    keys.append(key)
+  # values is 1-d list where y index changes first, i.e. (0,0), (0,1), (1,0), ...
+  
+  # Reshape first fills by row. 
+  # So each row is of constant x value
+  # and each column if of constant y value.
+  vals = np.array(values).reshape((len(x_idx), len(y_idx)))
+  # Transpose to get constant x value in columns
+  vals = vals.T
+  
+  if flip:
+    vals = 1 - vals
+
+  _plot_2d(vals, annotate_min=ann_min, annotate_max=ann_max, xlabel='alpha', ylabel='beta')
+  ax.set_title(metric_of_interest)
+  ax.grid()
+  
 def plot_monitor(monitor, model_paths, ax=None):
   ax = ax or plt.gca()
   if not isinstance(model_paths, list):
@@ -308,25 +362,28 @@ def _plot_1d(xs, vals, linestyle='-', color='blue', label=None, ax=None,
 
   return h[0]
 
-def _plot_2d(vals, xticks, yticks=None, title=None, ax=None, vlim=None, colorbar=True,
-              xlabel=None, ylabel=None, labels=None, all_ticks=None, annotate_max=True, cmap='coolwarm',
+def _plot_2d(grid, title=None, ax=None, vlim=None, colorbar=True,
+              xlabel=None, ylabel=None, labels=None, all_ticks=None, 
+              annotate_max=False, annotate_min=False, cmap='coolwarm',
               white_text=None, contours=None, point=None):
   ax = ax or plt.gca()
-  vals = np.array(vals)
 
   if cmap == 'coolwarm':
     cm = plt.cm.coolwarm
   else:
     cm = plt.cm.viridis
 
-  grid = vals.reshape(len(yticks), len(xticks))
+  num_x, num_y = grid.shape
   if contours:
-    X, Y = np.meshgrid(np.arange(len(yticks)), np.arange(len(xticks)))
+    X, Y = np.meshgrid(np.arange(num_x), np.arange(num_y))
     c1 = ax.contour(X, Y, grid, contours, colors=[
             'cyan', 'fuchsia', 'lime'], linewidths=1.5, linestyles='--')
 
   if annotate_max:
     ymax, xmax = np.unravel_index(grid.argmax(), grid.shape)
+    ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
+  if annotate_min:
+    ymax, xmax = np.unravel_index(grid.argmin(), grid.shape)
     ax.scatter([xmax], [ymax], marker='*', s=100, color='black')
 
   if point is not None:
@@ -369,9 +426,9 @@ def _plot_2d(vals, xticks, yticks=None, title=None, ax=None, vlim=None, colorbar
     ax.set_xticks([])
     ax.set_yticks([])
   if xlabel is not None:
-    ax.set_xlabel(xlabel, fontsize=28)
+    ax.set_xlabel(xlabel)
   if ylabel is not None:
-    ax.set_ylabel(ylabel, fontsize=28, rotation=0)
+    ax.set_ylabel(ylabel, rotation=0)
 
   if title is not None:
     ax.set_title(title, fontsize=20)
@@ -381,7 +438,7 @@ def _plot_2d(vals, xticks, yticks=None, title=None, ax=None, vlim=None, colorbar
         horizontalalignment='left',
         verticalalignment='center',
         transform=ax.transAxes)
-  return h[0]
+  return ax
 
 def plot_prior_maps(path, ax=None, xlabel=None, ylabel=None, ticks='ends'):
   ax = ax or plt.gca()
