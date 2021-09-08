@@ -1,5 +1,5 @@
 import torch
-
+import numpy as np
 from hyperrecon.util.train import BaseTrain
 
 class UHS(BaseTrain):
@@ -11,3 +11,13 @@ class UHS(BaseTrain):
   def train_epoch_begin(self):
       super().train_epoch_begin()
       print('UHS Sampling')
+  
+  def set_eval_hparams(self):
+    # self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
+    # self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
+    self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
+    hparams = []
+    for i in np.linspace(0, 1, 10):
+      for j in np.linspace(0, 1, 10):
+        hparams.append([i, j])
+    self.test_hparams = torch.tensor(hparams).float()

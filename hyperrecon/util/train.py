@@ -60,8 +60,8 @@ class BaseTrain(object):
     self.set_metrics()
 
   def set_eval_hparams(self):
-    self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
-    self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
+    # hparams must be list of tensors, each of shape (num_hyperparams)
+    pass
 
   def set_metrics(self):
     self.list_of_metrics = [
@@ -77,12 +77,12 @@ class BaseTrain(object):
       'loss:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ] + [
       'psnr:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    ] + [
-      'ssim:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    ] + [
-      'hfen:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    ] + [
-      'dice:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    # ] + [
+    #   'ssim:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    # ] + [
+    #   'hfen:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    # ] + [
+    #   'dice:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ]
 
   def set_random_seed(self):
@@ -221,7 +221,7 @@ class BaseTrain(object):
       self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
         self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
       self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
-        self.monitor_dir, 'train.time.txt')))[:cont_epoch]})
+        self.monitor_dir, 'time:train.txt')))[:cont_epoch]})
     if load_path is not None:
       self.network, self.optimizer, self.scheduler = utils.load_checkpoint(
         self.network, load_path, self.optimizer, self.scheduler)
@@ -518,7 +518,12 @@ class BaseTrain(object):
 
 
   def eval_step(self, batch, hparams):
-    '''Eval for one step.'''
+    '''Eval for one step.
+    
+    Args:
+      batch: Single batch from dataloader
+      hparams: Single hyperparameter vector (1, num_hyperparams)
+    '''
     zf, gt, y, seg = self.prepare_batch(batch, is_training=False)
     batch_size = len(zf)
     hparams = hparams.repeat(batch_size, 1)
