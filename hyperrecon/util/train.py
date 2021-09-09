@@ -77,10 +77,10 @@ class BaseTrain(object):
       'loss:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ] + [
       'psnr:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    # ] + [
-    #   'ssim:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    # ] + [
-    #   'hfen:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'ssim:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'hfen:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     # ] + [
     #   'dice:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ]
@@ -125,7 +125,8 @@ class BaseTrain(object):
       valset = SliceDataset(
         self.data_path, 'validate', total_subjects=self.num_val_subjects, transform=transform)
       testset = SliceVolDataset(
-        self.data_path, 'validate', total_subjects=self.num_val_subjects, transform=transform)
+        self.data_path, 'validate', total_subjects=self.num_val_subjects, transform=transform,
+        subsample=True)
 
     self.train_loader = torch.utils.data.DataLoader(trainset, 
           batch_size=self.batch_size,

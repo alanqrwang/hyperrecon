@@ -17,7 +17,7 @@ class UHS(BaseTrain):
     # self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
     self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
     hparams = []
-    for i in np.linspace(0, 1, 10):
-      for j in np.linspace(0, 1, 10):
+    for i in np.linspace(0, 1, 50):
+      for j in np.linspace(0, 1, 50):
         hparams.append([i, j])
     self.test_hparams = torch.tensor(hparams).float()

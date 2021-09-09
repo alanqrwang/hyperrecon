@@ -1,6 +1,12 @@
 import os
 import torch
-from hyperrecon import model, utils, dataset
+from hyperrecon.model.unet import HyperUnet
+from hyperrecon.util import utils
+from hyperrecon.data.mask import get_mask
+from hyperrecon.traj.model import TrajNet
+from hyperrecon.data.brain import SliceDataset
+from hyperrecon.model.layers import ClipByPercentile
+from torchvision import transforms
 import hyperrecon.loss as losslayer
 import numpy as np
 import argparse
@@ -35,13 +41,12 @@ class Parser(argparse.ArgumentParser):
               help='Total training epochs')
     self.add_argument('--loss_type', required=True, type=str,
               choices=['l2', 'perceptual'], help='Total training epochs')
-    self.add_argument('--undersampling_rate', type=int, default=4)
     self.add_argument('-fp', '--prefix', type=str, required=True)
 
   def parse(self):
     args = self.parse_args()
-    args.run_dir = os.path.join(args.model_dir, args.model_name, 'trajnet',
-                  '{fp}_{model_num}_{lr}_{batch_size}_{num_points}_{lmbda}_{loss_type}_{undersampling_rate}'.format(
+    args.run_dir = os.path.join(args.model_dir, 'traj',
+                  '{fp}_{model_num}_{lr}_{batch_size}_{num_points}_{lmbda}_{loss_type}'.format(
                     fp=args.prefix,
                     model_num=args.model_num,
                     lr=args.lr,
@@ -49,7 +54,6 @@ class Parser(argparse.ArgumentParser):
                     num_points=args.num_points,
                     lmbda=args.lmbda,
                     loss_type=args.loss_type,
-                    undersampling_rate=args.undersampling_rate
                   ))
 
     args.ckpt_dir = os.path.join(args.run_dir, 'checkpoints')
@@ -129,34 +133,39 @@ if __name__ == "__main__":
   args_txtfile = os.path.join(args.model_dir, args.model_name, 'args.txt')
   with open(args_txtfile) as json_file:
     model_args = json.load(json_file)
-  reg_types = model_args['reg_types']
-  num_hyperparams = len(
-    reg_types) if model_args['range_restrict'] else len(reg_types) + 1
-  hyparch = model_args['hyparch']
 
-  #### Load trained recon net ####
-  trained_reconnet = model.Unet(
-    args.device, num_hyperparams, hyparch=hyparch, nh=64).to(args.device)
+  # Load trained recon net
+  num_hyperparams = len(model_args['loss_list'])
+  trained_reconnet = HyperUnet(
+        num_hyperparams,
+        model_args['hnet_hdim'],
+        in_ch_main=2,
+        out_ch_main=model_args['n_ch_out'],
+        h_ch_main=model_args['unet_hdim'],
+        use_batchnorm=model_args['use_batchnorm']
+      ).to(args.device)
   trained_reconnet = utils.load_checkpoint(trained_reconnet, model_path)
   trained_reconnet.eval()
   for param in trained_reconnet.parameters():
     param.requires_grad = False
 
-  mask = dataset.get_mask(args.undersampling_rate)
+  mask = get_mask(model_args['mask_type'],
+      model_args['image_dims'], model_args['undersampling_rate']).to(args.device)
   args.mask = torch.tensor(mask, requires_grad=False).float().to(args.device)
 
-  #### Load data ####
-  xdata = dataset.get_test_data(old=True)
-  gt_data = dataset.get_test_gt(old=True)
-  testset = dataset.Dataset(xdata, gt_data)
-  params = {'batch_size': args.batch_size,
-        'shuffle': True,
-        'num_workers': 4}
-  dataloader = torch.utils.data.DataLoader(testset, **params)
+  # Load data 
+  transform = transforms.Compose([ClipByPercentile()])
+  valset = SliceDataset(
+        model_args['data_path'], 'validate', total_subjects=args.num_val_subjects, transform=transform)
+  val_loader = torch.utils.data.DataLoader(valset,
+        batch_size=args.batch_size*2,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=True)
 
   # Train with fixed lambda if provided
-  network = model.TrajNet(out_dim=num_hyperparams).to(args.device)
+  network = TrajNet(out_dim=num_hyperparams).to(args.device)
   network.train()
   optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
-  network = trajtrain(network, dataloader, trained_reconnet,
+  network = trajtrain(network, val_loader, trained_reconnet,
             optimizer, args)
