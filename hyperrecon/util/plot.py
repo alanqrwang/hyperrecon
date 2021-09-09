@@ -170,7 +170,7 @@ def plot_over_hyperparams_per_subject(model_path, base_paths, metric_of_interest
   ax.legend()
   ax.grid()
 
-def plot_over_hyperparams_2d(model_path, metric_of_interest, flip=False, ax=None):
+def plot_over_hyperparams_2d(model_path, metric_of_interest, flip=False, ax=None, vlim=None):
   ax = ax or plt.gca()
   if metric_of_interest in ['psnr', 'ssim', 'dice']:
     ann_min, ann_max = False, True
@@ -183,12 +183,10 @@ def plot_over_hyperparams_2d(model_path, metric_of_interest, flip=False, ax=None
   x_idx = set()
   y_idx = set()
   values = []
-  keys = []
   for key in sorted(hyp_parsed):
     x_idx.add(float(key.split('_')[0]))
     y_idx.add(float(key.split('_')[1]))
     values.append(np.mean(hyp_parsed[key]))
-    keys.append(key)
   # values is 1-d list where y index changes first, i.e. (0,0), (0,1), (1,0), ...
   
   # Reshape first fills by row. 
@@ -201,10 +199,45 @@ def plot_over_hyperparams_2d(model_path, metric_of_interest, flip=False, ax=None
   if flip:
     vals = 1 - vals
 
-  _plot_2d(vals, annotate_min=ann_min, annotate_max=ann_max, xlabel='alpha', ylabel='beta')
+  _plot_2d(vals, annotate_min=ann_min, annotate_max=ann_max, xlabel='alpha', ylabel='beta', ax=ax, vlim=vlim)
   ax.set_title(metric_of_interest)
   ax.grid()
+
+def plot_over_hyperparams_per_subject_2d(model_path, metric_of_interest, flip=False, vlim=None):
+  if metric_of_interest in ['psnr', 'ssim', 'dice']:
+    ann_min, ann_max = False, True
+  elif metric_of_interest in ['loss', 'hfen']:
+    ann_min, ann_max = True, False
+
+  hyp_parsed = _parse_summary_json(model_path, metric_of_interest)
+
+  # Gather values and unique x, y values
+  x_idx = set()
+  y_idx = set()
+  values = []
+  for key in sorted(hyp_parsed):
+    x_idx.add(float(key.split('_')[0]))
+    y_idx.add(float(key.split('_')[1]))
+    values.append(hyp_parsed[key])
+  # values is 1-d list where y index changes first, i.e. (0,0), (0,1), (1,0), ...
   
+  # Reshape first fills by row. 
+  # So each row is of constant x value
+  # and each column if of constant y value.
+  vals = np.array(values).reshape((len(x_idx), len(y_idx), -1))
+  # Transpose to get constant x value in columns
+  vals = np.transpose(vals, (1,0,2))
+  
+  if flip:
+    vals = 1 - vals
+  
+  fig, axes = plt.subplots(1, vals.shape[-1], figsize=(4*vals.shape[-1], 4))
+  for i in range(vals.shape[-1]):
+    _plot_2d(vals[..., i], annotate_min=ann_min, annotate_max=ann_max, xlabel='alpha', ylabel='beta', vlim=vlim, ax=axes[i])
+    axes[i].set_title('sub%d' % i)
+  fig.suptitle(metric_of_interest)
+  fig.show()
+
 def plot_monitor(monitor, model_paths, ax=None):
   ax = ax or plt.gca()
   if not isinstance(model_paths, list):
