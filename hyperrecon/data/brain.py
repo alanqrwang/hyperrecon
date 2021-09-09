@@ -59,12 +59,13 @@ class SliceDataset(data.Dataset):
     return x, y
 
 class SliceVolDataset(data.Dataset):
-  def __init__(self, data_path, split, total_subjects=None, transform=None):
+  def __init__(self, data_path, split, total_subjects=None, transform=None, subsample=False):
     super(SliceVolDataset, self).__init__()
     self.data_path = data_path
     self.split = split
     self.transform = transform
     self.total_subjects = total_subjects
+    self.subsample = subsample
 
     print('Gathering subjects for dataloader')
     self.vols = self._gather_vols()
@@ -101,7 +102,10 @@ class SliceVolDataset(data.Dataset):
   def __getitem__(self, index):
     # Load data and get label
     xs, ys = None, None
-    vol = self.vols[index]
+    vol = np.array(self.vols[index])
+    if self.subsample:
+      indices = np.arange(0, 192, 20)
+      vol = vol[indices]
     for path, aseg_path in vol:
       x = np.load(path)[np.newaxis]
       y = np.load(aseg_path)[np.newaxis]
