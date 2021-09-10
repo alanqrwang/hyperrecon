@@ -107,7 +107,7 @@ class BaseTrain(object):
         self.data_path, 'validate', total_subjects=self.num_val_subjects, transform=transform)
       testset = SliceVolDataset(
         self.data_path, 'validate', total_subjects=self.num_val_subjects, transform=transform,
-        subsample=True)
+        subsample=False)
 
     self.train_loader = torch.utils.data.DataLoader(trainset, 
           batch_size=self.batch_size,

@@ -8,13 +8,13 @@ from hyperrecon.traj.loss import compute_loss
 from hyperrecon.data.brain import SliceDataset
 from hyperrecon.model.layers import ClipByPercentile
 from torchvision import transforms
-import hyperrecon.loss as losslayer
 from tqdm import tqdm
 import argparse
 import sys
 import json
 from pprint import pprint
 import numpy as np
+import random
 
 
 class Parser(argparse.ArgumentParser):
@@ -39,6 +39,8 @@ class Parser(argparse.ArgumentParser):
               help='gpu id to train on')
     self.add_argument('--num_steps_per_epoch', type=int, default=256,
               help='gpu id to train on')
+    self.add_argument('--seed', type=int, default=0,
+              help='seed')
 
     self.add_argument('--num_points', type=int, default=12,
               help='Number of reconstructions (i.e. hyperparameters) for each slice')
@@ -61,6 +63,11 @@ class Parser(argparse.ArgumentParser):
                     loss_type=args.loss_type,
                   ))
 
+    if args.seed > 0:
+      random.seed(args.seed)
+      np.random.seed(args.seed)
+      torch.manual_seed(args.seed)
+      
     # Create save directories
     args.ckpt_dir = os.path.join(args.run_dir, 'checkpoints')
     if not os.path.isdir(args.ckpt_dir):
@@ -96,6 +103,7 @@ def generate_coefficients(device, samples):
     (alpha, (1-alpha)*beta, (1-alpha)*(1-beta)), dim=1)
   return coeffs.to(device)
 
+# TODO: figure out this output dimension of trajectory net.... it should match with 
 def train(network, train_loader, val_loader, trained_reconnet, optimizer, scheduler, args):
   logger = {}
   logger['loss:train'] = []
@@ -124,7 +132,7 @@ def train(network, train_loader, val_loader, trained_reconnet, optimizer, schedu
         loss = compute_loss(recons, args.loss_type)
         loss.backward()
         optimizer.step()
-        scheduler.step()
+
 
       logger['loss:train'].append(loss.item())
       logger['learning_rate'].append(scheduler.get_last_lr())
@@ -133,13 +141,24 @@ def train(network, train_loader, val_loader, trained_reconnet, optimizer, schedu
 
       if i == args.num_steps_per_epoch:
         break
+    scheduler.step()
 
-    final_out = network(torch.linspace(0, 1, 12).view(-1, 1).to(args.device))
+  # Evaluate and save results
+  inputs = torch.linspace(0, 1, 12).view(-1, 1).to(args.device)
+  final_out = network(inputs)
+  coeffs = generate_coefficients(args.device, final_out)
+
+  recons = []
+  num_eval_slices = 10 # Number of slices to evaluate on
+
+  for i in range(num_eval_slices):       
     batch = next(iter(val_loader))
     zf, _, _, _ = prepare_batch(batch, args.device, args.mask, args.num_points)
-    recons = trained_reconnet(zf, final_out)
-    print(final_out)
-    np.save(os.path.join(args.img_dir, 'recons'), recons.cpu().detach().numpy())
+    recons.append(trained_reconnet(zf, coeffs).cpu().detach().numpy())
+
+  print(final_out)
+  np.save(os.path.join(args.run_dir, 'out.npy'), final_out.cpu().detach().numpy())
+  np.save(os.path.join(args.img_dir, 'recons.npy'), np.array(recons))
 
   return network
 
@@ -199,7 +218,7 @@ if __name__ == "__main__":
   network.train()
   optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
   scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
-                         step_size=50,
+                         step_size=5,
                          gamma=0.1)
   network = train(network, train_loader, val_loader, trained_reconnet,
             optimizer, scheduler, args)
