@@ -55,7 +55,7 @@ class Parser(argparse.ArgumentParser):
               default=0.5, help='Multiplicative factor for scheduler')
     self.add_argument('--seed', type=int,
               default=0, help='Seed')
-    self.add_bool_arg('use_batchnorm', default=False)
+    self.add_bool_arg('use_batchnorm', default=True)
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
@@ -66,7 +66,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
-      '--method', choices=['uhs', 'dhs', 'baseline', 'uhs_anneal', 'predict'], type=str, help='Training method', required=True)
+      '--method', choices=['uhs', 'dhs', 'baseline', 'uhs_anneal', 'predict', 'constant'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_argument('--hyperparameters', type=float, default=None)
@@ -81,8 +81,8 @@ class Parser(argparse.ArgumentParser):
   def validate_args(self, args):
     if args.method == 'dhs':
       assert args.topK is not None, 'DHS sampling must set topK'
-    if args.method == 'baseline':
-      assert args.hyperparameters is not None, 'Baseline must set hyperparameters'
+    if args.method in ['baseline', 'constant']:
+      assert args.hyperparameters is not None, 'Baseline and constant must set hyperparameters'
     if args.range_restrict:
       assert len(
         args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
