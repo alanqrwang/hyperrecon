@@ -8,7 +8,7 @@ import json
 from glob import glob
 import random
 
-from hyperrecon.util import sampler, utils
+from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
 from hyperrecon.model.unet import HyperUnet
@@ -29,7 +29,8 @@ class BaseTrain(object):
     self.anneal = args.anneal
     self.range_restrict = args.range_restrict
     self.loss_list = args.loss_list
-    self.num_hyperparams = len(self.loss_list)
+    self.num_hparams = len(self.loss_list) - 1 if self.range_restrict else len(self.loss_list)
+    self.num_coeffs = len(self.loss_list)
     # ML
     self.num_epochs = args.num_epochs
     self.lr = args.lr
@@ -64,7 +65,30 @@ class BaseTrain(object):
     pass
 
   def set_metrics(self):
-    pass
+    self.list_of_metrics = [
+      'loss:train',
+      'psnr:train',
+    ]
+    self.list_of_val_metrics = [
+      'loss:val:' + self.stringify_list(l.tolist()) for l in self.val_hparams
+    ] + [
+      'psnr:val:' + self.stringify_list(l.tolist()) for l in self.val_hparams
+    ]
+    self.list_of_test_metrics = [
+      'loss:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'psnr:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'ssim:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'hfen:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'watson:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'mae:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    # ] + [
+    #   'dice:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ]
 
   def set_random_seed(self):
     seed = self.seed
@@ -84,7 +108,6 @@ class BaseTrain(object):
     self.network = self.get_model()
     self.optimizer = self.get_optimizer()
     self.scheduler = self.get_scheduler()
-    self.sampler = self.get_sampler()
     self.losses = compose_loss_seq(self.loss_list, self.mask, self.device)
 
     if self.force_lr is not None:
@@ -127,7 +150,7 @@ class BaseTrain(object):
 
   def get_model(self):
     self.network = HyperUnet(
-      self.num_hyperparams,
+      self.num_coeffs,
       self.hnet_hdim,
       in_ch_main=self.n_ch_in,
       out_ch_main=self.n_ch_out,
@@ -144,9 +167,6 @@ class BaseTrain(object):
     return torch.optim.lr_scheduler.StepLR(self.optimizer,
                          step_size=self.scheduler_step_size,
                          gamma=self.scheduler_gamma)
-
-  def get_sampler(self):
-    return sampler.Sampler(self.num_hyperparams)
 
   def train(self):
     self.train_begin()
@@ -275,12 +295,8 @@ class BaseTrain(object):
       print()
 
   def train_epoch_begin(self):
-    self.r1 = 0
-    self.r2 = 1
-
     print('\nEpoch %d/%d' % (self.epoch, self.num_epochs))
     print('Learning rate:', self.scheduler.get_last_lr())
-    print('Sampling bounds [%.2f, %.2f]' % (self.r1, self.r2))
 
   def train_epoch_end(self, is_val=True, save_metrics=False, save_ckpt=False):
     '''Save loss and checkpoints. Evaluate if necessary.'''
@@ -307,6 +323,7 @@ class BaseTrain(object):
     Returns:
       loss: Per-sample loss (bs)
     '''
+    assert len(self.losses) == coeffs.shape[1], 'loss and coeff mismatch'
     loss = 0
     for i in range(len(self.losses)):
       c = coeffs[:, i]
@@ -336,14 +353,12 @@ class BaseTrain(object):
     under_ksp, zf = utils.scale(under_ksp, zf)
     return zf, targets, under_ksp, segs
 
-  def inference(self, zf, hyperparams):
-    return self.network(zf, hyperparams)
+  def inference(self, zf, coeffs):
+    return self.network(zf, coeffs)
 
   def sample_hparams(self, num_samples):
     '''Samples hyperparameters from distribution.'''
-    hyperparams = self.sampler.sample(
-      num_samples, self.r1, self.r2)
-    return hyperparams
+    pass
 
   def generate_coefficients(self, samples):
     '''Generates coefficients from samples.'''

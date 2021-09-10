@@ -5,6 +5,7 @@ from hyperrecon.dhs import DHS
 from hyperrecon.uhs_anneal import UHSAnneal
 from hyperrecon.baseline import Baseline
 from hyperrecon.constant import Constant
+from hyperrecon.binary import Binary
 
 def get_trainer(args):
   """Get trainer."""
@@ -18,6 +19,8 @@ def get_trainer(args):
     trainer = Baseline(args)
   elif args.method.lower() == 'constant':
     trainer = Constant(args)
+  elif args.method.lower() == 'binary':
+    trainer = Binary(args)
   else:
     raise NotImplementedError
   return trainer
