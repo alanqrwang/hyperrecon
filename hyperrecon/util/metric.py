@@ -1,7 +1,9 @@
 import numpy as np
+import torch
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 import scipy.ndimage as nd
 from unetsegmentation import test as segtest
+from perceptualloss.loss_provider import LossProvider
 
 def psnr(img1, img2):
   '''PSNR of two images.  
@@ -92,6 +94,44 @@ def bhfen(bimg1, bimg2):
     img2 = img2.cpu().detach().numpy()
     metrics.append(hfen(img1, img2))
   return float(np.array(metrics).mean())
+
+def mae(img1, img2):
+  '''Mean-absolute-error.'''
+  return np.mean(np.abs(img1 - img2))
+
+def bmae(bimg1, bimg2):
+  '''Compute average mean-absolute-error of a batch of images (possibly complex).
+
+  Args:
+    bimg1: (batch_size, c, n1, n2)
+    bimg2: (batch_size, c, n1, n2)
+  '''
+  bimg1 = bimg1.norm(dim=1)
+  bimg2 = bimg2.norm(dim=1)
+  # if normalized:
+  #     recons = rescale(recons)
+  #     gt = rescale(gt)
+  #     zf = rescale(zf)
+
+  metrics = []
+  for img1, img2 in zip(bimg1, bimg2):
+    img1 = img1.cpu().detach().numpy()
+    img2 = img2.cpu().detach().numpy()
+    metrics.append(mae(img1, img2))
+  return float(np.array(metrics).mean())
+
+def bwatson(bimg1, bimg2):
+  '''Compute average mean-absolute-error of a batch of images (possibly complex).
+
+  Args:
+    bimg1: (batch_size, c, n1, n2)
+    bimg2: (batch_size, c, n1, n2)
+  '''
+  bimg1 = bimg1.norm(dim=1, keepdim=True).to('cuda:0')
+  bimg2 = bimg2.norm(dim=1, keepdim=True).to('cuda:0')
+  watson_dft = LossProvider().get_loss_function(
+    'Watson-DFT', colorspace='grey', pretrained=True).to('cuda:0')
+  return float(watson_dft(bimg1, bimg2))
 
 def dice(recon, gt, seg):
   '''Compute Dice score against segmentation labels of clean images.

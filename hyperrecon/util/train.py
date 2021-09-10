@@ -10,7 +10,7 @@ import random
 
 from hyperrecon.util import sampler, utils
 from hyperrecon.loss.losses import compose_loss_seq
-from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice
+from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
 from hyperrecon.model.unet import HyperUnet
 from hyperrecon.model.layers import ClipByPercentile
 from hyperrecon.data.mask import get_mask
@@ -64,26 +64,7 @@ class BaseTrain(object):
     pass
 
   def set_metrics(self):
-    self.list_of_metrics = [
-      'loss:train',
-      'psnr:train',
-    ]
-    self.list_of_val_metrics = [
-      'loss:val:' + self.stringify_list(l.tolist()) for l in self.val_hparams
-    ] + [
-      'psnr:val:' + self.stringify_list(l.tolist()) for l in self.val_hparams
-    ]
-    self.list_of_test_metrics = [
-      'loss:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    ] + [
-      'psnr:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    ] + [
-      'ssim:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    ] + [
-      'hfen:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    # ] + [
-    #   'dice:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    ]
+    pass
 
   def set_random_seed(self):
     seed = self.seed
@@ -486,6 +467,10 @@ class BaseTrain(object):
             self.test_metrics[key].append(bssim(gt[i], pred[i]))
           elif 'hfen' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bhfen(gt[i], pred[i]))
+          elif 'watson' in key and hparam_str in key and 'sub{}'.format(i) in key:
+            self.test_metrics[key].append(bwatson(gt[i], pred[i]))
+          elif 'mae' in key and hparam_str in key and 'sub{}'.format(i) in key:
+            self.test_metrics[key].append(bmae(gt[i], pred[i]))
           elif 'dice' in key and hparam_str in key and 'sub{}'.format(i) in key:
             loss_roi, _,_,_,_ = dice(pred[i], gt[i], seg[i])
             self.test_metrics[key].append(float(loss_roi.mean()))

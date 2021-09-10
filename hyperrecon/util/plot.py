@@ -177,7 +177,7 @@ def plot_over_hyperparams_2d(model_path, metric_of_interest, flip=False, ax=None
   ax = ax or plt.gca()
   if metric_of_interest in ['psnr', 'ssim', 'dice']:
     ann_min, ann_max = False, True
-  elif metric_of_interest in ['loss', 'hfen']:
+  elif metric_of_interest in ['loss', 'hfen', 'mae', 'watson']:
     ann_min, ann_max = True, False
 
   hyp_parsed = _parse_summary_json(model_path, metric_of_interest)
@@ -186,23 +186,34 @@ def plot_over_hyperparams_2d(model_path, metric_of_interest, flip=False, ax=None
   x_idx = set()
   y_idx = set()
   values = []
-  for key in sorted(hyp_parsed):
-    x_idx.add(float(key.split('_')[0]))
-    y_idx.add(float(key.split('_')[1]))
-    values.append(np.mean(hyp_parsed[key]))
+  keys = []
+  for i, key in enumerate(hyp_parsed):
+    x, y = float(key.split('_')[0]), float(key.split('_')[1])
+    x_idx.add(x)
+    y_idx.add(y)
+  for x in sorted(x_idx):
+    for y in sorted(y_idx):
+      key_str = str(x) + '_' + str(y)
+      value = hyp_parsed[key_str]
+      values.append(np.mean(value))
+      keys.append(key_str)
   # values is 1-d list where y index changes first, i.e. (0,0), (0,1), (1,0), ...
   
   # Reshape first fills by row. 
   # So each row is of constant x value
   # and each column if of constant y value.
   vals = np.array(values).reshape((len(x_idx), len(y_idx)))
+  keys = np.array(keys).reshape((len(x_idx), len(y_idx)))
   # Transpose to get constant x value in columns
   vals = vals.T
+  keys = keys.T
+  print(keys[:2, :2])
+  print(vals[:2, :2])
   
   if flip:
     vals = 1 - vals
 
-  _plot_2d(vals, annotate_min=ann_min, annotate_max=ann_max, xlabel='alpha', ylabel='beta', ax=ax, vlim=vlim)
+  _plot_2d(vals, annotate_min=ann_min, annotate_max=ann_max, xlabel='a', ylabel='b', ax=ax, vlim=vlim, all_ticks='ends')
   ax.set_title(metric_of_interest)
   ax.grid()
 
@@ -218,10 +229,17 @@ def plot_over_hyperparams_per_subject_2d(model_path, metric_of_interest, flip=Fa
   x_idx = set()
   y_idx = set()
   values = []
-  for key in sorted(hyp_parsed):
-    x_idx.add(float(key.split('_')[0]))
-    y_idx.add(float(key.split('_')[1]))
-    values.append(hyp_parsed[key])
+  keys = []
+  for i, key in enumerate(hyp_parsed):
+    x, y = float(key.split('_')[0]), float(key.split('_')[1])
+    x_idx.add(x)
+    y_idx.add(y)
+  for x in sorted(x_idx):
+    for y in sorted(y_idx):
+      key_str = str(x) + '_' + str(y)
+      value = hyp_parsed[key_str]
+      values.append(value)
+      keys.append(key_str)
   # values is 1-d list where y index changes first, i.e. (0,0), (0,1), (1,0), ...
   
   # Reshape first fills by row. 
@@ -427,7 +445,7 @@ def _plot_2d(grid, title=None, ax=None, vlim=None, colorbar=True,
   num_x, num_y = grid.shape
   if contours:
     X, Y = np.meshgrid(np.arange(num_x), np.arange(num_y))
-    c1 = ax.contour(X, Y, grid, contours, colors=[
+    ax.contour(X, Y, grid, contours, colors=[
             'cyan', 'fuchsia', 'lime'], linewidths=1.5, linestyles='--')
 
   if annotate_max:
@@ -452,25 +470,25 @@ def _plot_2d(grid, title=None, ax=None, vlim=None, colorbar=True,
     cbar.ax.tick_params(labelsize=16)
 
   if all_ticks == 'all':
-    ax.set_xticks(np.arange(len(xticks)))
+    ax.set_xticks(np.arange(num_x))
     ax.set_xticklabels(np.round(xticks, 5), rotation=25, fontsize=16)
-    ax.set_yticks(np.arange(len(yticks)))
+    ax.set_yticks(np.arange(num_y))
     ax.set_yticklabels(np.round(yticks, 5), fontsize=16)
   elif all_ticks == 'ends':
-    ax.set_xticks([0-0.5, len(xticks)-1+0.5])
+    ax.set_xticks([0-0.5, num_x-1+0.5])
     # ax.set_xticklabels([np.round(xticks[0], 0), np.round(xticks[-1], 0)], fontsize=16)
     ax.set_xticklabels([r'$0$', r'$1$'], fontsize=20)
-    ax.set_yticks([0-0.5, len(yticks)-1+0.5])
+    ax.set_yticks([0-0.5, num_y-1+0.5])
     # ax.set_yticklabels([np.round(yticks[0], 0), np.round(yticks[-1], 0)], fontsize=16)
     ax.set_yticklabels([r'$0$', r'$1$'], fontsize=20)
   elif all_ticks == 'x_only':
-    ax.set_xticks([0-0.5, len(xticks)-1+0.5])
+    ax.set_xticks([0-0.5, num_x-1+0.5])
     # ax.set_xticklabels([np.round(xticks[0], 0), np.round(xticks[-1], 0)], fontsize=16)
     ax.set_xticklabels([r'$0$', r'$1$'], fontsize=20)
     ax.set_yticks([])
   elif all_ticks == 'y_only':
     ax.set_xticks([])
-    ax.set_yticks([0-0.5, len(yticks)-1+0.5])
+    ax.set_yticks([0-0.5, num_y-1+0.5])
     # ax.set_yticklabels([np.round(yticks[0], 0), np.round(yticks[-1], 0)], fontsize=16)
     ax.set_yticklabels([r'$0$', r'$1$'], fontsize=20)
   else:
