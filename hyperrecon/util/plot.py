@@ -29,83 +29,86 @@ def _overlay_error(img, error):
   img_rgb[..., 0] += error * 10
   return img_rgb
 
-def viz_range(hyp_path, base_paths, slices, hparams, subject):
-  _, _, hyp_preds = _get_hypernet(hyp_path, hparams, subject)
-  _, _, base_preds = _get_base(base_paths, subject)
+def _extract_slices(imgs, slice_num):
+  '''Collect slices from list of batch of images.
+  
+  Args:
+    imgs: (num_hparams, bs, 1, n1, n2) 
+    slice_num: slice index to collect
+  
+  Returns:
+    res: (num_hparams, n1, n2)
+  '''
+  res = []
+  for j in range(len(imgs)):
+    pred_slice = imgs[j][slice_num,0]
+    res.append(pred_slice)
+  return np.array(res)
+
+def viz_pixel_range(paths, slices, hparams, subject, base=False):
+  '''Visualize pixel-wise range across hyperparameters.'''
+  if base:
+    assert isinstance(paths, list)
+    assert len(paths) == len(hparams), 'Paths and hparams mismatch'
+    _, _, preds = _collect_base_subject(paths, subject)
+  else:
+    _, _, preds = _collect_hypernet_subject(paths, hparams, subject)
+
   for s in slices:
-    hyps = []
-    for j in range(len(hparams)):
-      pred_slice = hyp_preds[j][s,0]
-      hyps.append(pred_slice)
+    slices = _extract_slices(preds, s)
 
-    bases = []
-    for j in range(len(hparams)):
-      base_slice = base_preds[j][s,0]
-      bases.append(base_slice)
-
-    hyps = np.array(hyps)
-    bases = np.array(bases)
-
-    fig, axes = plt.subplots(1, 2, figsize=(10, 6))
-    [ax.set_axis_off() for ax in axes.ravel()]
-    error = np.ptp(hyps, axis=0)
-    _plot_img(_overlay_error(hyps[0], error), ax=axes[0], rot90=True, title='Hypernet')
-    axes[0].set_title('Hypernet')
-    error = np.ptp(bases, axis=0)
-    _plot_img(_overlay_error(bases[0], error), ax=axes[1], rot90=True, title='Base')
+    fig, axes = plt.subplots(1, 1, figsize=(5, 6))
+    error = np.ptp(slices, axis=0)
+    _plot_img(_overlay_error(slices[0], error), ax=axes, rot90=True)
     fig.suptitle('Pixel-wise range across hparams')
     fig.show()
 
-def viz_errors(hyp_path, base_paths, slices, hparams, subject):
-  _, _, hyp_preds = _get_hypernet(hyp_path, hparams, subject)
-  _, _, base_preds = _get_base(base_paths, subject)
+def viz_pairwise_errors(paths, slices, hparams, subject, base=False):
+  '''Visualize pairwise errors.'''
+  if base:
+    assert isinstance(paths, list)
+    assert len(paths) == len(hparams), 'Paths and hparams mismatch'
+    _, _, preds = _collect_base_subject(paths, subject)
+  else:
+    _, _, preds = _collect_hypernet_subject(paths, hparams, subject)
   for s in slices:
-    hyps = []
-    for j in range(len(hparams)):
-      pred_slice = hyp_preds[j][s,0]
-      hyps.append(pred_slice)
-    bases = []
-    for j in range(len(hparams)):
-      base_slice = base_preds[j][s,0]
-      bases.append(base_slice)
+    slices = _extract_slices(preds, s)
+    num_slices = len(slices)
 
-    fig, axes = plt.subplots(len(hyps), len(hyps)*2, figsize=(20, 15))
+    fig, axes = plt.subplots(num_slices, num_slices, figsize=(10, 15))
     [ax.set_axis_off() for ax in axes.ravel()]
 
-    for i in range(len(hyps)):
-      for j in range(i, len(hyps)):
+    for i in range(num_slices):
+      for j in range(i, num_slices):
         if i == j:
-          _plot_img(hyps[i], ax=axes[i, j], rot90=True)
-          _plot_img(bases[i], ax=axes[i, len(hyps)+j], rot90=True)
+          _plot_img(slices[i], ax=axes[i, j], rot90=True)
         else:
-          error = np.abs(hyps[i] - hyps[j])
-          _plot_img(_overlay_error(hyps[i], error), ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
-          error = np.abs(bases[i] - bases[j])
-          _plot_img(_overlay_error(bases[i], error), ax=axes[i, len(hyps)+j], rot90=True, title=np.round(np.mean(error), 3))
+          error = np.abs(slices[i] - slices[j])
+          _plot_img(_overlay_error(slices[i], error), ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
     fig.show()
 
 def viz_all(hyp_path, base_paths, slices, hparams, subject):
-  hyp_gt, hyp_zf, hyp_preds = _get_hypernet(hyp_path, hparams, subject)
-  _, _, base_preds = _get_base(base_paths, subject)
+  hyp_gt, hyp_zf, hyp_preds = _collect_hypernet_subject(hyp_path, hparams, subject)
+  _, _, base_preds = _collect_base_subject(base_paths, subject)
   for s in slices:
     gt_slice = hyp_gt[s,0]
     zf_slice = hyp_zf[s]
+    hyp_slice = _extract_slices(hyp_preds, s)
+    base_slice = _extract_slices(base_preds, s)
     zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice))
 
     fig, axes = plt.subplots(2, len(hparams)+2, figsize=(17, 7))
     _plot_img(gt_slice, ax=axes[0,0], rot90=True, title='GT', ylabel='Hypernet')
     _plot_img(zf_slice, ax=axes[0,1], rot90=True, title='ZF', xlabel=zf_psnr)
     for j in range(len(hparams)):
-      pred_slice = hyp_preds[j][s,0]
-      pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice))
-      _plot_img(pred_slice, ax=axes[0,j+2], rot90=True, title=hparams[j], xlabel=pred_psnr)
+      pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, hyp_slice[j]))
+      _plot_img(hyp_slice[j], ax=axes[0,j+2], rot90=True, title=hparams[j], xlabel=pred_psnr)
 
     _plot_img(gt_slice, ax=axes[1,0], rot90=True, ylabel='Base')
     _plot_img(zf_slice, ax=axes[1,1], rot90=True, xlabel=zf_psnr)
     for j in range(len(hparams)):
-      base_slice = base_preds[j][s,0]
-      base_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, base_slice))
-      _plot_img(base_preds[j][s,0], ax=axes[1,j+2], rot90=True, xlabel=base_psnr)
+      base_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, base_slice[j]))
+      _plot_img(base_slice[j], ax=axes[1,j+2], rot90=True, xlabel=base_psnr)
   
   fig.tight_layout()
 
@@ -310,7 +313,14 @@ def plot_metrics(metric, model_paths,
     ax.legend(loc='best')
   return ax
 
-def _get_hypernet(model_path, hparams, subject):
+def _collect_hypernet_subject(model_path, hparams, subject):
+  '''For subject, get reconstructions from hypernet for all hyperparams.
+  
+  Returns:
+    gt: Ground truth of subject (bs, 1, n1, n2)
+    zf: Zero-filled recon of subject (bs, 1, n1, n2)
+    preds: Predictions of subject for each hyperparameter (num_hparams, bs, nch, n1, n2)
+  '''
   gt_path = os.path.join(model_path, 'img/gtsub{}.npy'.format(subject))
   zf_path = os.path.join(model_path, 'img/zfsub{}.npy'.format(subject))
   gt = np.load(gt_path)
@@ -321,7 +331,15 @@ def _get_hypernet(model_path, hparams, subject):
     preds.append(np.load(pred_path))
   return gt, zf, preds
 
-def _get_base(model_paths, subject):
+def _collect_base_subject(model_paths, subject):
+  '''For subject, get reconstructions from baseline for all hyperparams.
+  
+  The hparams are specified in the model_paths.
+  Returns:
+    gt: Ground truth of subject (bs, 1, n1, n2)
+    zf: Zero-filled recon of subject (bs, 1, n1, n2)
+    preds: Predictions of subject for each hyperparameter (num_hparams, bs, nch, n1, n2)
+  '''
   if not isinstance(model_paths, (list, tuple)):
     model_paths = [model_paths]
   gt_path = os.path.join(model_paths[0], 'img/gtsub{}.npy'.format(subject))
