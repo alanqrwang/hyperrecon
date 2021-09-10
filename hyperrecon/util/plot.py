@@ -45,6 +45,14 @@ def _extract_slices(imgs, slice_num):
     res.append(pred_slice)
   return np.array(res)
 
+def _compute_pixel_range(imgs):
+  '''Computes pixel-wise range.
+  
+  Args:
+    imgs: (num_imgs, n1, n2)
+  '''
+  return np.ptp(imgs, axis=0)
+
 def viz_pixel_range(paths, slices, hparams, subject, base=False):
   '''Visualize pixel-wise range across hyperparameters.'''
   if base:
@@ -56,10 +64,10 @@ def viz_pixel_range(paths, slices, hparams, subject, base=False):
 
   for s in slices:
     slices = _extract_slices(preds, s)
+    error = _compute_pixel_range(slices)
 
     fig, axes = plt.subplots(1, 1, figsize=(5, 6))
-    error = np.ptp(slices, axis=0)
-    _plot_img(_overlay_error(slices[0], error), ax=axes, rot90=True)
+    _plot_img(_overlay_error(slices[0], error), ax=axes, rot90=True, title=np.round(np.mean(error), 3))
     fig.suptitle('Pixel-wise range across hparams')
     fig.show()
 
@@ -111,6 +119,26 @@ def viz_all(hyp_path, base_paths, slices, hparams, subject):
       _plot_img(base_slice[j], ax=axes[1,j+2], rot90=True, xlabel=base_psnr)
   
   fig.tight_layout()
+
+def viz_trajnet(traj_path):
+  recon_path = os.path.join(traj_path, 'img/recons.npy')
+  recons = np.load(recon_path)
+  for i in range(len(recons)):
+    fig, axes = plt.subplots(3, 4, figsize=(12, 12))
+    for j in range(recons.shape[1]):
+      _plot_img(recons[i, j, 0], rot90=True, ax=axes[j//4, j%4])
+    fig.show()
+    plt.show()
+
+def viz_trajnet_range(traj_path):
+  recon_path = os.path.join(traj_path, 'img/recons.npy')
+  recons = np.load(recon_path)
+  for i in range(len(recons)):
+    slices = recons[i, :, 0]
+    error = _compute_pixel_range(slices)
+    fig, axes = plt.subplots(1, 1, figsize=(4, 4))
+    _plot_img(_overlay_error(slices[0], error), ax=axes, rot90=True, title=np.round(np.mean(error), 3))
+    plt.show()
 
 def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False, ax=None):
   ax = ax or plt.gca()
@@ -207,8 +235,6 @@ def plot_over_hyperparams_2d(model_path, metric_of_interest, flip=False, ax=None
   # Transpose to get constant x value in columns
   vals = vals.T
   keys = keys.T
-  print(keys[:2, :2])
-  print(vals[:2, :2])
   
   if flip:
     vals = 1 - vals
