@@ -1,39 +1,34 @@
 import torch
-from . import utils
+import torch.nn.functional as F
+from hyperrecon.util import utils
 
-def trajloss(recons, dc_losses, lmbda, device, loss_type, mse=None):
-  '''Trajectory Net Loss
+def pperc(recons):
+  num_points = len(recons)
+  for i in range(num_points-1):
+    for j in range(i+1, num_points):
+      img1 = utils.absval(recons[i:i+1, ...]).unsqueeze(1)
+      img2 = utils.absval(recons[j:j+1, ...]).unsqueeze(1)
+      dist_loss = dist_loss + loss_function(img1, img2)
+  return dist_loss
 
-  recons: (batch_size, num_points, n1, n2, 2)
+def pl2(recons):
+  num_points = len(recons)
+  return torch.sum(F.pdist(recons.reshape(num_points, -1)))
+
+def compute_loss(recons, loss_type):
+  '''Trajectory Net Loss.
+
   recons: (batch_size, num_points, n1, n2, 2)
   Loss = (1-lmbda)*dist_loss + lmbda*dc_loss
   '''
   # provider = LossProvider()
   # loss_function = provider.get_loss_function('Watson-DFT', colorspace='grey', pretrained=True, reduction='sum').to(device)
 
-  batch_size, num_points = recons.shape[0], recons.shape[1]
-  dist_loss = 0
-  reg_loss = 0
+  batch_size = len(recons)
+  loss = 0
   for b in range(batch_size):
     if loss_type == 'perceptual':
-      for i in range(num_points-1):
-        for j in range(i+1, num_points):
-          img1 = utils.absval(recons[b, i:i+1, ...]).unsqueeze(1)
-          img2 = utils.absval(recons[b, j:j+1, ...]).unsqueeze(1)
-          dist_loss = dist_loss + loss_function(img1, img2)
-
-    elif loss_type == 'l2':
-      dist_loss = dist_loss - torch.sum(F.pdist(recons[b].reshape(num_points, -1)))
+      loss = loss + pperc(recons[b])
     else:
-      raise Exception()
-
-    reg_loss = reg_loss + torch.sum(dc_losses[b])
-
-  if mse is None:
-    print(lmbda)
-    loss = (1-lmbda)*dist_loss + lmbda*reg_loss
-  else:
-    print(lmbda)
-    loss = (1-lmbda)*dist_loss + lmbda*mse
-  
+      loss = loss - pl2(recons[b])
   return loss
