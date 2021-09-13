@@ -29,6 +29,12 @@ class HypernetBaselineFit(BaseTrain):
 
     trained_reconnet_0 = utils.load_checkpoint(trained_reconnet_0, model_path_0)
     trained_reconnet_1 = utils.load_checkpoint(trained_reconnet_1, model_path_1)
+    trained_reconnet_0.eval()
+    trained_reconnet_1.eval()
+    for param in trained_reconnet_0.parameters():
+      param.requires_grad = False
+    for param in trained_reconnet_1.parameters():
+      param.requires_grad = False
 
     layers_0 = self.get_all_conv_layers(trained_reconnet_0, [])
     layers_1 = self.get_all_conv_layers(trained_reconnet_1, [])
