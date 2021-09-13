@@ -44,7 +44,6 @@ class HyperUnet(nn.Module):
       x : Input (batch_size, 2, img_height, img_width)
       hyperparams : Hyperparameter values (batch_size, num_hyperparams)
     """
-    print('model', hyperparams)
     hyp_out = self.hnet(hyperparams)
     out = self.unet(x, hyp_out)
 
