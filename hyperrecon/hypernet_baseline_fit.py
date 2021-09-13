@@ -36,16 +36,22 @@ class HypernetBaselineFit(BaseTrain):
     for param in trained_reconnet_1.parameters():
       param.requires_grad = False
 
-    layers_0 = self.get_all_conv_layers(trained_reconnet_0, [])
-    layers_1 = self.get_all_conv_layers(trained_reconnet_1, [])
+    conv_layers_0 = self.get_all_conv_layers(trained_reconnet_0, [])
+    conv_layers_1 = self.get_all_conv_layers(trained_reconnet_1, [])
+    bn_layers_0 = self.get_all_bn_layers(trained_reconnet_0, [])
+    bn_layers_1 = self.get_all_bn_layers(trained_reconnet_1, [])
     self.base_weights_0 = []
     self.base_weights_1 = []
-    for l in layers_0:
-      self.base_weights_0.append(l.weight)
-      self.base_weights_0.append(l.bias)
-    for l in layers_1:
-      self.base_weights_1.append(l.weight)
-      self.base_weights_1.append(l.bias)
+    for l0, l1 in zip(conv_layers_0, conv_layers_1):
+      self.base_weights_0.append(l0.weight)
+      self.base_weights_0.append(l0.bias)
+      self.base_weights_1.append(l1.weight)
+      self.base_weights_1.append(l1.bias)
+    for l0, l1 in zip(bn_layers_0, bn_layers_1):
+      self.base_weights_0.append(l0.weight)
+      self.base_weights_0.append(l0.bias)
+      self.base_weights_1.append(l1.weight)
+      self.base_weights_1.append(l1.bias)
 
   def train_epoch_begin(self):
       super().train_epoch_begin()
@@ -91,16 +97,29 @@ class HypernetBaselineFit(BaseTrain):
 
     return all_layers
 
+  def get_all_bn_layers(self, network, all_layers):
+    for layer in network.children():
+      if type(layer) == nn.BatchNorm2d: # if sequential layer, apply recursively to layers in sequential layer
+        all_layers.append(layer)
+      if list(layer.children()) != []: # if leaf node, add it to list
+        all_layers = self.get_all_bn_layers(layer, all_layers)
+
+    return all_layers
+
   def compute_loss(self, pred, gt, y, coeffs):
-    all_layers = utils.remove_sequential(self.network, [])
+    all_conv_layers = utils.remove_sequential(self.network, [])
+    all_bn_layers = self.get_all_bn_layers(self.network, [])
 
     # hyp_weights is list of outputs of hyperkernels and hyperbiases, which are of shape
     # (bs, *kernel_shape) and (bs, *bias_shape). Note that bs is the leading dimension
     # because the hyper layers produce a weight for each batch input.
     hyp_weights = []
-    for l in all_layers:
+    for l in all_conv_layers:
       hyp_weights.append(l.get_kernel())
       hyp_weights.append(l.get_bias())
+    for l in all_bn_layers:
+      hyp_weights.append(l.weight)
+      hyp_weights.append(l.bias)
 
     assert len(hyp_weights) == len(self.base_weights_0)
     assert len(hyp_weights) == len(self.base_weights_1)

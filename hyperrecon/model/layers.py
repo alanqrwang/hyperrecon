@@ -65,7 +65,6 @@ class BatchConv2d(nn.Module):
     # Reshape input and get weights from hyperkernel
     out = x.permute([1, 0, 2, 3, 4]).contiguous().view(b_j, b_i * c, h, w)
     self.kernel = self.hyperkernel(hyp_out)
-
     kernel = self.kernel.view(b_i * self.out_channels, self.in_channels, self.ks, self.ks)
     out = F.conv2d(out, weight=kernel, bias=None, stride=self.stride, dilation=self.dilation, groups=b_i,
              padding=self.padding)
