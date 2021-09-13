@@ -95,28 +95,24 @@ def viz_pairwise_errors(paths, slices, hparams, subject, base=False):
           _plot_img(_overlay_error(slices[i], error), ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
     fig.show()
 
-def viz_all(hyp_path, base_paths, slices, hparams, subject):
-  hyp_gt, hyp_zf, hyp_preds = _collect_hypernet_subject(hyp_path, hparams, subject)
-  _, _, base_preds = _collect_base_subject(base_paths, subject)
+def viz_all(paths, slices, hparams, subject, base=False):
+  title = 'Base' if base else 'Hypernet'
+  if base:
+    gt, zf, preds = _collect_base_subject(paths, subject)
+  else:
+    gt, zf, preds = _collect_hypernet_subject(paths, hparams, subject)
   for s in slices:
-    gt_slice = hyp_gt[s,0]
-    zf_slice = hyp_zf[s]
-    hyp_slice = _extract_slices(hyp_preds, s)
-    base_slice = _extract_slices(base_preds, s)
+    gt_slice = gt[s,0]
+    zf_slice = zf[s]
+    pred_slice = _extract_slices(preds, s)
     zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice))
 
-    fig, axes = plt.subplots(2, len(hparams)+2, figsize=(17, 7))
-    _plot_img(gt_slice, ax=axes[0,0], rot90=True, title='GT', ylabel='Hypernet')
-    _plot_img(zf_slice, ax=axes[0,1], rot90=True, title='ZF', xlabel=zf_psnr)
+    fig, axes = plt.subplots(1, len(hparams)+2, figsize=(17, 7))
+    _plot_img(gt_slice, ax=axes[0], rot90=True, title='GT', ylabel=title)
+    _plot_img(zf_slice, ax=axes[1], rot90=True, title='ZF', xlabel=zf_psnr)
     for j in range(len(hparams)):
-      pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, hyp_slice[j]))
-      _plot_img(hyp_slice[j], ax=axes[0,j+2], rot90=True, title=hparams[j], xlabel=pred_psnr)
-
-    _plot_img(gt_slice, ax=axes[1,0], rot90=True, ylabel='Base')
-    _plot_img(zf_slice, ax=axes[1,1], rot90=True, xlabel=zf_psnr)
-    for j in range(len(hparams)):
-      base_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, base_slice[j]))
-      _plot_img(base_slice[j], ax=axes[1,j+2], rot90=True, xlabel=base_psnr)
+      pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice[j]))
+      _plot_img(pred_slice[j], ax=axes[j+2], rot90=True, title=hparams[j], xlabel=pred_psnr)
   
   fig.tight_layout()
 
@@ -334,6 +330,8 @@ def plot_metrics(metric, model_paths,
     if 'train' in lines_to_plot:
       _plot_1d(xs, loss, label=model_path.split('/')[-4], color=color_t, linestyle='-', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
     if 'val' in lines_to_plot:
+      if len(val_losses) == 0:
+        continue
       if len(val_losses) == 1:
         _plot_1d(xs, val_losses[0], label=val_paths[0].split(
           '/')[-1], color=color_t, linestyle='.', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
