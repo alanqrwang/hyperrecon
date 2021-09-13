@@ -6,6 +6,7 @@ from hyperrecon.uhs_anneal import UHSAnneal
 from hyperrecon.baseline import Baseline
 from hyperrecon.constant import Constant
 from hyperrecon.binary import Binary
+from hyperrecon.hypernet_baseline_fit import HypernetBaselineFit
 
 def get_trainer(args):
   """Get trainer."""
@@ -21,6 +22,8 @@ def get_trainer(args):
     trainer = Constant(args)
   elif args.method.lower() == 'binary':
     trainer = Binary(args)
+  elif args.method.lower() == 'hypernet_baseline_fit':
+    trainer = HypernetBaselineFit(args)
   else:
     raise NotImplementedError
   return trainer

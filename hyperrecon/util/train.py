@@ -222,7 +222,8 @@ class BaseTrain(object):
         self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
       self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
         self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
-      self.monitor.update({'train.time': list(np.loadtxt(os.path.join(
+      print(self.monitor)
+      self.monitor.update({'time:train': list(np.loadtxt(os.path.join(
         self.monitor_dir, 'time:train.txt')))[:cont_epoch]})
     if load_path is not None:
       self.network, self.optimizer, self.scheduler = utils.load_checkpoint(
@@ -400,7 +401,7 @@ class BaseTrain(object):
     epoch_psnr /= epoch_samples
     self.metrics['loss:train'].append(epoch_loss)
     self.metrics['psnr:train'].append(epoch_psnr)
-    self.monitor['learning_rate'].append(self.scheduler.get_last_lr())
+    self.monitor['learning_rate'].append(self.scheduler.get_last_lr()[0])
     self.monitor['time:train'].append(epoch_time)
 
     print("train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(

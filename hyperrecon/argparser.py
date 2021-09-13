@@ -66,7 +66,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
-      '--method', choices=['uhs', 'dhs', 'baseline', 'uhs_anneal', 'predict', 'constant', 'binary'], type=str, help='Training method', required=True)
+      '--method', choices=['uhs', 'dhs', 'baseline', 'uhs_anneal', 'predict', 'constant', 'binary', 'hypernet_baseline_fit'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_argument('--hyperparameters', type=float, default=None)
