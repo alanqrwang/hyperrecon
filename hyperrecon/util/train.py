@@ -47,6 +47,7 @@ class BaseTrain(object):
     self.scheduler_gamma = args.scheduler_gamma
     self.seed = args.seed
     self.use_batchnorm = args.use_batchnorm
+    self.optimizer_type = args.optimizer_type
     # I/O
     self.load = args.load
     self.cont = args.cont
@@ -161,7 +162,10 @@ class BaseTrain(object):
     return self.network
 
   def get_optimizer(self):
-    return torch.optim.Adam(self.network.parameters(), lr=self.lr)
+    if self.optimizer_type == 'sgd':
+      return torch.optim.SGD(self.network.parameters(), lr=self.lr)
+    else:
+      return torch.optim.Adam(self.network.parameters(), lr=self.lr)
 
   def get_scheduler(self):
     return torch.optim.lr_scheduler.StepLR(self.optimizer,

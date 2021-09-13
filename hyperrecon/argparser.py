@@ -56,6 +56,8 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--seed', type=int,
               default=0, help='Seed')
     self.add_bool_arg('use_batchnorm', default=True)
+    self.add_argument('--optimizer_type', type=str, default='adam',
+              choices=['sgd', 'adam'])
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
