@@ -51,7 +51,7 @@ class BatchConv2d(nn.Module):
     self.kernel = None
     self.bias = None
 
-    kernel_units = np.prod(self.get_weight_shape())
+    kernel_units = np.prod(self.get_kernel_shape())
     bias_units = np.prod(self.get_bias_shape())
     self.hyperkernel = nn.Linear(hyp_out_units, kernel_units)
     self.hyperbias = nn.Linear(hyp_out_units, bias_units)
@@ -66,8 +66,8 @@ class BatchConv2d(nn.Module):
     out = x.permute([1, 0, 2, 3, 4]).contiguous().view(b_j, b_i * c, h, w)
     self.kernel = self.hyperkernel(hyp_out)
 
-    weight = self.kernel.view(b_i * self.out_channels, self.in_channels, self.ks, self.ks)
-    out = F.conv2d(out, weight=weight, bias=None, stride=self.stride, dilation=self.dilation, groups=b_i,
+    kernel = self.kernel.view(b_i * self.out_channels, self.in_channels, self.ks, self.ks)
+    out = F.conv2d(out, weight=kernel, bias=None, stride=self.stride, dilation=self.dilation, groups=b_i,
              padding=self.padding)
 
     out = out.view(b_j, b_i, self.out_channels, out.shape[-2], out.shape[-1])
@@ -81,9 +81,12 @@ class BatchConv2d(nn.Module):
     out = out[:,0,...]
     return out
 
-  def get_weight_shape(self):
+  def get_kernel(self):
+    return self.kernel
+  def get_bias(self):
+    return self.bias
+  def get_kernel_shape(self):
     return [self.out_channels, self.in_channels, self.ks, self.ks]
-
   def get_bias_shape(self):
     return [self.out_channels]
 

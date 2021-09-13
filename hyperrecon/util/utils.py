@@ -109,10 +109,9 @@ def summary(network):
 
   print('---------------------------------------------------------------')
   main_param_count = 0
-  all_layers = []
-  all_layers = remove_sequential(network, all_layers)
+  all_layers = remove_sequential(network, [])
   for l in all_layers:
-    main_param_count += np.prod(l.get_weight_shape()) + np.prod(l.get_bias_shape())
+    main_param_count += np.prod(l.get_kernel_shape()) + np.prod(l.get_bias_shape())
   print('Number of main weights:', main_param_count)
   print('Total parameters:', sum(p.numel() for p in network.parameters() if p.requires_grad))
   print('---------------------------------------------------------------')
