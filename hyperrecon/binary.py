@@ -3,7 +3,7 @@ import numpy as np
 from hyperrecon.util.train import BaseTrain
 
 class Binary(BaseTrain):
-  """Constant sampling for hypernetwork."""
+  """Binary sampling for hypernetwork."""
 
   def __init__(self, args):
     super(Binary, self).__init__(args=args)
