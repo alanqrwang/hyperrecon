@@ -7,6 +7,7 @@ from hyperrecon.baseline import Baseline
 from hyperrecon.constant import Constant
 from hyperrecon.binary import Binary
 from hyperrecon.hypernet_baseline_fit import HypernetBaselineFit
+from hyperrecon.hypernet_baseline_fit_layer import HypernetBaselineFitLayer
 
 def get_trainer(args):
   """Get trainer."""
@@ -24,6 +25,8 @@ def get_trainer(args):
     trainer = Binary(args)
   elif args.method.lower() == 'hypernet_baseline_fit':
     trainer = HypernetBaselineFit(args)
+  elif args.method.lower() == 'hypernet_baseline_fit_layer':
+    trainer = HypernetBaselineFitLayer(args)
   else:
     raise NotImplementedError
   return trainer
