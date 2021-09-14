@@ -72,6 +72,7 @@ class Parser(argparse.ArgumentParser):
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_argument('--hyperparameters', type=float, default=None)
+    self.add_argument('--hypernet_baseline_fit_layer_idx', type=int, default=None)
 
   def add_bool_arg(self, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -83,8 +84,10 @@ class Parser(argparse.ArgumentParser):
   def validate_args(self, args):
     if args.method == 'dhs':
       assert args.topK is not None, 'DHS sampling must set topK'
-    if args.method in ['baseline', 'constant']:
+    elif args.method in ['baseline', 'constant']:
       assert args.hyperparameters is not None, 'Baseline and constant must set hyperparameters'
+    elif args.method == 'hypernet_baseline_fit_layer':
+      assert args.hypernet_baseline_fit_layer_idx is not None
     if args.range_restrict:
       assert len(
         args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
@@ -108,7 +111,7 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}'.format(
+                  'rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_layer{l}'.format(
                     rate=args.undersampling_rate,
                     lr=args.lr,
                     batch_size=args.batch_size,
@@ -118,6 +121,7 @@ class Parser(argparse.ArgumentParser):
                     range_restrict=args.range_restrict,
                     topK=args.topK,
                     hps=args.hyperparameters,
+                    l=args.hypernet_baseline_fit_layer_idx,
                   ))
     if not os.path.exists(args.run_dir):
       os.makedirs(args.run_dir)

@@ -10,7 +10,8 @@ class HypernetBaselineFitLayer(BaseTrain):
 
   def __init__(self, args):
     super(HypernetBaselineFitLayer, self).__init__(args=args)
-    
+    self.layer_idx = args.hypernet_baseline_fit_layer_idx
+
     model_path_0 = '/share/sablab/nfs02/users/aw847/models/HyperRecon/vert_bn_fixed/Sep_06/rate4_lr0.001_bs32_l1+ssim_hnet64_unet32_topKNone_restrictTrue_hp0.0/checkpoints/model.1024.h5'
     model_path_1 = '/share/sablab/nfs02/users/aw847/models/HyperRecon/vert_bn_fixed/Sep_06/rate4_lr0.001_bs32_l1+ssim_hnet64_unet32_topKNone_restrictTrue_hp1.0/checkpoints/model.1024.h5'
 
@@ -38,36 +39,27 @@ class HypernetBaselineFitLayer(BaseTrain):
 
     conv_layers_0 = self.get_all_conv_layers(trained_reconnet_0, [])
     conv_layers_1 = self.get_all_conv_layers(trained_reconnet_1, [])
-    bn_layers_0 = self.get_all_bn_layers(trained_reconnet_0, [])
-    bn_layers_1 = self.get_all_bn_layers(trained_reconnet_1, [])
 
     self.base_conv_weights_0 = []
     self.base_conv_weights_1 = []
-    self.base_bn_weights_0 = []
-    self.base_bn_weights_1 = []
     for l0, l1 in zip(conv_layers_0, conv_layers_1):
       self.base_conv_weights_0.append(l0.weight)
       self.base_conv_weights_0.append(l0.bias)
       self.base_conv_weights_1.append(l1.weight)
       self.base_conv_weights_1.append(l1.bias)
-    for l0, l1 in zip(bn_layers_0, bn_layers_1):
-      self.base_bn_weights_0.append(l0.weight)
-      self.base_bn_weights_0.append(l0.bias)
-      self.base_bn_weights_1.append(l1.weight)
-      self.base_bn_weights_1.append(l1.bias)
 
   def train_epoch_begin(self):
       super().train_epoch_begin()
-      print('Hypernet baseline fit')
+      print('Hypernet baseline fit per layer')
   
   def sample_hparams(self, num_samples):
     '''Samples hyperparameters from distribution.'''
-    # return torch.bernoulli(torch.empty(num_samples, self.num_hparams).fill_(0.5))
-    return torch.ones((num_samples, self.num_hparams))
+    return torch.bernoulli(torch.empty(num_samples, self.num_hparams).fill_(0.5))
+    # return torch.ones((num_samples, self.num_hparams))
 
   def set_eval_hparams(self):
-    self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
-    self.test_hparams = torch.tensor([0., 1.]).view(-1, 1)
+    self.val_hparams = torch.tensor([]).view(-1, 1)
+    self.test_hparams = torch.tensor([]).view(-1, 1)
 
 
   def set_metrics(self):
@@ -100,24 +92,17 @@ class HypernetBaselineFitLayer(BaseTrain):
 
   def compute_loss(self, pred, gt, y, coeffs):
     all_conv_layers = utils.remove_sequential(self.network, [])
-    all_bn_layers = self.get_all_bn_layers(self.network, [])
 
     # hyp_weights is list of outputs of hyperkernels and hyperbiases, which are of shape
     # (bs, *kernel_shape) and (bs, *bias_shape). Note that bs is the leading dimension
     # because the hyper layers produce a weight for each batch input.
     hyp_conv_weights = []
-    hyp_bn_weights = []
     for l in all_conv_layers:
       hyp_conv_weights.append(l.get_kernel())
       hyp_conv_weights.append(l.get_bias())
-    for l in all_bn_layers:
-      hyp_bn_weights.append(l.weight)
-      hyp_bn_weights.append(l.bias)
 
     assert len(hyp_conv_weights) == len(self.base_conv_weights_0)
     assert len(hyp_conv_weights) == len(self.base_conv_weights_1)
-    assert len(hyp_bn_weights) == len(self.base_bn_weights_0)
-    assert len(hyp_bn_weights) == len(self.base_bn_weights_1)
 
     # In contrast, self.base_weights_0 and 1 are lists of tensors of shape
     # (*kernel_shape) and (*bias_shape). So we don't need to index by
@@ -126,13 +111,11 @@ class HypernetBaselineFitLayer(BaseTrain):
     for i, c in enumerate(coeffs):
       if c[1] == 0: # Compare against 0 model
         base_conv_weights = self.base_conv_weights_0
-        base_bn_weights = self.base_bn_weights_0
       else: # Compare against 1 model
         base_conv_weights = self.base_conv_weights_1
-        base_bn_weights = self.base_bn_weights_1
       
-      w = hyp_conv_weights[0] 
-      b = base_conv_weights[0]
-      loss += (w[i].flatten() - b.flatten()).norm()
+      w = hyp_conv_weights[self.layer_idx] 
+      b = base_conv_weights[self.layer_idx]
+      loss += (w[i].flatten() - b.flatten()).norm(p=2)
     return loss
   
