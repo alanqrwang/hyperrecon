@@ -301,19 +301,25 @@ def plot_monitor(monitor, model_paths, ax=None):
   return ax
 
 def plot_metrics(metric, model_paths,
-         show_legend=True, xlim=None, ylim=None, lines_to_plot=('train', 'val'), vline=None, ax=None):
+         show_legend=True, xlim=None, ylim=None, lines_to_plot=('train', 'val'), vline=None, ax=None, labels=None):
   ax = ax or plt.gca()
   if not isinstance(model_paths, list):
     model_paths = [model_paths]
   if not isinstance(lines_to_plot, (tuple, list)):
     lines_to_plot = (lines_to_plot)
+  if not isinstance(labels, (tuple, list)):
+    labels = [labels]
+  
+  if labels[0] is None:
+    labels = ['Line %d' % n for n in range(len(model_paths))]
+  assert len(labels) == len(model_paths), 'labels do not match model paths'
 
   if metric in ['psnr', 'ssim', 'dice']:
     ann_min, ann_max = False, True
   elif metric in ['loss', 'hfen']:
     ann_min, ann_max = True, False
 
-  for model_path in model_paths:
+  for i, model_path in enumerate(model_paths):
     train_path = os.path.join(model_path, 'metrics', '{}:train.txt'.format(metric))
     val_paths = glob(os.path.join(
       model_path, 'metrics', '{}:val*.txt'.format(metric)))
@@ -328,7 +334,7 @@ def plot_metrics(metric, model_paths,
     xs = np.arange(1, len(loss)+1)
     color_t = next(ax._get_lines.prop_cycler)['color']
     if 'train' in lines_to_plot:
-      _plot_1d(xs, loss, label=model_path.split('/')[-4], color=color_t, linestyle='-', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
+      _plot_1d(xs, loss, label=labels[i], color=color_t, linestyle='-', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
     if 'val' in lines_to_plot:
       if len(val_losses) == 0:
         continue
