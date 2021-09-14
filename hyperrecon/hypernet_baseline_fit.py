@@ -40,18 +40,21 @@ class HypernetBaselineFit(BaseTrain):
     conv_layers_1 = self.get_all_conv_layers(trained_reconnet_1, [])
     bn_layers_0 = self.get_all_bn_layers(trained_reconnet_0, [])
     bn_layers_1 = self.get_all_bn_layers(trained_reconnet_1, [])
-    self.base_weights_0 = []
-    self.base_weights_1 = []
+
+    self.base_conv_weights_0 = []
+    self.base_conv_weights_1 = []
+    self.base_bn_weights_0 = []
+    self.base_bn_weights_1 = []
     for l0, l1 in zip(conv_layers_0, conv_layers_1):
-      self.base_weights_0.append(l0.weight)
-      self.base_weights_0.append(l0.bias)
-      self.base_weights_1.append(l1.weight)
-      self.base_weights_1.append(l1.bias)
+      self.base_conv_weights_0.append(l0.weight)
+      self.base_conv_weights_0.append(l0.bias)
+      self.base_conv_weights_1.append(l1.weight)
+      self.base_conv_weights_1.append(l1.bias)
     for l0, l1 in zip(bn_layers_0, bn_layers_1):
-      self.base_weights_0.append(l0.weight)
-      self.base_weights_0.append(l0.bias)
-      self.base_weights_1.append(l1.weight)
-      self.base_weights_1.append(l1.bias)
+      self.base_bn_weights_0.append(l0.weight)
+      self.base_bn_weights_0.append(l0.bias)
+      self.base_bn_weights_1.append(l1.weight)
+      self.base_bn_weights_1.append(l1.bias)
 
   def train_epoch_begin(self):
       super().train_epoch_begin()
@@ -113,16 +116,19 @@ class HypernetBaselineFit(BaseTrain):
     # hyp_weights is list of outputs of hyperkernels and hyperbiases, which are of shape
     # (bs, *kernel_shape) and (bs, *bias_shape). Note that bs is the leading dimension
     # because the hyper layers produce a weight for each batch input.
-    hyp_weights = []
+    hyp_conv_weights = []
+    hyp_bn_weights = []
     for l in all_conv_layers:
-      hyp_weights.append(l.get_kernel())
-      hyp_weights.append(l.get_bias())
+      hyp_conv_weights.append(l.get_kernel())
+      hyp_conv_weights.append(l.get_bias())
     for l in all_bn_layers:
-      hyp_weights.append(l.weight)
-      hyp_weights.append(l.bias)
+      hyp_bn_weights.append(l.weight)
+      hyp_bn_weights.append(l.bias)
 
-    assert len(hyp_weights) == len(self.base_weights_0)
-    assert len(hyp_weights) == len(self.base_weights_1)
+    assert len(hyp_conv_weights) == len(self.base_conv_weights_0)
+    assert len(hyp_conv_weights) == len(self.base_conv_weights_1)
+    assert len(hyp_bn_weights) == len(self.base_bn_weights_0)
+    assert len(hyp_bn_weights) == len(self.base_bn_weights_1)
 
     # In contrast, self.base_weights_0 and 1 are lists of tensors of shape
     # (*kernel_shape) and (*bias_shape). So we don't need to index by
@@ -130,11 +136,15 @@ class HypernetBaselineFit(BaseTrain):
     loss = 0
     for i, c in enumerate(coeffs):
       if c[1] == 0: # Compare against 0 model
-        base_weights = self.base_weights_0
+        base_conv_weights = self.base_conv_weights_0
+        base_bn_weights = self.base_bn_weights_0
       else: # Compare against 1 model
-        base_weights = self.base_weights_1
-      for w, b in zip(hyp_weights, base_weights):
+        base_conv_weights = self.base_conv_weights_1
+        base_bn_weights = self.base_bn_weights_1
+      for w, b in zip(hyp_conv_weights, base_conv_weights):
         loss += (w[i].flatten() - b.flatten()).norm()
+      for w, b in zip(hyp_bn_weights, base_bn_weights):
+        loss += (w.flatten() - b.flatten()).norm()
     
     return loss
   

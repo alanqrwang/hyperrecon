@@ -51,7 +51,7 @@ class Parser(argparse.ArgumentParser):
               help='Number of output channels of main network', default=1)
     self.add_argument('--scheduler_step_size', type=int,
               default=128, help='Step size for scheduler')
-    self.add_argument('--scheduler_gamma', type=int,
+    self.add_argument('--scheduler_gamma', type=float,
               default=0.5, help='Multiplicative factor for scheduler')
     self.add_argument('--seed', type=int,
               default=0, help='Seed')
