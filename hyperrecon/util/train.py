@@ -226,7 +226,6 @@ class BaseTrain(object):
         self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
       self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
         self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
-      print(self.monitor)
       self.monitor.update({'time:train': list(np.loadtxt(os.path.join(
         self.monitor_dir, 'time:train.txt')))[:cont_epoch]})
     if load_path is not None:
