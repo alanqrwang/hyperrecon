@@ -113,7 +113,7 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_layer{l}'.format(
+                  'rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}'.format(
                     rate=args.undersampling_rate,
                     lr=args.lr,
                     batch_size=args.batch_size,
@@ -123,7 +123,6 @@ class Parser(argparse.ArgumentParser):
                     range_restrict=args.range_restrict,
                     topK=args.topK,
                     hps=args.hyperparameters,
-                    l=args.hypernet_baseline_fit_layer_idx,
                   ))
     if not os.path.exists(args.run_dir):
       os.makedirs(args.run_dir)

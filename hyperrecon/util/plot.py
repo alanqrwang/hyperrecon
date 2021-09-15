@@ -320,6 +320,7 @@ def plot_metrics(metric, model_paths,
     ann_min, ann_max = True, False
 
   for i, model_path in enumerate(model_paths):
+    print(model_path)
     train_path = os.path.join(model_path, 'metrics', '{}:train.txt'.format(metric))
     val_paths = glob(os.path.join(
       model_path, 'metrics', '{}:val*.txt'.format(metric)))
@@ -340,12 +341,12 @@ def plot_metrics(metric, model_paths,
         continue
       if len(val_losses) == 1:
         _plot_1d(xs, val_losses[0], label=val_paths[0].split(
-          '/')[-1], color=color_t, linestyle='.', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
+          '/')[-1], color=color_t, linestyle='--', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
       else:
         colors = cm.cool(np.linspace(0, 1, len(val_losses)))
         for i, (l, c) in enumerate(zip(val_losses, colors)):
           _plot_1d(xs, l, label=val_paths[i].split(
-            '/')[-1], color=c, linestyle='.', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
+            '/')[-1], color=c, linestyle='--', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
 
   if ylim is not None:
     ax.set_ylim(ylim)
