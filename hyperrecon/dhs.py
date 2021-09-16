@@ -2,17 +2,15 @@ import torch
 
 from hyperrecon.util.train import BaseTrain
 
-class DHS(BaseTrain):
-  """DHS."""
+class DataDriven(BaseTrain):
+  """DataDriven."""
 
   def __init__(self, args):
-    super(DHS, self).__init__(args=args)
+    super(DataDriven, self).__init__(args=args)
 
   def sample_hparams(self, num_samples):
     '''Samples hyperparameters from distribution.'''
-    hyperparams = self.sampler.sample(
-      num_samples, 0, 1)
-    return hyperparams
+    return torch.FloatTensor(num_samples, self.num_hparams).uniform_(0, 1)
 
   def process_loss(self, loss):
     dc_losses = loss_dict['dc']
