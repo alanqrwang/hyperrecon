@@ -53,14 +53,14 @@ def _compute_pixel_range(imgs):
   '''
   return np.ptp(imgs, axis=0)
 
-def viz_pixel_range(paths, slices, hparams, subject, base=False):
+def viz_pixel_range(paths, slices, hparams, subject, cp, base=False):
   '''Visualize pixel-wise range across hyperparameters.'''
   if base:
     assert isinstance(paths, list)
     assert len(paths) == len(hparams), 'Paths and hparams mismatch'
     _, _, preds = _collect_base_subject(paths, subject)
   else:
-    _, _, preds = _collect_hypernet_subject(paths, hparams, subject)
+    _, _, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
 
   for s in slices:
     slices = _extract_slices(preds, s)
@@ -95,12 +95,11 @@ def viz_pairwise_errors(paths, slices, hparams, subject, base=False):
           _plot_img(_overlay_error(slices[i], error), ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
     fig.show()
 
-def viz_all(paths, slices, hparams, subject, base=False):
-  title = 'Base' if base else 'Hypernet'
+def viz_all(paths, slices, hparams, subject, cp, title, base=False):
   if base:
     gt, zf, preds = _collect_base_subject(paths, subject)
   else:
-    gt, zf, preds = _collect_hypernet_subject(paths, hparams, subject)
+    gt, zf, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
   for s in slices:
     gt_slice = gt[s,0]
     zf_slice = zf[s]
@@ -281,7 +280,7 @@ def plot_over_hyperparams_per_subject_2d(model_path, metric_of_interest, flip=Fa
   fig.suptitle(metric_of_interest)
   fig.show()
 
-def plot_monitor(monitor, model_paths, ax=None):
+def plot_monitor(monitor, model_paths, ax=None, ylim=None):
   ax = ax or plt.gca()
   if not isinstance(model_paths, list):
     model_paths = [model_paths]
@@ -295,6 +294,8 @@ def plot_monitor(monitor, model_paths, ax=None):
       raise ValueError('Invalid train path found')
     _plot_1d(np.arange(len(loss)), loss, label=model_path.split('/')[-4], ax=ax)
 
+  if ylim is not None:
+    ax.set_ylim(ylim)
   ax.set_xlabel('Epoch')
   ax.set_title(monitor)
   ax.grid()
@@ -332,6 +333,7 @@ def plot_metrics(metric, model_paths,
     val_losses = [np.loadtxt(val_path)
             for val_path in val_paths if os.path.exists(val_path)]
 
+    print(len(loss))
     xs = np.arange(1, len(loss)+1)
     color_t = next(ax._get_lines.prop_cycler)['color']
     if 'train' in lines_to_plot:
@@ -362,7 +364,7 @@ def plot_metrics(metric, model_paths,
     ax.legend(loc='best')
   return ax
 
-def _collect_hypernet_subject(model_path, hparams, subject):
+def _collect_hypernet_subject(model_path, hparams, subject, cp):
   '''For subject, get reconstructions from hypernet for all hyperparams.
   
   Returns:
@@ -376,7 +378,7 @@ def _collect_hypernet_subject(model_path, hparams, subject):
   zf = np.linalg.norm(np.load(zf_path), axis=1)
   preds = []
   for hparam in hparams:
-    pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
+    pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{}.npy'.format(hparam, subject, cp))
     preds.append(np.load(pred_path))
   return gt, zf, preds
 

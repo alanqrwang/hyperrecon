@@ -68,13 +68,16 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
-      '--method', choices=['uhs', 'dhs', 'baseline', 'uhs_anneal', 'predict', \
+      '--method', choices=['uniform', 'dhs', 'baseline', 'predict', \
                            'constant', 'binary', 'hypernet_baseline_fit', \
-                            'hypernet_baseline_fit_layer', 'binary_constant_batch'], type=str, help='Training method', required=True)
+                           'hypernet_baseline_fit_layer', 'binary_constant_batch', \
+                           'binary_anneal', 'categorical_constant', 'uniform_constant'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_argument('--hyperparameters', type=float, default=None)
     self.add_argument('--hypernet_baseline_fit_layer_idx', type=int, default=None)
+    self.add_argument('--fraction_train_max', type=float, default=None, 
+                        help='Fraction of num_epochs where p-value is maximized')
 
   def add_bool_arg(self, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -90,6 +93,8 @@ class Parser(argparse.ArgumentParser):
       assert args.hyperparameters is not None, 'Baseline and constant must set hyperparameters'
     elif args.method == 'hypernet_baseline_fit_layer':
       assert args.hypernet_baseline_fit_layer_idx is not None
+    elif args.method == 'binary_anneal':
+      assert args.fraction_train_max is not None, 'Max train fraction must be set'
     if args.range_restrict:
       assert len(
         args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
@@ -123,6 +128,7 @@ class Parser(argparse.ArgumentParser):
                     range_restrict=args.range_restrict,
                     topK=args.topK,
                     hps=args.hyperparameters,
+                    T=args.fraction_train_max
                   ))
     if not os.path.exists(args.run_dir):
       os.makedirs(args.run_dir)

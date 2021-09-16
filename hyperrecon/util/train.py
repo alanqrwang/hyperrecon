@@ -31,6 +31,7 @@ class BaseTrain(object):
     self.loss_list = args.loss_list
     self.num_hparams = len(self.loss_list) - 1 if self.range_restrict else len(self.loss_list)
     self.num_coeffs = len(self.loss_list)
+    self.fraction_train_max = args.fraction_train_max
     # ML
     self.num_epochs = args.num_epochs
     self.lr = args.lr
@@ -51,7 +52,6 @@ class BaseTrain(object):
     # I/O
     self.load = args.load
     self.cont = args.cont
-    self.epoch = self.cont + 1
     self.run_dir = args.run_dir
     self.data_path = args.data_path
     self.log_interval = args.log_interval
@@ -59,11 +59,18 @@ class BaseTrain(object):
     self.num_val_subjects = args.num_val_subjects
 
     self.set_eval_hparams()
+    self.set_monitor()
     self.set_metrics()
 
   def set_eval_hparams(self):
     # hparams must be list of tensors, each of shape (num_hyperparams)
     pass
+
+  def set_monitor(self):
+    self.list_of_monitor = [
+      'learning_rate', 
+      'time:train',
+    ]
 
   def set_metrics(self):
     self.list_of_metrics = [
@@ -174,6 +181,7 @@ class BaseTrain(object):
 
   def train(self):
     self.train_begin()
+    self.epoch = self.start_epoch
     if self.num_epochs == 0:
       self.train_epoch_begin()
       self.train_epoch_end(is_val=False, save_metrics=False, save_ckpt=False)
@@ -204,15 +212,18 @@ class BaseTrain(object):
     cont_epoch = None
     if self.load:  # Load from path
       load_path = self.load
+      self.start_epoch = 1
     elif self.cont > 0:  # Load from previous checkpoint
       cont_epoch = self.cont
+      self.start_epoch = self.cont + 1
     else: # Try to load from latest checkpoint
       model_paths = sorted(glob(os.path.join(self.ckpt_dir, '*')))
       if len(model_paths) == 0 and self.num_epochs > 0:
         print('Randomly initialized model')
+        self.start_epoch = 1
       elif len(model_paths) > 0:
-        load_path = model_paths[-1]
-        cont_epoch = int(load_path.split('.')[-2])
+        cont_epoch = int(model_paths[-1].split('.')[-2])
+        self.start_epoch = cont_epoch + 1
       else:
         raise ValueError('No model found for prediction', self.run_dir)
 
@@ -224,16 +235,13 @@ class BaseTrain(object):
         self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_metrics})
       self.val_metrics.update({key: list(np.loadtxt(os.path.join(
         self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
-      self.monitor.update({'learning_rate': list(np.loadtxt(os.path.join(
-        self.monitor_dir, 'learning_rate.txt')))[:cont_epoch]})
-      self.monitor.update({'time:train': list(np.loadtxt(os.path.join(
-        self.monitor_dir, 'time:train.txt')))[:cont_epoch]})
+      self.monitor.update({key: list(np.loadtxt(os.path.join(
+        self.monitor_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_monitor})
     if load_path is not None:
       self.network, self.optimizer, self.scheduler = utils.load_checkpoint(
         self.network, load_path, self.optimizer, self.scheduler)
-
+    
   def train_begin(self):
-    self.start_epoch = self.cont + 1
     # Logging
     self.metrics = {}
     self.metrics.update({key: [] for key in self.list_of_metrics})
@@ -245,10 +253,9 @@ class BaseTrain(object):
     self.test_metrics = {}
     self.test_metrics.update({key: []
                   for key in self.list_of_test_metrics})
-    self.monitor = {
-      'learning_rate': [],
-      'time:train': [],
-    }
+    self.monitor = {}
+    self.monitor.update({key: []
+                  for key in self.list_of_monitor})
 
     # Directories to save information
     self.ckpt_dir = os.path.join(self.run_dir, 'checkpoints')
@@ -266,6 +273,8 @@ class BaseTrain(object):
 
     # Checkpoint Loading
     self.manage_checkpoint()
+    # utils.save_checkpoint(0, self.network, self.optimizer,
+    #               self.ckpt_dir, self.scheduler)
 
   def train_end(self, verbose=False):
     """Called at the end of training.
@@ -310,7 +319,7 @@ class BaseTrain(object):
       utils.save_metrics(self.metric_dir, self.metrics, *self.list_of_metrics)
       utils.save_metrics(self.metric_dir, self.val_metrics,
                 *self.list_of_val_metrics)
-      utils.save_metrics(self.monitor_dir, self.monitor, 'learning_rate', 'time:train')
+      utils.save_metrics(self.monitor_dir, self.monitor, *self.list_of_monitor)
     if save_ckpt:
       utils.save_checkpoint(self.epoch, self.network, self.optimizer,
                   self.ckpt_dir, self.scheduler)
@@ -468,7 +477,7 @@ class BaseTrain(object):
         if save_preds:
           gt_path = os.path.join(self.img_dir, 'gt' + 'sub{}'.format(i) + '.npy')
           zf_path = os.path.join(self.img_dir, 'zf' + 'sub{}'.format(i) + '.npy')
-          pred_path = os.path.join(self.img_dir, 'pred'+hparam_str+'sub{}'.format(i) + '.npy')
+          pred_path = os.path.join(self.img_dir, 'pred'+hparam_str+'sub{}'.format(i)+'cp{}'.format(self.epoch-1) + '.npy')
           np.save(pred_path, pred[i].cpu().detach().numpy())
           if not os.path.exists(gt_path):
             np.save(gt_path, gt[i].cpu().detach().numpy())
