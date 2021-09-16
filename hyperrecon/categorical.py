@@ -7,7 +7,7 @@ class CategoricalConstant(BaseTrain):
 
   def __init__(self, args):
     super(CategoricalConstant, self).__init__(args=args)
-    self.categories = [0, 0.25, 0.5, 0.75, 1]
+    self.categories = [0, 0.5, 1]
 
   def train_epoch_begin(self):
       super().train_epoch_begin()

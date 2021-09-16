@@ -2,7 +2,7 @@
 
 from hyperrecon.uniform import Uniform
 from hyperrecon.uniform import UniformConstant
-from hyperrecon.dhs import DHS
+from hyperrecon.data_driven import DataDriven
 from hyperrecon.baseline import Baseline
 from hyperrecon.categorical import CategoricalConstant
 from hyperrecon.constant import Constant
@@ -27,7 +27,7 @@ def get_trainer(args):
   elif args.method.lower() == 'constant':
     trainer = Constant(args)
   elif args.method.lower() == 'dhs':
-    trainer = DHS(args)
+    trainer = DataDriven(args)
   elif args.method.lower() == 'hypernet_baseline_fit':
     trainer = HypernetBaselineFit(args)
   elif args.method.lower() == 'hypernet_baseline_fit_layer':
