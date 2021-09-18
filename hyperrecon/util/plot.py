@@ -53,8 +53,9 @@ def _compute_pixel_range(imgs):
   '''
   return np.ptp(imgs, axis=0)
 
-def viz_pixel_range(paths, slices, hparams, subject, cp, base=False):
+def viz_pixel_range(paths, slice_idx, hparams, subject, cp, title, base=False, ax=None):
   '''Visualize pixel-wise range across hyperparameters.'''
+  ax = ax or plt.gca()
   if base:
     assert isinstance(paths, list)
     assert len(paths) == len(hparams), 'Paths and hparams mismatch'
@@ -62,14 +63,12 @@ def viz_pixel_range(paths, slices, hparams, subject, cp, base=False):
   else:
     _, _, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
 
-  for s in slices:
-    slices = _extract_slices(preds, s)
-    error = _compute_pixel_range(slices)
+  slices = _extract_slices(preds, slice_idx)
+  error = _compute_pixel_range(slices)
 
-    fig, axes = plt.subplots(1, 1, figsize=(5, 6))
-    _plot_img(_overlay_error(slices[0], error), ax=axes, rot90=True, title=np.round(np.mean(error), 3))
-    fig.suptitle('Pixel-wise range across hparams')
-    fig.show()
+  avg_error = np.mean(error)
+  _plot_img(_overlay_error(slices[0], error), ax=ax, rot90=True, title=title, xlabel='MAE=' + str(np.round(avg_error, 3)))
+  return avg_error
 
 def viz_pairwise_errors(paths, slices, hparams, subject, base=False):
   '''Visualize pairwise errors.'''

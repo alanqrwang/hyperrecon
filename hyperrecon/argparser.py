@@ -76,8 +76,14 @@ class Parser(argparse.ArgumentParser):
     self.add_bool_arg('anneal', default=False)
     self.add_argument('--hyperparameters', type=float, default=None)
     self.add_argument('--hypernet_baseline_fit_layer_idx', type=int, default=None)
-    self.add_argument('--fraction_train_max', type=float, default=None, 
-                        help='Fraction of num_epochs where p-value is maximized')
+    self.add_argument('--epoch_of_p_max', type=float, default=None, 
+                        help='Epoch when p-value is maximized')
+    self.add_argument('--p_min', type=float, default=None, 
+                        help='Minimum p value for Bernoulli annealing')
+    self.add_argument('--p_max', type=float, default=None, 
+                        help='Maximum p value for Bernoulli annealing')
+    self.add_argument('--additive_gauss_std', type=float, default=None, 
+                        help='Std for additive Gaussian noise')
 
   def add_bool_arg(self, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -87,6 +93,8 @@ class Parser(argparse.ArgumentParser):
     self.set_defaults(**{name: default})
 
   def validate_args(self, args):
+    if args.cont is not None and args.load is not None:
+      assert True, 'Cannot set both cont and load path'
     if args.method == 'dhs':
       assert args.topK is not None, 'DHS sampling must set topK'
     elif args.method in ['baseline', 'constant']:
@@ -94,7 +102,7 @@ class Parser(argparse.ArgumentParser):
     elif args.method == 'hypernet_baseline_fit_layer':
       assert args.hypernet_baseline_fit_layer_idx is not None
     elif args.method == 'binary_anneal':
-      assert args.fraction_train_max is not None, 'Max train fraction must be set'
+      assert args.epoch_of_p_max is not None, 'Epoch of p_max must be set'
     if args.range_restrict:
       assert len(
         args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
@@ -118,7 +126,8 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}'.format(
+                  'method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_std{std}_cp25'.format(
+                    method=args.method,
                     rate=args.undersampling_rate,
                     lr=args.lr,
                     batch_size=args.batch_size,
@@ -128,7 +137,7 @@ class Parser(argparse.ArgumentParser):
                     range_restrict=args.range_restrict,
                     topK=args.topK,
                     hps=args.hyperparameters,
-                    T=args.fraction_train_max
+                    std=args.additive_gauss_std
                   ))
     if not os.path.exists(args.run_dir):
       os.makedirs(args.run_dir)

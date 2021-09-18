@@ -31,7 +31,10 @@ class BaseTrain(object):
     self.loss_list = args.loss_list
     self.num_hparams = len(self.loss_list) - 1 if self.range_restrict else len(self.loss_list)
     self.num_coeffs = len(self.loss_list)
-    self.fraction_train_max = args.fraction_train_max
+    self.epoch_of_p_max = args.epoch_of_p_max
+    self.p_min = args.p_min
+    self.p_max = args.p_max
+    self.additive_gauss_std = args.additive_gauss_std
     # ML
     self.num_epochs = args.num_epochs
     self.lr = args.lr
@@ -273,8 +276,6 @@ class BaseTrain(object):
 
     # Checkpoint Loading
     self.manage_checkpoint()
-    # utils.save_checkpoint(0, self.network, self.optimizer,
-    #               self.ckpt_dir, self.scheduler)
 
   def train_end(self, verbose=False):
     """Called at the end of training.
@@ -287,8 +288,8 @@ class BaseTrain(object):
     """
     if verbose:
       summary_dict = {}
-      summary_dict.update({key: self.val_metrics[key][-1]
-                 for key in self.list_of_val_metrics})
+      # summary_dict.update({key: self.val_metrics[key][-1]
+      #            for key in self.list_of_val_metrics})
       summary_dict.update({key: self.test_metrics[key][-1]
                  for key in self.list_of_test_metrics})
       
@@ -364,6 +365,8 @@ class BaseTrain(object):
     under_ksp = utils.generate_measurement(targets, self.mask)
     zf = utils.ifft(under_ksp)
     under_ksp, zf = utils.scale(under_ksp, zf)
+
+    zf = zf + torch.normal(0, self.additive_gauss_std, size=zf.shape).to(self.device)
     return zf, targets, under_ksp, segs
 
   def inference(self, zf, coeffs):

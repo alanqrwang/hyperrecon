@@ -49,9 +49,6 @@ class BinaryAnneal(BaseTrain):
 
   def __init__(self, args):
     super(BinaryAnneal, self).__init__(args=args)
-    self.p_min = 0.01
-    self.p_max = 0.5
-    self.epoch_of_p_max = self.num_epochs * self.fraction_train_max
     self.p = self.p_min
 
   def set_monitor(self):
@@ -90,6 +87,8 @@ class BinaryAnneal(BaseTrain):
       samples = torch.bernoulli(torch.empty(num_samples, self.num_hparams).fill_(self.p))
     else:
       samples = torch.bernoulli(torch.empty(num_samples, self.num_hparams).fill_(1-self.p))
+    print(self.p)
+    print(samples)
     return samples
 
   def set_eval_hparams(self):
