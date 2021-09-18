@@ -41,6 +41,7 @@ def _extract_slices(imgs, slice_num):
   '''
   res = []
   for j in range(len(imgs)):
+    print(imgs[j].shape)
     pred_slice = imgs[j][slice_num,0]
     res.append(pred_slice)
   return np.array(res)
@@ -88,7 +89,7 @@ def viz_pairwise_errors(paths, slices, hparams, subject, base=False):
     for i in range(num_slices):
       for j in range(i, num_slices):
         if i == j:
-          _plot_img(slices[i], ax=axes[i, j], rot90=True)
+          _plot_img(slices[i], ax=axes[i, j], rot90=True, title=hparams[i])
         else:
           error = np.abs(slices[i] - slices[j])
           _plot_img(_overlay_error(slices[i], error), ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))

@@ -2,6 +2,7 @@
 
 from hyperrecon.uniform import Uniform
 from hyperrecon.uniform import UniformConstant
+from hyperrecon.uniform import UniformDiversityPrior
 from hyperrecon.data_driven import DataDriven
 from hyperrecon.baseline import Baseline
 from hyperrecon.categorical import CategoricalConstant
@@ -36,6 +37,8 @@ def get_trainer(args):
     trainer = Uniform(args)
   elif args.method.lower() == 'uniform_constant':
     trainer = UniformConstant(args)
+  elif args.method.lower() == 'uniform_diversity_prior':
+    trainer = UniformDiversityPrior(args)
   else:
     raise NotImplementedError
   return trainer

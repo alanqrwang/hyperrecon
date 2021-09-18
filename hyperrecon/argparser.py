@@ -71,7 +71,8 @@ class Parser(argparse.ArgumentParser):
       '--method', choices=['uniform', 'dhs', 'baseline', 'predict', \
                            'constant', 'binary', 'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', 'binary_constant_batch', \
-                           'binary_anneal', 'categorical_constant', 'uniform_constant'], type=str, help='Training method', required=True)
+                           'binary_anneal', 'categorical_constant', 'uniform_constant', \
+                           'uniform_diversity_prior'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_argument('--hyperparameters', type=float, default=None)
@@ -93,6 +94,7 @@ class Parser(argparse.ArgumentParser):
     self.set_defaults(**{name: default})
 
   def validate_args(self, args):
+    assert args.batch_size > 1 and args.batch_size % 2 == 0
     if args.cont is not None and args.load is not None:
       assert True, 'Cannot set both cont and load path'
     if args.method == 'dhs':
@@ -126,7 +128,7 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_std{std}_cp25'.format(
+                  'method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}'.format(
                     method=args.method,
                     rate=args.undersampling_rate,
                     lr=args.lr,

@@ -366,7 +366,8 @@ class BaseTrain(object):
     zf = utils.ifft(under_ksp)
     under_ksp, zf = utils.scale(under_ksp, zf)
 
-    zf = zf + torch.normal(0, self.additive_gauss_std, size=zf.shape).to(self.device)
+    if self.additive_gauss_std is not None:
+      zf = zf + torch.normal(0, self.additive_gauss_std, size=zf.shape).to(self.device)
     return zf, targets, under_ksp, segs
 
   def inference(self, zf, coeffs):
