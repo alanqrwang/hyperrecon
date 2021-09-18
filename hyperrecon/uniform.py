@@ -70,7 +70,7 @@ class UniformDiversityPrior(BaseTrain):
     psnr = bpsnr(gt, pred)
     return loss.cpu().detach().numpy(), psnr, batch_size
 
-  def compute_loss(self, pred, gt, y, coeffs):
+  def compute_loss(self, pred, gt, y, coeffs, is_training=False):
     '''Compute loss with diversity prior. 
     Batch size should be 2 * self.batch_size
 
@@ -91,11 +91,15 @@ class UniformDiversityPrior(BaseTrain):
       l = self.losses[i]
       recon_loss += c * l(pred[:self.batch_size], gt[:self.batch_size], y[:self.batch_size])
     
-    # TODO: generalize to higher-order coefficients
-    hparams = coeffs[:, 1]
-    lmbda = torch.abs(hparams[:self.batch_size] - hparams[self.batch_size:])
-    diversity_loss = (pred[:self.batch_size] - pred[self.batch_size:]).norm(p=2, dim=(1, 2, 3))
-    return recon_loss - lmbda*diversity_loss
+    if is_training:
+      # TODO: generalize to higher-order coefficients
+      hparams = coeffs[:, 1]
+      lmbda = torch.abs(hparams[:self.batch_size] - hparams[self.batch_size:])
+      pred_vec = pred.view(len(pred), -1)
+      diversity_loss = (pred_vec[:self.batch_size] - pred_vec[self.batch_size:]).norm(p=2, dim=1)
+      return recon_loss - lmbda*diversity_loss
+    else:
+      return recon_loss
 
   def set_eval_hparams(self):
     self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
