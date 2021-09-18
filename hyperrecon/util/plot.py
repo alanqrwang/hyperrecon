@@ -41,7 +41,6 @@ def _extract_slices(imgs, slice_num):
   '''
   res = []
   for j in range(len(imgs)):
-    print(imgs[j].shape)
     pred_slice = imgs[j][slice_num,0]
     res.append(pred_slice)
   return np.array(res)
