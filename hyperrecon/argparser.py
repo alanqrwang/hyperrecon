@@ -85,6 +85,8 @@ class Parser(argparse.ArgumentParser):
                         help='Maximum p value for Bernoulli annealing')
     self.add_argument('--additive_gauss_std', type=float, default=None, 
                         help='Std for additive Gaussian noise')
+    self.add_argument('--beta', type=float, default=10000, 
+                        help='Scaling factor for diversity loss term')
 
   def add_bool_arg(self, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -128,7 +130,7 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}'.format(
+                  'method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}'.format(
                     method=args.method,
                     rate=args.undersampling_rate,
                     lr=args.lr,
@@ -139,7 +141,7 @@ class Parser(argparse.ArgumentParser):
                     range_restrict=args.range_restrict,
                     topK=args.topK,
                     hps=args.hyperparameters,
-                    std=args.additive_gauss_std
+                    beta=args.beta
                   ))
     if not os.path.exists(args.run_dir):
       os.makedirs(args.run_dir)

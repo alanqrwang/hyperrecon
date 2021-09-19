@@ -53,31 +53,11 @@ class UniformDiversityPrior(BaseTrain):
       'diversity_loss',
       'recon_loss'
     ]
+
   def sample_hparams(self, num_samples):
     '''Samples hyperparameters from distribution.'''
     return torch.FloatTensor(num_samples, self.num_hparams).uniform_(0, 1)
   
-  def train_step(self, batch):
-    '''Train for one step.'''
-    zf, gt, y, _ = self.prepare_batch(batch)
-    zf = torch.cat((zf, zf), dim=0)
-    gt = torch.cat((gt, gt), dim=0)
-    y = torch.cat((y, y), dim=0)
-    batch_size = len(zf)
-
-    self.optimizer.zero_grad()
-    with torch.set_grad_enabled(True):
-      hparams = self.sample_hparams(batch_size)
-      coeffs = self.generate_coefficients(hparams)
-      pred = self.inference(zf, coeffs)
-
-      loss, recon_loss, div_loss = self.compute_loss(pred, gt, y, coeffs, is_training=True)
-      loss = self.process_loss(loss)
-      loss.backward()
-      self.optimizer.step()
-    psnr = bpsnr(gt, pred)
-    return loss.cpu().detach().numpy(), psnr, batch_size // 2, recon_loss.mean(), div_loss.mean()
-
   def train_epoch(self):
     """Train for one epoch."""
     self.network.train()
@@ -115,6 +95,28 @@ class UniformDiversityPrior(BaseTrain):
     print("train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
       epoch_loss, epoch_psnr, epoch_time))
 
+  def train_step(self, batch):
+    '''Train for one step.'''
+    zf, gt, y, _ = self.prepare_batch(batch)
+    zf = torch.cat((zf, zf), dim=0)
+    gt = torch.cat((gt, gt), dim=0)
+    y = torch.cat((y, y), dim=0)
+    batch_size = len(zf)
+
+    self.optimizer.zero_grad()
+    with torch.set_grad_enabled(True):
+      hparams = self.sample_hparams(batch_size)
+      coeffs = self.generate_coefficients(hparams)
+      pred = self.inference(zf, coeffs)
+
+      loss, recon_loss, div_loss = self.compute_loss(pred, gt, y, coeffs, is_training=True)
+      loss = self.process_loss(loss)
+      loss.backward()
+      self.optimizer.step()
+    psnr = bpsnr(gt, pred)
+    return loss.cpu().detach().numpy(), psnr, batch_size // 2, \
+      recon_loss.mean().cpu().detach().numpy(), div_loss.mean().cpu().detach().numpy()
+
   def compute_loss(self, pred, gt, y, coeffs, is_training=False):
     '''Compute loss with diversity prior. 
     Batch size should be 2 * self.batch_size
@@ -132,9 +134,13 @@ class UniformDiversityPrior(BaseTrain):
     assert len(self.losses) == coeffs.shape[1], 'loss and coeff mismatch'
     recon_loss = 0
     for i in range(len(self.losses)):
-      c = coeffs[:self.batch_size, i]
       l = self.losses[i]
-      recon_loss += c * l(pred[:self.batch_size], gt[:self.batch_size], y[:self.batch_size])
+      if is_training:
+        c = coeffs[:self.batch_size, i]
+        recon_loss += c * l(pred[:self.batch_size], gt[:self.batch_size], y[:self.batch_size])
+      else:
+        c = coeffs[:, i]
+        recon_loss += c * l(pred, gt, y)
     
     if is_training:
       # TODO: generalize to higher-order coefficients
@@ -142,7 +148,7 @@ class UniformDiversityPrior(BaseTrain):
       lmbda = torch.abs(hparams[:self.batch_size] - hparams[self.batch_size:])
       pred_vec = pred.view(len(pred), -1)
       diversity_loss = 1/(n_ch*n1*n2) * (pred_vec[:self.batch_size] - pred_vec[self.batch_size:]).norm(p=2, dim=1)
-      return recon_loss - lmbda*diversity_loss, recon_loss, diversity_loss
+      return recon_loss - self.beta*lmbda*diversity_loss, recon_loss, diversity_loss
     else:
       return recon_loss
 

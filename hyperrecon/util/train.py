@@ -35,6 +35,7 @@ class BaseTrain(object):
     self.p_min = args.p_min
     self.p_max = args.p_max
     self.additive_gauss_std = args.additive_gauss_std
+    self.beta = args.beta
     # ML
     self.num_epochs = args.num_epochs
     self.lr = args.lr
