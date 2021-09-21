@@ -117,7 +117,7 @@ class UniformDiversityPrior(BaseTrain):
     return loss.cpu().detach().numpy(), psnr, batch_size // 2, \
       recon_loss.mean().cpu().detach().numpy(), div_loss.mean().cpu().detach().numpy()
 
-  def compute_loss(self, pred, gt, y, coeffs, is_training=False):
+  def compute_loss(self, pred, gt, y, segs, coeffs, is_training=False):
     '''Compute loss with diversity prior. 
     Batch size should be 2 * self.batch_size
 
@@ -137,10 +137,10 @@ class UniformDiversityPrior(BaseTrain):
       l = self.losses[i]
       if is_training:
         c = coeffs[:self.batch_size, i]
-        recon_loss += c * l(pred[:self.batch_size], gt[:self.batch_size], y[:self.batch_size])
+        recon_loss += c * l(pred[:self.batch_size], gt[:self.batch_size], y[:self.batch_size], segs[:self.batch_size])
       else:
         c = coeffs[:, i]
-        recon_loss += c * l(pred, gt, y)
+        recon_loss += c * l(pred, gt, y, segs)
     
     if is_training:
       # TODO: generalize to higher-order coefficients

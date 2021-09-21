@@ -70,14 +70,14 @@ def viz_pixel_range(paths, slice_idx, hparams, subject, cp, title, base=False, a
   _plot_img(_overlay_error(slices[0], error), ax=ax, rot90=True, title=title, xlabel='MAE=' + str(np.round(avg_error, 3)))
   return avg_error
 
-def viz_pairwise_errors(paths, slices, hparams, subject, base=False):
+def viz_pairwise_errors(paths, slices, hparams, subject, cp, base=False):
   '''Visualize pairwise errors.'''
   if base:
     assert isinstance(paths, list)
     assert len(paths) == len(hparams), 'Paths and hparams mismatch'
     _, _, preds = _collect_base_subject(paths, subject)
   else:
-    _, _, preds = _collect_hypernet_subject(paths, hparams, subject)
+    _, _, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
   for s in slices:
     slices = _extract_slices(preds, s)
     num_slices = len(slices)
@@ -387,7 +387,7 @@ def _collect_hypernet_subject(model_path, hparams, subject, cp):
     if cp is None:
       pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
     else:
-      pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{}.npy'.format(hparam, subject, cp))
+      pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{:04d}.npy'.format(hparam, subject, cp))
     preds.append(np.load(pred_path))
   return gt, zf, preds
 

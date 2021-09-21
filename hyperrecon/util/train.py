@@ -483,7 +483,7 @@ class BaseTrain(object):
         if save_preds:
           gt_path = os.path.join(self.img_dir, 'gt' + 'sub{}'.format(i) + '.npy')
           zf_path = os.path.join(self.img_dir, 'zf' + 'sub{}'.format(i) + '.npy')
-          pred_path = os.path.join(self.img_dir, 'pred'+hparam_str+'sub{}'.format(i)+'cp{}'.format(self.epoch-1) + '.npy')
+          pred_path = os.path.join(self.img_dir, 'pred'+hparam_str+'sub{}'.format(i)+'cp{:04d}'.format(self.epoch-1) + '.npy')
           np.save(pred_path, pred[i].cpu().detach().numpy())
           if not os.path.exists(gt_path):
             np.save(gt_path, gt[i].cpu().detach().numpy())
