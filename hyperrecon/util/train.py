@@ -326,13 +326,14 @@ class BaseTrain(object):
       utils.save_checkpoint(self.epoch, self.network, self.optimizer,
                   self.ckpt_dir, self.scheduler)
 
-  def compute_loss(self, pred, gt, y, coeffs, is_training=False):
+  def compute_loss(self, pred, gt, y, seg, coeffs, is_training=False):
     '''Compute loss.
 
     Args:
       pred: Predictions (bs, nch, n1, n2)
       gt: Ground truths (bs, nch, n1, n2)
       y: Under-sampled k-space (bs, nch, n1, n2)
+      seg: Segmentation maps of clean images (bs, nch, n1, n2)
       coeffs: Loss coefficients (bs, num_losses)
 
     Returns:
@@ -343,7 +344,7 @@ class BaseTrain(object):
     for i in range(len(self.losses)):
       c = coeffs[:, i]
       l = self.losses[i]
-      loss += c * l(pred, gt, y)
+      loss += c * l(pred, gt, y, seg)
     return loss
 
   def process_loss(self, loss):
@@ -426,7 +427,7 @@ class BaseTrain(object):
 
   def train_step(self, batch):
     '''Train for one step.'''
-    zf, gt, y, _ = self.prepare_batch(batch)
+    zf, gt, y, seg = self.prepare_batch(batch)
     batch_size = len(zf)
 
     self.optimizer.zero_grad()
@@ -435,7 +436,7 @@ class BaseTrain(object):
       coeffs = self.generate_coefficients(hparams)
       pred = self.inference(zf, coeffs)
 
-      loss = self.compute_loss(pred, gt, y, coeffs, is_training=True)
+      loss = self.compute_loss(pred, gt, y, seg, coeffs, is_training=True)
       loss = self.process_loss(loss)
       loss.backward()
       self.optimizer.step()
@@ -462,7 +463,7 @@ class BaseTrain(object):
       zf, gt, y, pred, segs, coeffs = self.get_predictions(hparam)
       for key in self.val_metrics:
         if 'loss' in key and hparam_str in key:
-          loss = self.compute_loss(pred, gt, y, coeffs, is_training=False)
+          loss = self.compute_loss(pred, gt, y, segs, coeffs, is_training=False)
           loss = self.process_loss(loss).item()
           self.val_metrics[key].append(loss)
         elif 'psnr' in key and hparam_str in key:
@@ -490,7 +491,7 @@ class BaseTrain(object):
             np.save(zf_path, zf[i].cpu().detach().numpy())
         for key in self.test_metrics:
           if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            loss = self.compute_loss(pred[i], gt[i], y[i], coeffs[i], is_training=False)
+            loss = self.compute_loss(pred[i], gt[i], y[i], seg[i], coeffs[i], is_training=False)
             loss = self.process_loss(loss).item()
             self.test_metrics[key].append(loss)
           elif 'psnr' in key and hparam_str in key and 'sub{}'.format(i) in key:

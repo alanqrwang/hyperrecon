@@ -65,14 +65,14 @@ class Parser(argparse.ArgumentParser):
               choices=['4', '8', '4p2', '8p2', '8p3', '16p2', '16p3'])
     self.add_argument('--mask_type', type=str, default='poisson',
               choices=['poisson', 'epi_horizontal', 'epi_vertical'])
-    self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft'],
+    self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
       '--method', choices=['uniform', 'dhs', 'baseline', 'predict', \
                            'constant', 'binary', 'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', 'binary_constant_batch', \
                            'binary_anneal', 'categorical_constant', 'uniform_constant', \
-                           'uniform_diversity_prior'], type=str, help='Training method', required=True)
+                           'uniform_diversity_prior', 'last_layer'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_argument('--hyperparameters', type=float, default=None)
