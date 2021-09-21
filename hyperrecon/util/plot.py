@@ -279,24 +279,31 @@ def plot_over_hyperparams_per_subject_2d(model_path, metric_of_interest, flip=Fa
   fig.suptitle(metric_of_interest)
   fig.show()
 
-def plot_monitor(monitor, model_paths, ax=None, ylim=None):
+def plot_monitor(monitor, model_paths, ax=None, ylim=None, labels=None):
   ax = ax or plt.gca()
   if not isinstance(model_paths, list):
     model_paths = [model_paths]
+  if not isinstance(labels, (tuple, list)):
+    labels = [labels]
+  
+  if labels[0] is None:
+    labels = ['Line %d' % n for n in range(len(model_paths))]
 
-  for model_path in model_paths:
+  for i, model_path in enumerate(model_paths):
+    color_t = next(ax._get_lines.prop_cycler)['color']
     train_path = os.path.join(model_path, 'monitor', '{}.txt'.format(monitor))
 
     if os.path.exists(train_path):
       loss = np.loadtxt(train_path) 
     else:
       raise ValueError('Invalid train path found')
-    _plot_1d(np.arange(len(loss)), loss, label=model_path.split('/')[-4], ax=ax)
+    _plot_1d(np.arange(len(loss)), loss, label=labels[i], ax=ax, color=color_t)
 
   if ylim is not None:
     ax.set_ylim(ylim)
   ax.set_xlabel('Epoch')
   ax.set_title(monitor)
+  ax.legend()
   ax.grid()
   return ax
 
@@ -377,7 +384,10 @@ def _collect_hypernet_subject(model_path, hparams, subject, cp):
   zf = np.linalg.norm(np.load(zf_path), axis=1)
   preds = []
   for hparam in hparams:
-    pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{}.npy'.format(hparam, subject, cp))
+    if cp is None:
+      pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
+    else:
+      pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{}.npy'.format(hparam, subject, cp))
     preds.append(np.load(pred_path))
   return gt, zf, preds
 
