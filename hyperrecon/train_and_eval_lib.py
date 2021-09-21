@@ -12,6 +12,7 @@ from hyperrecon.binary import BinaryConstantBatch
 from hyperrecon.binary import BinaryAnneal
 from hyperrecon.hypernet_baseline_fit import HypernetBaselineFit
 from hyperrecon.hypernet_baseline_fit_layer import HypernetBaselineFitLayer
+from hyperrecon.last_layer import LastLayer
 
 def get_trainer(args):
   """Get trainer."""
@@ -33,6 +34,8 @@ def get_trainer(args):
     trainer = HypernetBaselineFit(args)
   elif args.method.lower() == 'hypernet_baseline_fit_layer':
     trainer = HypernetBaselineFitLayer(args)
+  elif args.method.lower() == 'last_layer':
+    trainer = LastLayer(args)
   elif args.method.lower() == 'uniform':
     trainer = Uniform(args)
   elif args.method.lower() == 'uniform_constant':

@@ -29,6 +29,13 @@ class MultiSequential(nn.Sequential):
         x = module(x)
     return x
 
+class Conv2d(nn.Module):
+  def __init__(self, in_channels, out_channels, kernel_size=3, padding=0):
+    super(Conv2d, self).__init__()
+    self.layer = nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding)
+  def forward(self, x, hyp_out=None):
+    return self.layer(x)
+
 class BatchConv2d(nn.Module):
   """
   Conv2D for a batch of images and weights
@@ -38,13 +45,13 @@ class BatchConv2d(nn.Module):
   Takes hypernet output and transforms it to weights and biases
   """
   def __init__(self, in_channels, out_channels, hyp_out_units, stride=1,
-         padding=0, dilation=1, ks=3):
+         padding=0, dilation=1, kernel_size=3):
     super(BatchConv2d, self).__init__()
 
     self.stride = stride
     self.padding = padding
     self.dilation = dilation
-    self.ks = ks
+    self.kernel_size = kernel_size
 
     self.in_channels = in_channels
     self.out_channels = out_channels
@@ -65,7 +72,7 @@ class BatchConv2d(nn.Module):
     # Reshape input and get weights from hyperkernel
     out = x.permute([1, 0, 2, 3, 4]).contiguous().view(b_j, b_i * c, h, w)
     self.kernel = self.hyperkernel(hyp_out)
-    kernel = self.kernel.view(b_i * self.out_channels, self.in_channels, self.ks, self.ks)
+    kernel = self.kernel.view(b_i * self.out_channels, self.in_channels, self.kernel_size, self.kernel_size)
     out = F.conv2d(out, weight=kernel, bias=None, stride=self.stride, dilation=self.dilation, groups=b_i,
              padding=self.padding)
 
@@ -85,7 +92,7 @@ class BatchConv2d(nn.Module):
   def get_bias(self):
     return self.bias
   def get_kernel_shape(self):
-    return [self.out_channels, self.in_channels, self.ks, self.ks]
+    return [self.out_channels, self.in_channels, self.kernel_size, self.kernel_size]
   def get_bias_shape(self):
     return [self.out_channels]
 

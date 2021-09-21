@@ -74,7 +74,7 @@ class Unet(nn.Module):
     self.dconv_up1 = self.double_conv(h_ch+h_ch, h_ch)
     
     if hnet_hdim is not None:
-      self.conv_last = layers.BatchConv2d(h_ch, out_ch, hnet_hdim, ks=1)
+      self.conv_last = layers.BatchConv2d(h_ch, out_ch, hnet_hdim, kernel_size=1)
     else:
       self.conv_last = nn.Conv2d(h_ch, out_ch, 1)
     
