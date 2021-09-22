@@ -23,8 +23,6 @@ class HyperUnet(nn.Module):
     """
     super(HyperUnet, self).__init__()
 
-    self.residual = residual
-
     # HyperNetwork
     self.hnet = HyperNetwork(
                     in_dim=in_units_hnet, 
@@ -35,6 +33,7 @@ class HyperUnet(nn.Module):
                     out_ch=out_ch_main, 
                     h_ch=h_ch_main, 
                     hnet_hdim=h_units_hnet,
+                    residual=residual,
                     use_batchnorm=use_batchnorm
                 )
 

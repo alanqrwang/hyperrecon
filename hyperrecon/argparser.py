@@ -75,6 +75,7 @@ class Parser(argparse.ArgumentParser):
                            'uniform_diversity_prior', 'last_layer'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
+    self.add_bool_arg('unet_residual', default=True)
     self.add_argument('--hyperparameters', type=float, default=None)
     self.add_argument('--hypernet_baseline_fit_layer_idx', type=int, default=None)
     self.add_argument('--epoch_of_p_max', type=float, default=None, 

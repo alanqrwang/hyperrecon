@@ -36,6 +36,7 @@ class BaseTrain(object):
     self.p_max = args.p_max
     self.additive_gauss_std = args.additive_gauss_std
     self.beta = args.beta
+    self.unet_residual = args.unet_residual
     # ML
     self.num_epochs = args.num_epochs
     self.lr = args.lr
@@ -167,6 +168,7 @@ class BaseTrain(object):
       in_ch_main=self.n_ch_in,
       out_ch_main=self.n_ch_out,
       h_ch_main=self.unet_hdim,
+      residual=self.unet_residual,
       use_batchnorm=self.use_batchnorm
     ).to(self.device)
     utils.summary(self.network)
