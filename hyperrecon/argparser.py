@@ -44,6 +44,8 @@ class Parser(argparse.ArgumentParser):
               default=256, help='Num steps per epoch')
     self.add_argument('--num_epochs', type=int, default=1024,
               help='Total training epochs')
+    self.add_argument('--arch', type=str, default='hyperunet',
+              choices=['hyperunet', 'last_layer_hyperunet', 'unet'])
     self.add_argument('--unet_hdim', type=int, default=32)
     self.add_argument('--hnet_hdim', type=int,
               help='Hypernetwork architecture', default=64)
@@ -72,7 +74,7 @@ class Parser(argparse.ArgumentParser):
                            'constant', 'binary', 'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', 'binary_constant_batch', \
                            'binary_anneal', 'categorical_constant', 'uniform_constant', \
-                           'uniform_diversity_prior', 'last_layer'], type=str, help='Training method', required=True)
+                           'uniform_diversity_prior'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_bool_arg('unet_residual', default=True)
@@ -115,6 +117,8 @@ class Parser(argparse.ArgumentParser):
       assert 'p' in args.undersampling_rate, 'Invalid undersampling rate for poisson'
     elif 'epi' in args.mask_type:
       assert 'p' not in args.undersampling_rate, 'Invalid undersampling rate for epi'
+    if args.arch == 'unet':
+      assert args.method == 'baseline', 'Unet architecture must use baseline method'
 
   def parse(self):
     args = self.parse_args()
@@ -131,7 +135,8 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}'.format(
+                  'arch{arch}_method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}'.format(
+                    arch=args.arch,
                     method=args.method,
                     rate=args.undersampling_rate,
                     lr=args.lr,

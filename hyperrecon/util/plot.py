@@ -1,4 +1,6 @@
+import torch
 from matplotlib.pyplot import cm
+from torchvision.utils import make_grid
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 import numpy as np
@@ -12,6 +14,8 @@ from scipy.spatial.distance import squareform, pdist
 matplotlib.rcParams['lines.linewidth'] = 3
 from . import metric
 import json
+from hyperrecon.model.unet import HyperUnet, Unet
+from hyperrecon.model.unet_v2 import LastLayerHyperUnet
 
 SMALL_SIZE = 8
 MEDIUM_SIZE = 14
@@ -94,23 +98,22 @@ def viz_pairwise_errors(paths, slices, hparams, subject, cp, base=False):
           _plot_img(_overlay_error(slices[i], error), ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
     fig.show()
 
-def viz_all(paths, slices, hparams, subject, cp, title, base=False):
+def viz_all(paths, s, hparams, subject, cp, title, base=False):
   if base:
     gt, zf, preds = _collect_base_subject(paths, subject)
   else:
     gt, zf, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
-  for s in slices:
-    gt_slice = gt[s,0]
-    zf_slice = zf[s]
-    pred_slice = _extract_slices(preds, s)
-    zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice))
+  gt_slice = gt[s,0]
+  zf_slice = zf[s]
+  pred_slice = _extract_slices(preds, s)
+  zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice))
 
-    fig, axes = plt.subplots(1, len(hparams)+2, figsize=(17, 7))
-    _plot_img(gt_slice, ax=axes[0], rot90=True, title='GT', ylabel=title)
-    _plot_img(zf_slice, ax=axes[1], rot90=True, title='ZF', xlabel=zf_psnr)
-    for j in range(len(hparams)):
-      pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice[j]))
-      _plot_img(pred_slice[j], ax=axes[j+2], rot90=True, title=hparams[j], xlabel=pred_psnr)
+  fig, axes = plt.subplots(1, len(hparams)+2, figsize=(17, 7))
+  _plot_img(gt_slice, ax=axes[0], rot90=True, title='GT', ylabel=title)
+  _plot_img(zf_slice, ax=axes[1], rot90=True, title='ZF', xlabel=zf_psnr)
+  for j in range(len(hparams)):
+    pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice[j]))
+    _plot_img(pred_slice[j], ax=axes[j+2], rot90=True, title=hparams[j], xlabel=pred_psnr)
   
   fig.tight_layout()
 
@@ -134,7 +137,102 @@ def viz_trajnet_range(traj_path):
     _plot_img(_overlay_error(slices[0], error), ax=axes, rot90=True, title=np.round(np.mean(error), 3))
     plt.show()
 
-def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False, ax=None):
+def get_all_kernels_base(model):
+  kernels = []
+  # kernels.append(model.dconv_down1[0].weight.detach().clone())
+  # kernels.append(model.dconv_down1[3].weight.detach().clone())
+  # kernels.append(model.dconv_down2[0].weight.detach().clone())
+  # kernels.append(model.dconv_down2[3].weight.detach().clone())
+  # kernels.append(model.dconv_down3[0].weight.detach().clone())
+  # kernels.append(model.dconv_down3[3].weight.detach().clone())
+  # kernels.append(model.dconv_down4[0].weight.detach().clone())
+  # kernels.append(model.dconv_down4[3].weight.detach().clone())
+  # kernels.append(model.dconv_up3[0].weight.detach().clone())
+  # kernels.append(model.dconv_up3[3].weight.detach().clone())
+  # kernels.append(model.dconv_up2[0].weight.detach().clone())
+  # kernels.append(model.dconv_up2[3].weight.detach().clone())
+  # kernels.append(model.dconv_up1[0].weight.detach().clone())
+  # kernels.append(model.dconv_up1[3].weight.detach().clone())
+  kernels.append(model.conv_last.weight.detach().clone())
+
+  return kernels
+
+
+def get_all_kernels_hyp(model, hparam):
+  def extract_kernel_hyp(model_layer, hyp_out):
+    batchconvlayer = model_layer.hyperkernel
+    kernels = batchconvlayer(hyp_out)
+    kernels = kernels.reshape(model_layer.get_kernel_shape())    
+    return kernels
+
+  hnet = model.hnet
+  hyp_out = hnet(torch.tensor(hparam).view(-1, 2))
+
+  kernels = []
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_down4[0], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_down4[3], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_down3[0], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_down3[3], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_down2[0], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_down2[3], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_down1[0], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_down1[3], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_up3[0], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_up3[3], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_up2[0], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_up2[3], hyp_out))
+  # kernels.append(extract_kernel_hyp(model.unet.dconv_up1[0], hyp_out))
+  kernels.append(extract_kernel_hyp(model.conv_last, hyp_out))
+
+  return kernels
+
+def viz_kernels(model_path, hparam, hnet_hdim=None, base=False):
+  if base:
+    model = Unet(
+              in_ch=2,
+              out_ch=1,
+              h_ch=32,
+              use_batchnorm=True
+            )
+    model = utils.load_checkpoint(model, model_path, verbose=False)
+    model.eval()
+
+    kernels = get_all_kernels_base(model)
+  else:
+    # model = HyperUnet(
+    model = LastLayerHyperUnet(
+      2,
+      hnet_hdim,
+      in_ch_main=2,
+      out_ch_main=1,
+      h_ch_main=32,
+      residual=True,
+      use_batchnorm=True,
+    )
+    model = utils.load_checkpoint(model, model_path, verbose=False)
+    model.eval()
+    kernels = get_all_kernels_hyp(model, hparam) 
+
+  # for k in kernels:
+    # plt.hist(k.flatten().cpu().detach().numpy())
+    # plt.show()
+
+    # _plot_img(k.view(8, 4).cpu().detach().numpy(), colorbar=True, title=k.sum().item())
+    # plt.show()
+  
+  return kernels[0].view(8, 4)
+
+    # fig, axes = plt.subplots(1, 2, figsize=(16, 4))
+    # img = make_grid(k).permute(1,2,0)
+    # img = torch.cat((img, torch.zeros(img.shape[0], img.shape[1], 1)), dim=-1)
+    # _plot_img(img[..., 0].cpu().detach().numpy(), ax=axes[0], colorbar=True, title='Real')
+    # _plot_img(img[..., 1].cpu().detach().numpy(), ax=axes[1], colorbar=True, title='Imag')
+    # fig.suptitle(img.sum().item())
+    # fig.show()
+    # plt.show()
+  # return img[..., 0], img[..., 1]
+
+def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False, ax=None, ylim=None):
   ax = ax or plt.gca()
   if metric_of_interest in ['psnr', 'ssim', 'dice']:
     ann_min, ann_max = False, True
@@ -159,10 +257,12 @@ def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False
   _plot_1d(base_xs, base_ys, color='orange', label='base', linestyle='.--', annotate_min=ann_min, annotate_max=ann_max, ax=ax)
   ax.set_title(metric_of_interest)
   ax.set_xlabel('alpha')
+  if ylim is not None:
+    ax.set_ylim(ylim)
   ax.legend()
   ax.grid()
 
-def plot_over_hyperparams_per_subject(model_path, base_paths, metric_of_interest, flip=False, ax=None):
+def plot_over_hyperparams_per_subject(model_path, base_paths, metric_of_interest, flip=False, ax=None, ylim=None):
   ax = ax or plt.gca()
   if metric_of_interest in ['psnr', 'ssim', 'dice']:
     ann_min, ann_max = False, True
@@ -192,6 +292,8 @@ def plot_over_hyperparams_per_subject(model_path, base_paths, metric_of_interest
     _plot_1d(base_xs, base_y, label=l, color=c, annotate_min=ann_min, annotate_max=ann_max, linestyle='--', ax=ax)
   ax.set_title(metric_of_interest + ' per subject')
   ax.set_xlabel('alpha')
+  if ylim is not None:
+    ax.set_ylim(ylim)
   ax.legend()
   ax.grid()
 
@@ -327,19 +429,18 @@ def plot_metrics(metric, model_paths,
     ann_min, ann_max = True, False
 
   for i, model_path in enumerate(model_paths):
-    print(model_path)
     train_path = os.path.join(model_path, 'metrics', '{}:train.txt'.format(metric))
     val_paths = glob(os.path.join(
       model_path, 'metrics', '{}:val*.txt'.format(metric)))
 
     if os.path.exists(train_path):
       loss = np.loadtxt(train_path) 
+      print(len(loss))
     else:
       raise ValueError('Invalid train path found')
     val_losses = [np.loadtxt(val_path)
             for val_path in val_paths if os.path.exists(val_path)]
 
-    print(len(loss))
     xs = np.arange(1, len(loss)+1)
     color_t = next(ax._get_lines.prop_cycler)['color']
     if 'train' in lines_to_plot:
@@ -436,13 +537,15 @@ def _parse_summary_json(model_path, metric_of_interest, split='test'):
   return parsed
 
 
-def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, vlim=None):
+def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, vlim=None, colorbar=False):
   ax = ax or plt.gca()
   if rot90:
     img = np.rot90(img, k=1)
 
-  # im = ax.imshow(img, vmin=0, vmax=1, cmap='gray')
-  im = ax.imshow(img, cmap='gray')
+  if vlim is not None:
+    im = ax.imshow(img, vmin=vlim[0], vmax=vlim[1], cmap='gray')
+  else:
+    im = ax.imshow(img, cmap='gray')
   if title is not None:
     ax.set_title(title, fontsize=16)
   ax.set_xticks([])
@@ -451,7 +554,8 @@ def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, v
     ax.set_ylabel(ylabel)
   if xlabel is not None:
     ax.set_xlabel(xlabel)
-  # plt.colorbar(im, ax=ax)
+  if colorbar:
+    plt.colorbar(im, ax=ax)
   return ax, im
 
 

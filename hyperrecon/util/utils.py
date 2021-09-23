@@ -118,8 +118,9 @@ def summary(network):
   print('')
 
 ######### Saving/Loading checkpoints ############
-def load_checkpoint(model, path, optimizer=None, scheduler=None):
-  print('Loading checkpoint from', path)
+def load_checkpoint(model, path, optimizer=None, scheduler=None, verbose=True):
+  if verbose:
+    print('Loading checkpoint from', path)
   checkpoint = torch.load(path, map_location=torch.device('cpu'))
   model.load_state_dict(checkpoint['state_dict'])
   if optimizer is not None and scheduler is not None:

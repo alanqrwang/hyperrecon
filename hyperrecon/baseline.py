@@ -12,20 +12,6 @@ class Baseline(BaseTrain):
   def __init__(self, args):
     super(Baseline, self).__init__(args=args)
 
-  def train_epoch_begin(self):
-    super().train_epoch_begin()
-    print('Baseline')
-
-  def get_model(self):
-    self.network = Unet(
-                      in_ch=self.n_ch_in,
-                      out_ch=self.n_ch_out,
-                      h_ch=self.unet_hdim,
-                      use_batchnorm=self.use_batchnorm
-                   ).to(self.device)
-    utils.summary(self.network)
-    return self.network
-
   def inference(self, zf, coeffs):
     return self.network(zf)
 

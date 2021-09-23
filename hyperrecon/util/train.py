@@ -11,7 +11,8 @@ import random
 from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
-from hyperrecon.model.unet import HyperUnet
+from hyperrecon.model.unet import HyperUnet, Unet
+from hyperrecon.model.unet_v2 import LastLayerHyperUnet
 from hyperrecon.model.layers import ClipByPercentile
 from hyperrecon.data.mask import get_mask
 from hyperrecon.data.brain import ArrDataset, SliceDataset, SliceVolDataset, get_train_data, get_train_gt
@@ -45,6 +46,7 @@ class BaseTrain(object):
     self.num_steps_per_epoch = args.num_steps_per_epoch
     self.arr_dataset = args.arr_dataset
     self.hyperparameters = args.hyperparameters
+    self.arch = args.arch
     self.hnet_hdim = args.hnet_hdim
     self.unet_hdim = args.unet_hdim
     self.n_ch_in = 2
@@ -162,15 +164,33 @@ class BaseTrain(object):
           pin_memory=True)
 
   def get_model(self):
-    self.network = HyperUnet(
-      self.num_coeffs,
-      self.hnet_hdim,
-      in_ch_main=self.n_ch_in,
-      out_ch_main=self.n_ch_out,
-      h_ch_main=self.unet_hdim,
-      residual=self.unet_residual,
-      use_batchnorm=self.use_batchnorm
-    ).to(self.device)
+    if self.arch == 'hyperunet':
+      self.network = HyperUnet(
+                        self.num_coeffs,
+                        self.hnet_hdim,
+                        in_ch_main=self.n_ch_in,
+                        out_ch_main=self.n_ch_out,
+                        h_ch_main=self.unet_hdim,
+                        residual=self.unet_residual,
+                        use_batchnorm=self.use_batchnorm
+                      ).to(self.device)
+    elif self.arch == 'last_layer_hyperunet':
+      self.network = LastLayerHyperUnet(
+                        self.num_coeffs,
+                        self.hnet_hdim,
+                        in_ch_main=self.n_ch_in,
+                        out_ch_main=self.n_ch_out,
+                        h_ch_main=self.unet_hdim,
+                        use_batchnorm=self.use_batchnorm
+                      ).to(self.device)
+    elif self.arch == 'unet':
+      self.network = Unet(
+                      in_ch=self.n_ch_in,
+                      out_ch=self.n_ch_out,
+                      h_ch=self.unet_hdim,
+                      use_batchnorm=self.use_batchnorm
+                   ).to(self.device)
+
     utils.summary(self.network)
     return self.network
 
