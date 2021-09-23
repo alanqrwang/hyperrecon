@@ -139,20 +139,20 @@ def viz_trajnet_range(traj_path):
 
 def get_all_kernels_base(model):
   kernels = []
-  # kernels.append(model.dconv_down1[0].weight.detach().clone())
-  # kernels.append(model.dconv_down1[3].weight.detach().clone())
-  # kernels.append(model.dconv_down2[0].weight.detach().clone())
-  # kernels.append(model.dconv_down2[3].weight.detach().clone())
-  # kernels.append(model.dconv_down3[0].weight.detach().clone())
-  # kernels.append(model.dconv_down3[3].weight.detach().clone())
-  # kernels.append(model.dconv_down4[0].weight.detach().clone())
-  # kernels.append(model.dconv_down4[3].weight.detach().clone())
-  # kernels.append(model.dconv_up3[0].weight.detach().clone())
-  # kernels.append(model.dconv_up3[3].weight.detach().clone())
-  # kernels.append(model.dconv_up2[0].weight.detach().clone())
-  # kernels.append(model.dconv_up2[3].weight.detach().clone())
-  # kernels.append(model.dconv_up1[0].weight.detach().clone())
-  # kernels.append(model.dconv_up1[3].weight.detach().clone())
+  kernels.append(model.dconv_down1[0].weight.detach().clone())
+  kernels.append(model.dconv_down1[3].weight.detach().clone())
+  kernels.append(model.dconv_down2[0].weight.detach().clone())
+  kernels.append(model.dconv_down2[3].weight.detach().clone())
+  kernels.append(model.dconv_down3[0].weight.detach().clone())
+  kernels.append(model.dconv_down3[3].weight.detach().clone())
+  kernels.append(model.dconv_down4[0].weight.detach().clone())
+  kernels.append(model.dconv_down4[3].weight.detach().clone())
+  kernels.append(model.dconv_up3[0].weight.detach().clone())
+  kernels.append(model.dconv_up3[3].weight.detach().clone())
+  kernels.append(model.dconv_up2[0].weight.detach().clone())
+  kernels.append(model.dconv_up2[3].weight.detach().clone())
+  kernels.append(model.dconv_up1[0].weight.detach().clone())
+  kernels.append(model.dconv_up1[3].weight.detach().clone())
   kernels.append(model.conv_last.weight.detach().clone())
 
   return kernels
@@ -160,8 +160,7 @@ def get_all_kernels_base(model):
 
 def get_all_kernels_hyp(model, hparam):
   def extract_kernel_hyp(model_layer, hyp_out):
-    batchconvlayer = model_layer.hyperkernel
-    kernels = batchconvlayer(hyp_out)
+    kernels = model_layer.get_kernel(hyp_out)
     kernels = kernels.reshape(model_layer.get_kernel_shape())    
     return kernels
 
@@ -169,25 +168,25 @@ def get_all_kernels_hyp(model, hparam):
   hyp_out = hnet(torch.tensor(hparam).view(-1, 2))
 
   kernels = []
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_down4[0], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_down4[3], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_down3[0], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_down3[3], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_down2[0], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_down2[3], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_down1[0], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_down1[3], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_up3[0], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_up3[3], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_up2[0], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_up2[3], hyp_out))
-  # kernels.append(extract_kernel_hyp(model.unet.dconv_up1[0], hyp_out))
-  kernels.append(extract_kernel_hyp(model.conv_last, hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_down4[0], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_down4[3], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_down3[0], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_down3[3], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_down2[0], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_down2[3], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_down1[0], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_down1[3], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_up3[0], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_up3[3], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_up2[0], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_up2[3], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.dconv_up1[0], hyp_out))
+  kernels.append(extract_kernel_hyp(model.unet.conv_last, hyp_out))
 
   return kernels
 
-def viz_kernels(model_path, hparam, hnet_hdim=None, base=False):
-  if base:
+def viz_kernels(model_path, hparam, layer_idx, hnet_hdim=None, arch=False):
+  if arch == 'baseline':
     model = Unet(
               in_ch=2,
               out_ch=1,
@@ -198,8 +197,7 @@ def viz_kernels(model_path, hparam, hnet_hdim=None, base=False):
     model.eval()
 
     kernels = get_all_kernels_base(model)
-  else:
-    # model = HyperUnet(
+  elif arch == 'last_layer_hyperunet':
     model = LastLayerHyperUnet(
       2,
       hnet_hdim,
@@ -212,25 +210,21 @@ def viz_kernels(model_path, hparam, hnet_hdim=None, base=False):
     model = utils.load_checkpoint(model, model_path, verbose=False)
     model.eval()
     kernels = get_all_kernels_hyp(model, hparam) 
-
-  # for k in kernels:
-    # plt.hist(k.flatten().cpu().detach().numpy())
-    # plt.show()
-
-    # _plot_img(k.view(8, 4).cpu().detach().numpy(), colorbar=True, title=k.sum().item())
-    # plt.show()
+  else:
+    model = HyperUnet(
+      2,
+      hnet_hdim,
+      in_ch_main=2,
+      out_ch_main=1,
+      h_ch_main=32,
+      residual=True,
+      use_batchnorm=True,
+    )
+    model = utils.load_checkpoint(model, model_path, verbose=False)
+    model.eval()
+    kernels = get_all_kernels_hyp(model, hparam) 
   
-  return kernels[0].view(8, 4)
-
-    # fig, axes = plt.subplots(1, 2, figsize=(16, 4))
-    # img = make_grid(k).permute(1,2,0)
-    # img = torch.cat((img, torch.zeros(img.shape[0], img.shape[1], 1)), dim=-1)
-    # _plot_img(img[..., 0].cpu().detach().numpy(), ax=axes[0], colorbar=True, title='Real')
-    # _plot_img(img[..., 1].cpu().detach().numpy(), ax=axes[1], colorbar=True, title='Imag')
-    # fig.suptitle(img.sum().item())
-    # fig.show()
-    # plt.show()
-  # return img[..., 0], img[..., 1]
+  return kernels[layer_idx]
 
 def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False, ax=None, ylim=None):
   ax = ax or plt.gca()

@@ -74,7 +74,7 @@ class Parser(argparse.ArgumentParser):
                            'constant', 'binary', 'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', 'binary_constant_batch', \
                            'binary_anneal', 'categorical_constant', 'uniform_constant', \
-                           'uniform_diversity_prior'], type=str, help='Training method', required=True)
+                           'uniform_diversity_prior', 'uniform_hypernet_variability_prior'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_bool_arg('unet_residual', default=True)
@@ -135,7 +135,7 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'arch{arch}_method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}'.format(
+                  'arch{arch}_method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}'.format(
                     arch=args.arch,
                     method=args.method,
                     rate=args.undersampling_rate,

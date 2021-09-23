@@ -47,6 +47,9 @@ class HyperUnet(nn.Module):
     out = self.unet(x, hyp_out)
 
     return out
+  
+  def get_hyp_out(self, hyperparams):
+    return self.hnet(hyperparams)
 
 class Unet(nn.Module):
   def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True, use_batchnorm=False):
