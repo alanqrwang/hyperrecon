@@ -74,7 +74,7 @@ class Parser(argparse.ArgumentParser):
                            'constant', 'binary', 'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', 'binary_constant_batch', \
                            'binary_anneal', 'categorical_constant', 'uniform_constant', \
-                           'uniform_diversity_prior', 'uniform_hypernet_variability_prior'], type=str, help='Training method', required=True)
+                           'uniform_diversity_prior'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_bool_arg('unet_residual', default=True)

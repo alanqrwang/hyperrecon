@@ -159,6 +159,6 @@ class DICE():
 
   def __call__(self, pred, gt, y, seg):
     loss = self.segmenter.predict(
-                  recon=pred.cpu().detach().numpy(),
-                  seg_data=seg.cpu().detach().numpy())
+                  recon=pred,
+                  seg_data=seg)
     return loss
