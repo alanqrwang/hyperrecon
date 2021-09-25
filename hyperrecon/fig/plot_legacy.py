@@ -1,6 +1,5 @@
 import torch
 from matplotlib.pyplot import cm
-from torchvision.utils import make_grid
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 import numpy as np
@@ -12,7 +11,7 @@ from hyperrecon.util import utils
 from hyperrecon.data import brain
 from scipy.spatial.distance import squareform, pdist
 matplotlib.rcParams['lines.linewidth'] = 3
-from . import metric
+from hyperrecon.util import metric
 import json
 from hyperrecon.model.unet import HyperUnet, Unet
 from hyperrecon.model.unet_v2 import LastLayerHyperUnet
@@ -79,7 +78,7 @@ def viz_pairwise_errors(paths, slices, hparams, subject, cp, base=False):
   if base:
     assert isinstance(paths, list)
     assert len(paths) == len(hparams), 'Paths and hparams mismatch'
-    _, _, preds = _collect_base_subject(paths, subject)
+    _, _, preds = _collect_base_subject(paths, hparams, subject, cp)
   else:
     _, _, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
   for s in slices:
@@ -100,7 +99,7 @@ def viz_pairwise_errors(paths, slices, hparams, subject, cp, base=False):
 
 def viz_all(paths, s, hparams, subject, cp, title, base=False):
   if base:
-    gt, zf, preds = _collect_base_subject(paths, subject)
+    gt, zf, preds = _collect_base_subject(paths, hparams, subject, cp)
   else:
     gt, zf, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
   gt_slice = gt[s,0]
@@ -486,7 +485,7 @@ def _collect_hypernet_subject(model_path, hparams, subject, cp):
     preds.append(np.load(pred_path))
   return gt, zf, preds
 
-def _collect_base_subject(model_paths, subject):
+def _collect_base_subject(model_paths, hparams, subject, cps):
   '''For subject, get reconstructions from baseline for all hyperparams.
   
   The hparams are specified in the model_paths.
@@ -502,9 +501,8 @@ def _collect_base_subject(model_paths, subject):
   gt = np.load(gt_path)
   zf = np.linalg.norm(np.load(zf_path), axis=1)
   preds = []
-  for model_path in model_paths:
-    hparam = model_path.split('_hp')[-1]
-    pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
+  for hparam, model_path, cp in zip(hparams, model_paths, cps):
+    pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{:04d}.npy'.format(hparam, subject, cp))
     preds.append(np.load(pred_path))
   return gt, zf, preds
 
