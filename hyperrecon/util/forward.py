@@ -44,7 +44,6 @@ class InpaintingForward(BaseForward):
     Args:
       fullysampled: Clean image in image space (N, n_ch, l, w)
     '''
-    print(fullysampled.shape, self.mask.shape)
     masked = fullysampled * self.mask
     masked = torch.cat((masked, torch.zeros_like(masked)), dim=1)
     return masked, fft(masked)

@@ -20,29 +20,31 @@ plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-def plot_over_hyperparams(model_path, base_paths, metric_of_interest, flip=False, ax=None, ylim=None):
+def plot_over_hyperparams(path, metric_of_interest, label, flip=False, ax=None, ylim=None, base=False, color='blue'):
   ax = ax or plt.gca()
   if metric_of_interest in ['psnr', 'ssim', 'dice']:
     ann_min, ann_max = False, True
   elif metric_of_interest in ['loss', 'hfen']:
     ann_min, ann_max = True, False
 
-  hyp_parsed = _parse_summary_json(model_path, metric_of_interest)
+  if base:
+    xs, ys = [], []
+    for base_path in path:
+      base_parsed = _parse_summary_json(base_path, metric_of_interest)
+      xs.append([float(n) for n in base_parsed.keys()][0])
+      ys.append([np.mean(l) for l in base_parsed.values()][0])
+    color='orange'
+    linestyle='.--'
+  else:
+    hyp_parsed = _parse_summary_json(path, metric_of_interest)
+    xs = [float(n) for n in hyp_parsed.keys()]
+    ys = np.array([np.mean(l) for l in hyp_parsed.values()])
+    linestyle='-'
 
-  base_xs, base_ys = [], []
-  for base_path in base_paths:
-    base_parsed = _parse_summary_json(base_path, metric_of_interest)
-    base_xs.append([float(n) for n in base_parsed.keys()][0])
-    base_ys.append([np.mean(l) for l in base_parsed.values()][0])
-
-  xs = [float(n) for n in hyp_parsed.keys()]
-  ys = np.array([np.mean(l) for l in hyp_parsed.values()])
   if flip:
     ys = 1 - ys
-    base_ys = 1 - np.array(base_ys)
 
-  _plot_1d(xs, ys, color='blue', label='hyp', linestyle='-', annotate_min=ann_min, annotate_max=ann_max, ax=ax)
-  _plot_1d(base_xs, base_ys, color='orange', label='base', linestyle='.--', annotate_min=ann_min, annotate_max=ann_max, ax=ax)
+  _plot_1d(xs, ys, color=color, label=label, linestyle=linestyle, annotate_min=ann_min, annotate_max=ann_max, ax=ax)
   ax.set_title(metric_of_interest)
   ax.set_xlabel('alpha')
   if ylim is not None:

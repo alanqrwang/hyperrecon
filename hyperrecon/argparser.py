@@ -104,8 +104,12 @@ class Parser(argparse.ArgumentParser):
       assert True, 'Cannot set both cont and load path'
     if args.method == 'dhs':
       assert args.topK is not None, 'DHS sampling must set topK'
-    elif args.method in ['baseline', 'constant']:
+    elif args.method == 'baseline':
       assert args.hyperparameters is not None, 'Baseline and constant must set hyperparameters'
+      assert args.arch == 'unet'
+    elif args.method == 'constant':
+      assert args.hyperparameters is not None, 'Baseline and constant must set hyperparameters'
+      assert args.arch == 'hyperunet'
     elif args.method == 'hypernet_baseline_fit_layer':
       assert args.hypernet_baseline_fit_layer_idx is not None
     elif args.method == 'binary_anneal':
