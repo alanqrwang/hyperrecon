@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-def get_mask(mask_type, mask_dims, undersampling_rate, as_tensor=True, centered=False):
+def get_mask(mask_type, mask_dims, undersampling_rate, centered=False):
   '''Load mask.
 
   Args:
@@ -18,12 +18,14 @@ def get_mask(mask_type, mask_dims, undersampling_rate, as_tensor=True, centered=
     mask = epi_horizontal(mask_dims, undersampling_rate)
   elif mask_type == 'epi_vertical':
     mask = epi_vertical(mask_dims, undersampling_rate)
+  elif mask_type == 'first_half':
+    mask = first_half(mask_dims)
+  elif mask_type == 'second_half':
+    mask = second_half(mask_dims)
 
   if not centered:
     mask = np.fft.fftshift(mask)
-  if as_tensor:
-    mask = torch.tensor(mask, requires_grad=False).float()
-  return mask
+  return torch.tensor(mask, requires_grad=False).float()
 
 def vds_poisson(mask_dims, undersampling_rate):
   path = '/share/sablab/nfs02/users/aw847/data/masks/poisson_disk_{maskname}_{dim1}_{dim2}.npy'.format(maskname=undersampling_rate, dim1=mask_dims[0], dim2=mask_dims[1])
@@ -63,4 +65,14 @@ def epi_vertical(mask_dims, undersampling_rate, percent_acs=0.2):
   path = '/share/sablab/nfs02/users/aw847/data/masks/EPI_vertical_{rate}_{dim1}_{dim2}.npy'.format(rate=undersampling_rate, dim1=mask_dims[0], dim2=mask_dims[1])
   print('Loading mask:', path)
   mask = np.load(path)
+  return mask
+
+def first_half(mask_dims):
+  mask = np.zeros(mask_dims)
+  mask[mask_dims[0]//2::, :] = 1
+  return mask
+
+def second_half(mask_dims):
+  mask = np.zeros(mask_dims)
+  mask[:mask_dims[0]//2, :] = 1
   return mask

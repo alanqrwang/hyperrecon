@@ -39,18 +39,6 @@ def ifft(x):
   x = x.permute(0, 3, 1, 2)
   return x
 
-def generate_measurement(fullysampled, mask):
-  '''Generate under-sampled k-space data with given binary mask.
-  
-  Args:
-    fullysampled: Clean image in image space (N, n_ch, l, w)
-    mask: Binary mask of where to under-sample (l, w)
-  '''
-  mask_expand = mask.unsqueeze(0)
-  ksp = fft(fullysampled)
-  under_ksp = ksp * mask_expand
-  return under_ksp
-
 def absval(arr):
   """
   Takes absolute value of last dimension, if complex.

@@ -36,8 +36,6 @@ class Parser(argparse.ArgumentParser):
               help='Image dimensions')
     self.add_argument('--lr', type=float, default=1e-3,
               help='Learning rate')
-    self.add_argument('--force_lr', type=float,
-              default=None, help='Learning rate')
     self.add_argument('--batch_size', type=int,
               default=32, help='Batch size')
     self.add_argument('--num_steps_per_epoch', type=int,
@@ -60,13 +58,15 @@ class Parser(argparse.ArgumentParser):
     self.add_bool_arg('use_batchnorm', default=True)
     self.add_argument('--optimizer_type', type=str, default='adam',
               choices=['sgd', 'adam'])
+    self.add_argument('--forward_type', type=str, default='csmri',
+              choices=['csmri', 'inpainting'])
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
     self.add_argument('--undersampling_rate', type=str, default='4p2',
               choices=['4', '8', '4p2', '8p2', '8p3', '16p2', '16p3'])
     self.add_argument('--mask_type', type=str, default='poisson',
-              choices=['poisson', 'epi_horizontal', 'epi_vertical'])
+              choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half'])
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
@@ -119,6 +119,10 @@ class Parser(argparse.ArgumentParser):
       assert 'p' not in args.undersampling_rate, 'Invalid undersampling rate for epi'
     if args.arch == 'unet':
       assert args.method == 'baseline', 'Unet architecture must use baseline method'
+    if args.forward_type == 'csmri':
+      assert args.mask_type in ['poisson', 'epi_vertical', 'epi_horizontal'], 'Invalid mask_type for forward model'
+    elif args.forward_type == 'inpainting':
+      assert args.mask_type in ['first_half', 'second_half'], 'Invalid mask_type for forward model'
 
   def parse(self):
     args = self.parse_args()

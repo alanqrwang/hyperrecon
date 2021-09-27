@@ -1,3 +1,4 @@
+from hyperrecon.util.forward import CSMRIForward
 import torch
 from torchvision import transforms
 import numpy as np
@@ -16,6 +17,7 @@ from hyperrecon.model.unet_v2 import LastLayerHyperUnet
 from hyperrecon.model.layers import ClipByPercentile
 from hyperrecon.data.mask import get_mask
 from hyperrecon.data.brain import ArrDataset, SliceDataset, SliceVolDataset, get_train_data, get_train_gt
+from hyperrecon.util.forward import CSMRIForward, InpaintingForward
 
 
 class BaseTrain(object):
@@ -38,10 +40,10 @@ class BaseTrain(object):
     self.additive_gauss_std = args.additive_gauss_std
     self.beta = args.beta
     self.unet_residual = args.unet_residual
+    self.forward_type = args.forward_type
     # ML
     self.num_epochs = args.num_epochs
     self.lr = args.lr
-    self.force_lr = args.force_lr
     self.batch_size = args.batch_size
     self.num_steps_per_epoch = args.num_steps_per_epoch
     self.arr_dataset = args.arr_dataset
@@ -114,20 +116,20 @@ class BaseTrain(object):
 
   def config(self):
     self.set_random_seed()
-    # Data
-    self.get_dataloader()
-    self.mask = get_mask(self.mask_type,
-      self.image_dims, self.undersampling_rate).to(self.device)
 
-    # Model, Optimizer, Sampler, Loss
+    self.get_dataloader()
+    if self.forward_type == 'csmri':
+      centered = False
+    else:
+      centered = True
+    self.mask = get_mask(self.mask_type,
+      self.image_dims, self.undersampling_rate, centered).to(self.device)
+    self.forward_model = self.get_forward_model()
+
     self.network = self.get_model()
     self.optimizer = self.get_optimizer()
     self.scheduler = self.get_scheduler()
     self.losses = compose_loss_seq(self.loss_list, self.mask, self.device)
-
-    if self.force_lr is not None:
-      for param_group in self.optimizer.param_groups:
-        param_group['lr'] = self.force_lr
 
   def get_dataloader(self):
     if self.arr_dataset:
@@ -204,6 +206,13 @@ class BaseTrain(object):
     return torch.optim.lr_scheduler.StepLR(self.optimizer,
                          step_size=self.scheduler_step_size,
                          gamma=self.scheduler_gamma)
+
+  def get_forward_model(self):
+    if self.forward_type == 'csmri':
+      self.forward_model = CSMRIForward(self.mask)
+    elif self.forward_type == 'inpainting':
+      self.forward_model = InpaintingForward(self.mask)
+    return self.forward_model
 
   def train(self):
     self.train_begin()
@@ -386,13 +395,8 @@ class BaseTrain(object):
       targets = targets.view(-1, 1, *targets.shape[-2:])
       segs = segs.view(-1, 1, *targets.shape[-2:])
 
-    under_ksp = utils.generate_measurement(targets, self.mask)
-    zf = utils.ifft(under_ksp)
-    under_ksp, zf = utils.scale(under_ksp, zf)
-
-    if self.additive_gauss_std is not None:
-      zf = zf + torch.normal(0, self.additive_gauss_std, size=zf.shape).to(self.device)
-    return zf, targets, under_ksp, segs
+    measurement, measurement_ksp = self.forward_model.generate_measurement(targets)
+    return measurement, targets, measurement_ksp, segs
 
   def inference(self, zf, coeffs):
     return self.network(zf, coeffs)

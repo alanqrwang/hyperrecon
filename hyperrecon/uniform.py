@@ -97,10 +97,11 @@ class UniformDiversityPrior(BaseTrain):
 
   def train_step(self, batch):
     '''Train for one step.'''
-    zf, gt, y, _ = self.prepare_batch(batch)
+    zf, gt, y, seg = self.prepare_batch(batch)
     zf = torch.cat((zf, zf), dim=0)
     gt = torch.cat((gt, gt), dim=0)
     y = torch.cat((y, y), dim=0)
+    seg = torch.cat((seg, seg), dim=0)
     batch_size = len(zf)
 
     self.optimizer.zero_grad()
@@ -109,7 +110,7 @@ class UniformDiversityPrior(BaseTrain):
       coeffs = self.generate_coefficients(hparams)
       pred = self.inference(zf, coeffs)
 
-      loss, recon_loss, div_loss = self.compute_loss(pred, gt, y, None, coeffs, is_training=True)
+      loss, recon_loss, div_loss = self.compute_loss(pred, gt, y, seg, coeffs, is_training=True)
       loss = self.process_loss(loss)
       loss.backward()
       self.optimizer.step()
@@ -117,7 +118,7 @@ class UniformDiversityPrior(BaseTrain):
     return loss.cpu().detach().numpy(), psnr, batch_size // 2, \
       recon_loss.mean().cpu().detach().numpy(), div_loss.mean().cpu().detach().numpy()
 
-  def compute_loss(self, pred, gt, y, segs, coeffs, is_training=False):
+  def compute_loss(self, pred, gt, y, seg, coeffs, is_training=False):
     '''Compute loss with diversity prior. 
     Batch size should be 2 * self.batch_size
 
@@ -137,10 +138,10 @@ class UniformDiversityPrior(BaseTrain):
       l = self.losses[i]
       if is_training:
         c = coeffs[:self.batch_size, i]
-        recon_loss += c * l(pred[:self.batch_size], gt[:self.batch_size], y[:self.batch_size], segs[:self.batch_size])
+        recon_loss += c * l(pred[:self.batch_size], gt[:self.batch_size], y[:self.batch_size], seg[:self.batch_size])
       else:
         c = coeffs[:, i]
-        recon_loss += c * l(pred, gt, y, segs)
+        recon_loss += c * l(pred, gt, y, seg)
     
     if is_training:
       # TODO: generalize to higher-order coefficients
