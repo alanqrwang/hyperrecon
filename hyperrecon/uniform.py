@@ -136,15 +136,12 @@ class UniformDiversityPrior(BaseTrain):
     recon_loss = 0
     for i in range(len(self.losses)):
       l = self.losses[i]
-      if is_training:
-        c = coeffs[:self.batch_size, i]
-        recon_loss += c * l(pred[:self.batch_size], gt[:self.batch_size], y[:self.batch_size], seg[:self.batch_size])
-      else:
-        c = coeffs[:, i]
-        recon_loss += c * l(pred, gt, y, seg)
+      c = coeffs[:, i]
+      recon_loss += c * l(pred, gt, y, seg)
     
     if is_training:
       # TODO: generalize to higher-order coefficients
+      recon_loss = recon_loss[:self.batch_size] + recon_loss[self.batch_size:]
       hparams = coeffs[:, 1]
       lmbda = torch.abs(hparams[:self.batch_size] - hparams[self.batch_size:])
       pred_vec = pred.view(len(pred), -1)
