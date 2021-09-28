@@ -171,7 +171,7 @@ def plot_over_hyperparams_per_subject_2d(model_path, metric_of_interest, flip=Fa
   fig.suptitle(metric_of_interest)
   fig.show()
 
-def plot_monitor(monitor, model_paths, ax=None, ylim=None, labels=None):
+def plot_monitor(monitor, model_paths, ax=None, ylim=None, xlim=None, labels=None):
   ax = ax or plt.gca()
   if not isinstance(model_paths, list):
     model_paths = [model_paths]
@@ -193,6 +193,8 @@ def plot_monitor(monitor, model_paths, ax=None, ylim=None, labels=None):
 
   if ylim is not None:
     ax.set_ylim(ylim)
+  if xlim is not None:
+    ax.set_xlim(xlim)
   ax.set_xlabel('Epoch')
   ax.set_title(monitor)
   ax.legend()

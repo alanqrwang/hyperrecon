@@ -22,6 +22,8 @@ def get_mask(mask_type, mask_dims, undersampling_rate, centered=False):
     mask = first_half(mask_dims)
   elif mask_type == 'second_half':
     mask = second_half(mask_dims)
+  elif mask_type == 'center_patch':
+    mask = center_patch(mask_dims)
 
   if not centered:
     mask = np.fft.fftshift(mask)
@@ -75,4 +77,11 @@ def first_half(mask_dims):
 def second_half(mask_dims):
   mask = np.zeros(mask_dims)
   mask[:mask_dims[0]//2, :] = 1
+  return mask
+
+def center_patch(mask_dims):
+  p_dim = (50, 50)
+  mask = np.ones(mask_dims)
+  mask[mask_dims[0]//2 - p_dim[0]//2 : mask_dims[0]//2 + p_dim[0]//2, \
+       mask_dims[1]//2 - p_dim[1]//2 : mask_dims[1]//2 + p_dim[1]//2] = 0
   return mask

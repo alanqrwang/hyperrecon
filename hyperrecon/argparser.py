@@ -66,7 +66,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--undersampling_rate', type=str, default='4p2',
               choices=['4', '8', '4p2', '8p2', '8p3', '16p2', '16p3'])
     self.add_argument('--mask_type', type=str, default='poisson',
-              choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half'])
+              choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch'])
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
@@ -126,7 +126,7 @@ class Parser(argparse.ArgumentParser):
     if args.forward_type == 'csmri':
       assert args.mask_type in ['poisson', 'epi_vertical', 'epi_horizontal'], 'Invalid mask_type for forward model'
     elif args.forward_type == 'inpainting':
-      assert args.mask_type in ['first_half', 'second_half'], 'Invalid mask_type for forward model'
+      assert args.mask_type in ['first_half', 'second_half', 'center_patch'], 'Invalid mask_type for forward model'
 
   def parse(self):
     args = self.parse_args()
