@@ -14,7 +14,7 @@ class BaseMask(nn.Module):
     pass
 
   def forward(self):
-    return torch.tensor(self.mask, requires_grad=False).float()
+    return self.mask
 
 
 class Loupe(BaseMask):
