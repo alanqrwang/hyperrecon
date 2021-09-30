@@ -15,7 +15,7 @@ from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
 from hyperrecon.model.unet import HyperUnet, Unet
 from hyperrecon.model.unet_v2 import LastLayerHyperUnet
 from hyperrecon.model.layers import ClipByPercentile
-from hyperrecon.data.mask import get_mask
+from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch, Loupe
 from hyperrecon.data.brain import ArrDataset, SliceDataset, SliceVolDataset, get_train_data, get_train_gt
 from hyperrecon.util.forward import CSMRIForward, InpaintingForward
 
@@ -118,18 +118,30 @@ class BaseTrain(object):
     self.set_random_seed()
 
     self.get_dataloader()
-    if self.forward_type == 'csmri':
-      centered = False
-    else:
-      centered = True
-    self.mask = get_mask(self.mask_type,
-      self.image_dims, self.undersampling_rate, centered).to(self.device)
+    self.mask_module = self.get_mask()
     self.forward_model = self.get_forward_model()
 
     self.network = self.get_model()
     self.optimizer = self.get_optimizer()
     self.scheduler = self.get_scheduler()
-    self.losses = compose_loss_seq(self.loss_list, self.mask, self.device)
+    self.losses = compose_loss_seq(self.loss_list, self.device)
+
+  def get_mask(self):
+    if self.mask_type == 'poisson':
+      mask = VDSPoisson(self.image_dims, self.undersampling_rate)
+    elif self.mask_type == 'epi_horizontal':
+      mask = EPIHorizontal(self.image_dims, self.undersampling_rate)
+    elif self.mask_type == 'epi_vertical':
+      mask = EPIVertical(self.image_dims, self.undersampling_rate)
+    elif self.mask_type == 'first_half':
+      mask = FirstHalf(self.image_dims)
+    elif self.mask_type == 'second_half':
+      mask = SecondHalf(self.image_dims)
+    elif self.mask_type == 'center_patch':
+      mask = CenterPatch(self.image_dims)
+    elif self.mask_type == 'loupe':
+      mask = Loupe(self.image_dims, self.undersampling_rate)
+    return mask
 
   def get_dataloader(self):
     if self.arr_dataset:
@@ -209,9 +221,9 @@ class BaseTrain(object):
 
   def get_forward_model(self):
     if self.forward_type == 'csmri':
-      self.forward_model = CSMRIForward(self.mask)
+      self.forward_model = CSMRIForward()
     elif self.forward_type == 'inpainting':
-      self.forward_model = InpaintingForward(self.mask)
+      self.forward_model = InpaintingForward()
     return self.forward_model
 
   def train(self):
@@ -389,13 +401,17 @@ class BaseTrain(object):
     '''
     return loss.mean()
 
+  def mask_inference(self):
+    return self.mask_module()
+
   def prepare_batch(self, batch, is_training=True):
     targets, segs = batch[0].float().to(self.device), batch[1].float().to(self.device)
     if not is_training:
       targets = targets.view(-1, 1, *targets.shape[-2:])
       segs = segs.view(-1, 1, *targets.shape[-2:])
 
-    measurement, measurement_ksp = self.forward_model.generate_measurement(targets)
+    undersample_mask = self.mask_inference().to(self.device)
+    measurement, measurement_ksp = self.forward_model.generate_measurement(targets, undersample_mask)
     return measurement, targets, measurement_ksp, segs
 
   def inference(self, zf, coeffs):
@@ -453,15 +469,14 @@ class BaseTrain(object):
 
   def train_step(self, batch):
     '''Train for one step.'''
+    batch_size = len(batch)
+    hparams = self.sample_hparams(batch_size)
+    coeffs = self.generate_coefficients(hparams)
     zf, gt, y, seg = self.prepare_batch(batch)
-    batch_size = len(zf)
 
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
-      hparams = self.sample_hparams(batch_size)
-      coeffs = self.generate_coefficients(hparams)
       pred = self.inference(zf, coeffs)
-
       loss = self.compute_loss(pred, gt, y, seg, coeffs, is_training=True)
       loss = self.process_loss(loss)
       loss.backward()

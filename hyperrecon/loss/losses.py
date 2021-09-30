@@ -16,7 +16,7 @@ REGISTERED_UNSUP_LOSSES = [
                             ]
 
 
-def compose_loss_seq(loss_list, mask, device):
+def compose_loss_seq(loss_list, device):
   """Compose loss list.
 
   Args:
@@ -25,11 +25,11 @@ def compose_loss_seq(loss_list, mask, device):
     device: Cuda device
   """
   return [
-    generate_loss_ops(loss_type, mask, device)
+    generate_loss_ops(loss_type, device)
     for loss_type in loss_list
   ]
 
-def generate_loss_ops(loss_type, mask, device):
+def generate_loss_ops(loss_type, device):
   """Generate Loss Operators."""
   assert loss_type.lower() in REGISTERED_SUP_LOSSES + REGISTERED_UNSUP_LOSSES
 
@@ -37,14 +37,14 @@ def generate_loss_ops(loss_type, mask, device):
     tx_op = loss_ops.Total_Variation()
   elif loss_type.lower() == 'wave':
     tx_op = loss_ops.L1_Wavelets(device)
-  elif loss_type.lower() == 'shear':
-    tx_op = loss_ops.L1_Shearlets(mask.shape)
+  # elif loss_type.lower() == 'shear':
+  #   tx_op = loss_ops.L1_Shearlets(mask.shape)
   elif loss_type.lower() == 'ssim':
     tx_op = loss_ops.SSIM()
   elif loss_type.lower() == 'watson-dft':
     tx_op = loss_ops.Watson_DFT(device)
-  elif loss_type.lower() == 'dc':
-    tx_op = loss_ops.Data_Consistency(mask)
+  # elif loss_type.lower() == 'dc':
+  #   tx_op = loss_ops.Data_Consistency(mask)
   elif loss_type.lower() == 'l1':
     tx_op = loss_ops.L1()
   elif loss_type.lower() == 'mse':
