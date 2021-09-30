@@ -152,4 +152,4 @@ class UniformDiversityPrior(BaseTrain):
 
   def set_eval_hparams(self):
     self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
-    self.test_hparams = torch.tensor([0., 1.]).view(-1, 1)
+    self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)

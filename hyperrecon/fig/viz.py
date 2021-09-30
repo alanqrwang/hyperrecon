@@ -12,7 +12,7 @@ def viz_pixel_range(paths, slice_idx, hparams, subject, cp, title, base=False, a
   if base:
     assert isinstance(paths, list)
     assert len(paths) == len(hparams), 'Paths and hparams mismatch'
-    _, _, preds = _collect_base_subject(paths, subject)
+    _, _, preds = _collect_base_subject(paths, hparams, subject, cp)
   else:
     _, _, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
 
