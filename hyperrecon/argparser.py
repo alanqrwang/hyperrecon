@@ -66,7 +66,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--undersampling_rate', type=str, default='4p2',
               choices=['4', '8', '4p2', '8p2', '8p3', '16p2', '16p3'])
     self.add_argument('--mask_type', type=str, default='poisson',
-              choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch'])
+              choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch', 'loupe'])
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
@@ -74,7 +74,7 @@ class Parser(argparse.ArgumentParser):
                            'constant', 'binary', 'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', 'binary_constant_batch', \
                            'binary_anneal', 'categorical_constant', 'uniform_constant', \
-                           'uniform_diversity_prior'], type=str, help='Training method', required=True)
+                           'uniform_diversity_prior', 'rate_agnostic'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_bool_arg('unet_residual', default=True)
@@ -124,9 +124,11 @@ class Parser(argparse.ArgumentParser):
     if args.arch == 'unet':
       assert args.method == 'baseline', 'Unet architecture must use baseline method'
     if args.forward_type == 'csmri':
-      assert args.mask_type in ['poisson', 'epi_vertical', 'epi_horizontal'], 'Invalid mask_type for forward model'
+      assert args.mask_type in ['poisson', 'epi_vertical', 'epi_horizontal', 'loupe'], 'Invalid mask_type for forward model'
     elif args.forward_type == 'inpainting':
       assert args.mask_type in ['first_half', 'second_half', 'center_patch'], 'Invalid mask_type for forward model'
+    if args.method == 'rate_agnostic':
+      assert args.mask_type == 'loupe'
 
   def parse(self):
     args = self.parse_args()

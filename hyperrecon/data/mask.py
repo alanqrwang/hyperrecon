@@ -13,8 +13,9 @@ class BaseMask(nn.Module):
   def _config(self):
     pass
 
-  def forward(self):
-    return self.mask
+  def forward(self, num_samples):
+    mask_stack = self.mask[None, None].repeat(num_samples, 1, 1, 1)
+    return mask_stack
 
 
 class Loupe(BaseMask):
@@ -30,10 +31,9 @@ class Loupe(BaseMask):
     self.pmask.requires_grad = True
     self.pmask.data.uniform_(self.mask_eps, 1-self.mask_eps)
     self.pmask.data = -torch.log(1. / self.pmask.data - 1.) / self.pmask_slope
-    self.pmask.data = self.pmask.data.to(self.device)
     
   def sample_gumbel(self, shape, eps=1e-20):
-    U = torch.rand(shape).to(self.device)
+    U = torch.rand(shape)
     return -torch.log(-torch.log(U + eps) + eps)
 
   def gumbel_softmax_sample(self, p, temperature):
@@ -54,16 +54,20 @@ class Loupe(BaseMask):
   def squash_mask(self, mask):
     return self.sigmoid(self.pmask_slope*mask)
 
-  def sparsify(self, mask, rate):
-    xbar = mask.mean()
-    r = rate / xbar
+  def sparsify(self, masks, rate):
+    xbar = masks.mean(dim=(1, 2, 3))
+    r = (rate / xbar)
     beta = (1-rate) / (1-xbar)
     le = (r <= 1).float()
-    return le * mask * r + (1-le) * (1 - (1 - mask) * beta)
+    r = r[..., None, None, None]
+    beta = beta[..., None, None, None]
+    le = le[..., None, None, None]
+    return le * masks * r + (1-le) * (1 - (1 - masks) * beta)
 
-  def forward(self, rate):
+  def forward(self, num_samples, rate):
     mask = self.squash_mask(self.pmask)
-    mask = self.sparsify(mask, rate)
+    mask = mask[None, None].repeat(num_samples, 1, 1, 1)
+    mask = self.sparsify(mask, rate.squeeze())
     mask = self.binary_gumbel_softmax(mask, self.temp)
     return mask
 

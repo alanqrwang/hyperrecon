@@ -12,6 +12,7 @@ from hyperrecon.binary import BinaryConstantBatch
 from hyperrecon.binary import BinaryAnneal
 from hyperrecon.hypernet_baseline_fit import HypernetBaselineFit
 from hyperrecon.hypernet_baseline_fit_layer import HypernetBaselineFitLayer
+from hyperrecon.rate_agnostic import RateAgnostic
 
 def get_trainer(args):
   """Get trainer."""
@@ -39,6 +40,8 @@ def get_trainer(args):
     trainer = UniformConstant(args)
   elif args.method.lower() == 'uniform_diversity_prior':
     trainer = UniformDiversityPrior(args)
+  elif args.method.lower() == 'rate_agnostic':
+    trainer = RateAgnostic(args)
   else:
     raise NotImplementedError
   return trainer

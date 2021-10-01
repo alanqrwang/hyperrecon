@@ -1,10 +1,5 @@
 import torch
-import numpy as np
-from tqdm import tqdm
-
 from hyperrecon.util.train import BaseTrain
-from hyperrecon.util import utils
-from hyperrecon.model.unet import Unet
 
 class Baseline(BaseTrain):
   """Baseline."""

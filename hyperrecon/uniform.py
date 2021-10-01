@@ -69,8 +69,8 @@ class UniformDiversityPrior(BaseTrain):
     epoch_recon_loss = 0
 
     start_time = time.time()
-    for i, batch in tqdm(enumerate(self.train_loader), total=self.num_steps_per_epoch):
-      loss, psnr, batch_size, recon_loss, div_loss = self.train_step(batch)
+    for i, (targets, segs) in tqdm(enumerate(self.train_loader), total=self.num_steps_per_epoch):
+      loss, psnr, batch_size, recon_loss, div_loss = self.train_step(targets, segs)
       epoch_loss += loss * batch_size
       epoch_psnr += psnr * batch_size
       epoch_samples += batch_size
@@ -95,26 +95,25 @@ class UniformDiversityPrior(BaseTrain):
     print("train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
       epoch_loss, epoch_psnr, epoch_time))
 
-  def train_step(self, batch):
+  def train_step(self, targets, segs):
     '''Train for one step.'''
-    zf, gt, y, seg = self.prepare_batch(batch)
-    zf = torch.cat((zf, zf), dim=0)
-    gt = torch.cat((gt, gt), dim=0)
-    y = torch.cat((y, y), dim=0)
-    seg = torch.cat((seg, seg), dim=0)
-    batch_size = len(zf)
-
+    targets, segs = targets.float().to(self.device), segs.float().to(self.device)
+    batch_size = len(targets) * 2
+    undersample_mask = self.mask_module(batch_size).to(self.device)
+    targets = torch.cat((targets, targets), dim=0)
+    segs = torch.cat((segs, segs), dim=0)
+    measurements, measurements_ksp = self.forward_model.generate_measurement(targets, undersample_mask)
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
       hparams = self.sample_hparams(batch_size)
       coeffs = self.generate_coefficients(hparams)
-      pred = self.inference(zf, coeffs)
+      pred = self.inference(measurements, coeffs)
 
-      loss, recon_loss, div_loss = self.compute_loss(pred, gt, y, seg, coeffs, is_training=True)
+      loss, recon_loss, div_loss = self.compute_loss(pred, targets, measurements_ksp, segs, coeffs, is_training=True)
       loss = self.process_loss(loss)
       loss.backward()
       self.optimizer.step()
-    psnr = bpsnr(gt, pred)
+    psnr = bpsnr(targets, pred)
     return loss.cpu().detach().numpy(), psnr, batch_size // 2, \
       recon_loss.mean().cpu().detach().numpy(), div_loss.mean().cpu().detach().numpy()
 

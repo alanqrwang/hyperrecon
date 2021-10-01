@@ -25,8 +25,8 @@ class CSMRIForward(BaseForward):
     
     Args:
       fullysampled: Clean image in image space (N, n_ch, l, w)
+      mask: Stack of masks (N, 1, l, w)
     '''
-    mask = mask.unsqueeze(0)
     ksp = fft(fullysampled)
     under_ksp = ksp * mask
     zf = ifft(under_ksp)
@@ -43,6 +43,7 @@ class InpaintingForward(BaseForward):
     
     Args:
       fullysampled: Clean image in image space (N, n_ch, l, w)
+      mask: Stack of masks (N, 1, l, w)
     '''
     mask = mask.unsqueeze(0)
     masked = fullysampled * mask
