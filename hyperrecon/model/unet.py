@@ -10,7 +10,6 @@ from . import layers
 from .hypernetwork import HyperNetwork
 from hyperrecon.data.mask import Loupe
 from hyperrecon.util.forward import CSMRIForward
-import matplotlib.pyplot as plt
 
 class HyperUnet(nn.Module):
   """HyperUnet for hyperparameter-agnostic image reconstruction"""
