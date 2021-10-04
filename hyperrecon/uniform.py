@@ -1,9 +1,13 @@
 import torch
+import torch.nn as nn
 import random
 from hyperrecon.util.train import BaseTrain
 from hyperrecon.util.metric import bpsnr
+from hyperrecon.loss import loss_ops
 import time
 from tqdm import tqdm
+from perceptualloss.loss_provider import LossProvider
+import pytorch_ssim
 
 class Uniform(BaseTrain):
   """Uniform."""
@@ -45,6 +49,12 @@ class UniformDiversityPrior(BaseTrain):
 
   def __init__(self, args):
     super(UniformDiversityPrior, self).__init__(args=args)
+    if self.distance_type == 'l2':
+      self.distance_metric = loss_ops.L2Loss()
+    elif self.distance_type == 'ssim':
+      self.distance_metric = pytorch_ssim.SSIM(size_average=False)
+    elif self.distance_type == 'watson_dft':
+      self.distance_metric = loss_ops.Watson_DFT('cuda:0')
   
   def set_monitor(self):
     self.list_of_monitor = [
@@ -136,15 +146,14 @@ class UniformDiversityPrior(BaseTrain):
     for i in range(len(self.losses)):
       l = self.losses[i]
       c = coeffs[:, i]
-      recon_loss += c * l(pred, gt, y, seg)
+      recon_loss += c * l(pred, gt, y=y, seg=seg)
     
     if is_training:
       # TODO: generalize to higher-order coefficients
       recon_loss = recon_loss[:self.batch_size] + recon_loss[self.batch_size:]
       hparams = coeffs[:, 1]
       lmbda = torch.abs(hparams[:self.batch_size] - hparams[self.batch_size:])
-      pred_vec = pred.view(len(pred), -1)
-      diversity_loss = 1/(n_ch*n1*n2) * (pred_vec[:self.batch_size] - pred_vec[self.batch_size:]).norm(p=2, dim=1)
+      diversity_loss = 1/(n_ch*n1*n2) * self.distance_metric(pred[:self.batch_size], pred[self.batch_size:])
       return recon_loss - self.beta*lmbda*diversity_loss, recon_loss, diversity_loss
     else:
       return recon_loss

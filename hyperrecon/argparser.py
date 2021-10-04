@@ -67,6 +67,8 @@ class Parser(argparse.ArgumentParser):
               choices=['4', '8', '4p2', '8p2', '8p3', '16p2', '16p3'])
     self.add_argument('--mask_type', type=str, default='poisson',
               choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch', 'loupe'])
+    self.add_argument('--distance_type', type=str, default='l2',
+              choices=['l2', 'ssim', 'watson_dft'])
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
