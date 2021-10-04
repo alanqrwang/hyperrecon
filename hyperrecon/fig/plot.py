@@ -33,7 +33,6 @@ def plot_over_hyperparams(path, metric_of_interest, label, flip=False, ax=None, 
       base_parsed = _parse_summary_json(base_path, metric_of_interest)
       xs.append([float(n) for n in base_parsed.keys()][0])
       ys.append([np.mean(l) for l in base_parsed.values()][0])
-    color='orange'
     linestyle='.--'
   else:
     hyp_parsed = _parse_summary_json(path, metric_of_interest)

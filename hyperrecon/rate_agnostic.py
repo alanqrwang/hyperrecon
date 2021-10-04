@@ -23,17 +23,13 @@ class RateAgnostic(BaseTrain):
   def train_step(self, targets, segs):
     '''Train for one step.'''
     batch_size = len(targets)
-    hparams = self.sample_hparams(batch_size)
-    coeffs = self.generate_coefficients(hparams)
+    hparams = self.sample_hparams(batch_size).to(self.device)
 
     targets, segs = targets.float().to(self.device), segs.float().to(self.device)
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
-      undersample_mask = self.mask_module(batch_size, hparams).to(self.device)
-      measurement, measurement_ksp = self.forward_model.generate_measurement(targets, undersample_mask)
-      pred = self.inference(measurement, coeffs)
-      loss = self.compute_loss(pred, targets, measurement_ksp, segs, coeffs, is_training=True)
-      loss = self.process_loss(loss)
+      pred, _, _ = self.inference(targets, hparams)
+      loss = self.compute_loss(pred, targets, None, None, None)
       loss.backward()
       self.optimizer.step()
     psnr = bpsnr(targets, pred)
@@ -47,16 +43,12 @@ class RateAgnostic(BaseTrain):
       hparams: Single hyperparameter vector (1, num_hyperparams)
     '''
     batch_size = len(targets)
+    hparams = hparams.repeat(batch_size, 1).to(self.device)
+
     targets, segs = targets.float().to(self.device), segs.float().to(self.device)
     targets = targets.view(-1, 1, *targets.shape[-2:])
     segs = segs.view(-1, 1, *targets.shape[-2:])
-
-    undersample_mask = self.mask_module(batch_size, hparams).to(self.device)
-    measurement, measurement_ksp = self.forward_model.generate_measurement(targets, undersample_mask)
-    hparams = hparams.repeat(batch_size, 1)
-
     with torch.set_grad_enabled(False):
-      coeffs = self.generate_coefficients(hparams)
-      pred = self.inference(measurement, coeffs)
+      pred, measurement, measurement_ft = self.inference(targets, hparams)
 
-    return measurement, measurement_ksp, targets, pred, segs, coeffs
+    return measurement, measurement_ft, targets, pred, segs, hparams

@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import matplotlib.pyplot as plt
 
 class BaseMask(nn.Module):
   def __init__(self, dims, rate):
@@ -18,58 +19,6 @@ class BaseMask(nn.Module):
     return mask_stack
 
 
-class Loupe(BaseMask):
-  def __init__(self, dims, rate, pmask_slope=5, mask_eps=0.01, temp=0.8):
-    super(Loupe, self).__init__(dims, rate)
-
-    self.pmask_slope = pmask_slope
-    self.temp = temp
-    self.sigmoid = nn.Sigmoid()
-    self.mask_eps = mask_eps
-
-    self.pmask = nn.Parameter(torch.FloatTensor(*self.dims))         
-    self.pmask.requires_grad = True
-    self.pmask.data.uniform_(self.mask_eps, 1-self.mask_eps)
-    self.pmask.data = -torch.log(1. / self.pmask.data - 1.) / self.pmask_slope
-    
-  def sample_gumbel(self, shape, eps=1e-20):
-    U = torch.rand(shape)
-    return -torch.log(-torch.log(U + eps) + eps)
-
-  def gumbel_softmax_sample(self, p, temperature):
-    g1 = self.sample_gumbel(p.size())
-    g2 = self.sample_gumbel(p.size())
-    return 1-self.sigmoid((torch.log(1-p) - torch.log(p) + g1 - g2)/temperature)
-
-  def binary_gumbel_softmax(self, pmask, temperature):
-    """Shape-agnostic binary Gumbel-Softmax sampler
-
-    input: (*) probabilistic mask
-    return: (*) pixel-wise Bernoulli realization
-    """
-    y = self.gumbel_softmax_sample(pmask, temperature)
-    y_hard = y.round()
-    return (y_hard - y).detach() + y
-
-  def squash_mask(self, mask):
-    return self.sigmoid(self.pmask_slope*mask)
-
-  def sparsify(self, masks, rate):
-    xbar = masks.mean(dim=(1, 2, 3))
-    r = (rate / xbar)
-    beta = (1-rate) / (1-xbar)
-    le = (r <= 1).float()
-    r = r[..., None, None, None]
-    beta = beta[..., None, None, None]
-    le = le[..., None, None, None]
-    return le * masks * r + (1-le) * (1 - (1 - masks) * beta)
-
-  def forward(self, num_samples, rate):
-    mask = self.squash_mask(self.pmask)
-    mask = mask[None, None].repeat(num_samples, 1, 1, 1)
-    mask = self.sparsify(mask, rate.squeeze())
-    mask = self.binary_gumbel_softmax(mask, self.temp)
-    return mask
 
 class VDSPoisson(BaseMask):
   def _config(self):
@@ -135,3 +84,56 @@ class CenterPatch(BaseMask):
     mask[self.dims[0]//2 - p_dim[0]//2 : self.dims[0]//2 + p_dim[0]//2, \
         self.dims[1]//2 - p_dim[1]//2 : self.dims[1]//2 + p_dim[1]//2] = 0
     return torch.tensor(mask, requires_grad=False).float()
+    
+class Loupe(nn.Module):
+  def __init__(self, dims, pmask_slope=5, mask_eps=0.01, temp=0.8):
+    super(Loupe, self).__init__()
+
+    self.pmask_slope = pmask_slope
+    self.temp = temp
+    self.sigmoid = nn.Sigmoid()
+
+    self.pmask = nn.Parameter(torch.FloatTensor(*dims))         
+    self.pmask.requires_grad = True
+    self.pmask.data.uniform_(mask_eps, 1-mask_eps)
+    self.pmask.data = -torch.log(1. / self.pmask.data - 1.) / self.pmask_slope
+    self.pmask.data = self.pmask.data.cuda()
+    
+  def sample_gumbel(self, shape, eps=1e-20):
+    U = torch.rand(shape).cuda()
+    return -torch.log(-torch.log(U + eps) + eps)
+
+  def gumbel_softmax_sample(self, p):
+    g1 = self.sample_gumbel(p.size())
+    g2 = self.sample_gumbel(p.size())
+    return 1-self.sigmoid((torch.log(1-p) - torch.log(p) + g1 - g2)/self.temp)
+
+  def binary_gumbel_softmax(self, pmask):
+    """Shape-agnostic binary Gumbel-Softmax sampler
+
+    input: (*) probabilistic mask
+    return: (*) pixel-wise Bernoulli realization
+    """
+    y = self.gumbel_softmax_sample(pmask)
+    y_hard = y.round()
+    return (y_hard - y).detach() + y
+
+  def squash_mask(self, mask):
+    return self.sigmoid(self.pmask_slope*mask)
+
+  def sparsify(self, masks, rate):
+    xbar = masks.mean(dim=(1, 2, 3))
+    r = rate / xbar
+    beta = (1-rate) / (1-xbar)
+    le = (r <= 1).float()
+    r = r[..., None, None, None]
+    beta = beta[..., None, None, None]
+    le = le[..., None, None, None]
+    return le * masks * r + (1-le) * (1 - (1 - masks) * beta)
+
+  def forward(self, num_samples, rate):
+    mask = self.squash_mask(self.pmask)
+    mask = mask[None, None].repeat(num_samples, 1, 1, 1)
+    mask = self.sparsify(mask, rate.squeeze())
+    mask = self.binary_gumbel_softmax(mask)
+    return mask

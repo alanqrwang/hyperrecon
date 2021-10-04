@@ -43,7 +43,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--num_epochs', type=int, default=1024,
               help='Total training epochs')
     self.add_argument('--arch', type=str, default='hyperunet',
-              choices=['hyperunet', 'last_layer_hyperunet', 'unet'])
+              choices=['hyperunet', 'last_layer_hyperunet', 'unet', 'loupe_hyperunet'])
     self.add_argument('--unet_hdim', type=int, default=32)
     self.add_argument('--hnet_hdim', type=int,
               help='Hypernetwork architecture', default=64)

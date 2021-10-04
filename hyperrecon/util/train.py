@@ -12,10 +12,10 @@ import random
 from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
-from hyperrecon.model.unet import HyperUnet, Unet
+from hyperrecon.model.unet import HyperUnet, Unet, LoupeHyperUnet
 from hyperrecon.model.unet_v2 import LastLayerHyperUnet
 from hyperrecon.model.layers import ClipByPercentile
-from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch, Loupe
+from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch
 from hyperrecon.data.brain import ArrDataset, SliceDataset, SliceVolDataset, get_train_data, get_train_gt
 from hyperrecon.util.forward import CSMRIForward, InpaintingForward
 
@@ -140,7 +140,7 @@ class BaseTrain(object):
     elif self.mask_type == 'center_patch':
       mask = CenterPatch(self.image_dims)
     elif self.mask_type == 'loupe':
-      mask = Loupe(self.image_dims, self.undersampling_rate)
+      mask = None
     return mask
 
   def get_dataloader(self):
@@ -195,6 +195,18 @@ class BaseTrain(object):
                         in_ch_main=self.n_ch_in,
                         out_ch_main=self.n_ch_out,
                         h_ch_main=self.unet_hdim,
+                        residual=self.unet_residual,
+                        use_batchnorm=self.use_batchnorm
+                      ).to(self.device)
+    elif self.arch == 'loupe_hyperunet':
+      self.network = LoupeHyperUnet(
+                        1,
+                        self.hnet_hdim,
+                        in_ch_main=self.n_ch_in,
+                        out_ch_main=self.n_ch_out,
+                        h_ch_main=self.unet_hdim,
+                        image_dims=self.image_dims,
+                        residual=self.unet_residual,
                         use_batchnorm=self.use_batchnorm
                       ).to(self.device)
     elif self.arch == 'unet':
@@ -202,6 +214,7 @@ class BaseTrain(object):
                       in_ch=self.n_ch_in,
                       out_ch=self.n_ch_out,
                       h_ch=self.unet_hdim,
+                      residual=self.unet_residual,
                       use_batchnorm=self.use_batchnorm
                    ).to(self.device)
 
@@ -573,13 +586,13 @@ class BaseTrain(object):
       batch: Single batch from dataloader
       hparams: Single hyperparameter vector (1, num_hyperparams)
     '''
+    targets, segs = targets.float().to(self.device), segs.float().to(self.device)
+    targets = targets.view(-1, 1, *targets.shape[-2:])
+    segs = segs.view(-1, 1, *targets.shape[-2:])
     batch_size = len(targets)
     hparams = hparams.repeat(batch_size, 1)
     coeffs = self.generate_coefficients(hparams)
 
-    targets, segs = targets.float().to(self.device), segs.float().to(self.device)
-    targets = targets.view(-1, 1, *targets.shape[-2:])
-    segs = segs.view(-1, 1, *targets.shape[-2:])
     undersample_mask = self.mask_module(batch_size).to(self.device)
     measurement, measurement_ksp = self.forward_model.generate_measurement(targets, undersample_mask)
     with torch.set_grad_enabled(False):
