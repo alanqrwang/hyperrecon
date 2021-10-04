@@ -121,10 +121,10 @@ class Loupe(nn.Module):
   def squash_mask(self, mask):
     return self.sigmoid(self.pmask_slope*mask)
 
-  def sparsify(self, masks, rate):
+  def sparsify(self, masks, rate, eps=1e-20):
     xbar = masks.mean(dim=(1, 2, 3))
-    r = rate / xbar
-    beta = (1-rate) / (1-xbar)
+    r = rate / (xbar+eps)
+    beta = (1-rate) / (1-xbar-eps)
     le = (r <= 1).float()
     r = r[..., None, None, None]
     beta = beta[..., None, None, None]
