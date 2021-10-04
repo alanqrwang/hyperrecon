@@ -1,6 +1,6 @@
 import numpy as np
-import torch
-from skimage.metrics import peak_signal_noise_ratio, structural_similarity
+from skimage.metrics import structural_similarity
+import math
 import scipy.ndimage as nd
 from unetsegmentation import test as segtest
 from perceptualloss.loss_provider import LossProvider
@@ -12,8 +12,12 @@ def psnr(img1, img2):
     img1: (n1, n2)
     img2: (n1, n2)
   '''
-
-  return peak_signal_noise_ratio(img1, img2)
+  mse = np.mean((img1 - img2) ** 2)
+  if mse == 0:  
+    return 100
+  max_pixel = 1.0
+  psnr = 20 * math.log10(max_pixel / math.sqrt(mse))
+  return psnr
 
 def bpsnr(bimg1, bimg2):
   '''Compute average PSNR of a batch of images (possibly complex).
