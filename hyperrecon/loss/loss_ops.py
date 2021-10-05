@@ -2,7 +2,6 @@ import sys
 sys.path.append('/home/aw847/PerceptualSimilarity/src/')
 sys.path.append('/home/aw847/torch-radon/')
 import torch
-from hyperrecon.util import utils
 from pytorch_wavelets import DWTForward
 from torch_radon.shearlet import ShearletTransform
 from perceptualloss.loss_provider import LossProvider
@@ -18,7 +17,7 @@ from unetsegmentation.predict import Segmenter
 #     return dc
 
 class Total_Variation(object):
-  def __call__(self, pred, gt, y, seg):
+  def __call__(self, pred, **kwargs):
     """Total variation loss.
 
     x : torch.Tensor (batch_size, img_height, img_width, 2)
@@ -38,7 +37,7 @@ class L1_Wavelets(object):
   def __init__(self, device):
     self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(device)
 
-  def __call__(self, pred, gt, y, seg):
+  def __call__(self, pred, **kwargs):
 
     def nextPowerOf2(n):
       """Get next power of 2"""
@@ -100,7 +99,7 @@ class SSIM(object):
   def __init__(self):
     self.ssim_loss = pytorch_ssim.SSIM(size_average=False)
 
-  def __call__(self, pred, gt, y, seg):
+  def __call__(self, pred, gt, **kwargs):
     '''
     Mean ssim loss on test set:
     knee, 8p3: 0.31786856
@@ -119,15 +118,15 @@ class Watson_DFT(object):
     self.watson_dft = provider.get_loss_function(
       'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
 
-  def __call__(self, pred, gt, y, seg):
-    loss = self.watson_dft(pred, gt) / 64352.55078125
+  def __call__(self, pred, gt, **kwargs):
+    loss = self.watson_dft(pred, gt) 
     return loss
 
 
 class L1(object):
   def __init__(self):
     self.l1 = torch.nn.L1Loss(reduction='none')
-  def __call__(self, pred, gt, y, seg):
+  def __call__(self, pred, gt, **kwargs):
     '''
     Mean l1 loss on test set:
     knee, 8p3: 0.045254722
@@ -142,8 +141,14 @@ class L1(object):
 class MSE(object):
   def __init__(self):
     self.mse_loss = torch.nn.MSELoss(reduction='none')
-  def __call__(self, pred, gt, y, seg):
+  def __call__(self, pred, gt, **kwargs):
     return torch.mean(self.mse_loss(pred, gt), dim=(1, 2, 3))
+
+class L2Loss(object):
+  def __call__(self, pred, gt, **kwargs):
+    pred_vec = pred.view(len(pred), -1)
+    gt_vec = gt.view(len(gt), -1)
+    return (pred_vec - gt_vec).norm(p=2, dim=1)
 
 class DICE():
   '''Compute Dice score against segmentation labels of clean images.
