@@ -61,14 +61,14 @@ def scale(y, zf):
   zf = zf / max_val_per_batch.view(len(y), 1, 1, 1)
   return y, zf
 
-def rescale(arr):
+def unit_rescale(arr):
   """Rescales a batch of images into range [0, 1]
 
-  arr: (batch_size, l, w, 2)
+  arr: (batch_size, n_ch, l, w)
   """
-  flat_arr = torch.flatten(arr, start_dim=1, end_dim=2)
-  max_per_batch, _ = torch.max(flat_arr, dim=1, keepdim=True) 
-  min_per_batch, _ = torch.min(flat_arr, dim=1, keepdim=True) 
+  flat_arr = torch.flatten(arr, start_dim=2, end_dim=3)
+  max_per_batch, _ = torch.max(flat_arr, dim=2, keepdim=True) 
+  min_per_batch, _ = torch.min(flat_arr, dim=2, keepdim=True) 
 
   # Handling the edge case of image of all 0's
   max_per_batch[max_per_batch==0] = 1 
