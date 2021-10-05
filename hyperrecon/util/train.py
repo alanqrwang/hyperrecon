@@ -41,6 +41,7 @@ class BaseTrain(object):
     self.beta = args.beta
     self.unet_residual = args.unet_residual
     self.forward_type = args.forward_type
+    self.distance_type = args.distance_type
     # ML
     self.num_epochs = args.num_epochs
     self.lr = args.lr
@@ -400,7 +401,7 @@ class BaseTrain(object):
     for i in range(len(self.losses)):
       c = coeffs[:, i]
       l = self.losses[i]
-      loss += c * l(pred, gt, y, seg)
+      loss += c * l(pred, gt, y=y, seg=seg)
     return loss
 
   def process_loss(self, loss):
