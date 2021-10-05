@@ -47,7 +47,6 @@ class HyperUnet(nn.Module):
     """
     hyp_out = self.hnet(hyperparams)
     out = self.unet(x, hyp_out)
-
     return out
   
   def get_hyp_out(self, hyperparams):
@@ -100,7 +99,7 @@ class LoupeHyperUnet(nn.Module):
     return self.hnet(hyperparams)
 
 class Unet(nn.Module):
-  def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True, use_batchnorm=False, include_enc_feat_sum=False):
+  def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True, use_batchnorm=False):
     '''Main Unet architecture.
     
     hnet_hdim activates hypernetwork for Unet.
@@ -110,7 +109,6 @@ class Unet(nn.Module):
     self.residual = residual
     self.hnet_hdim = hnet_hdim
     self.use_batchnorm = use_batchnorm
-    self.include_enc_feat_sum = include_enc_feat_sum
 
     self.dconv_down1 = self.double_conv(in_ch, h_ch)
     self.dconv_down2 = self.double_conv(h_ch, h_ch)
@@ -168,22 +166,24 @@ class Unet(nn.Module):
     
   def forward(self, zf, hyp_out=None):
     x = zf
-    feature_sum = 0
+    feature_mean = 0
 
     conv1 = self.dconv_down1(x, hyp_out)
-    feature_sum = feature_sum + conv1.sum()
+    feature_mean = feature_mean + conv1.mean(dim=(1,2,3))
     x = self.maxpool(conv1)
 
     conv2 = self.dconv_down2(x, hyp_out)
-    feature_sum = feature_sum + conv2.sum()
+    feature_mean = feature_mean + conv2.mean(dim=(1,2,3))
     x = self.maxpool(conv2)
     
     conv3 = self.dconv_down3(x, hyp_out)
-    feature_sum = feature_sum + conv3.sum()
+    feature_mean = feature_mean + conv3.mean(dim=(1,2,3))
     x = self.maxpool(conv3)   
     
     x = self.dconv_down4(x, hyp_out)
-    feature_sum = feature_sum + x.sum()
+    feature_mean = feature_mean + x.mean(dim=(1,2,3))
+
+    self.feature_mean = feature_mean
     
     x = self.upsample(x)        
     x = torch.cat([x, conv3], dim=1)
@@ -206,6 +206,7 @@ class Unet(nn.Module):
       zf = zf.norm(p=2, dim=1, keepdim=True)
       out = zf + out 
     
-    if self.include_enc_feat_sum:
-      return out, feature_sum
     return out
+
+  def get_feature_mean(self):
+    return self.feature_mean

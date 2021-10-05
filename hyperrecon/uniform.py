@@ -55,6 +55,8 @@ class UniformDiversityPrior(BaseTrain):
       self.distance_metric = pytorch_ssim.SSIM(size_average=False)
     elif self.distance_type == 'watson_dft':
       self.distance_metric = loss_ops.Watson_DFT('cuda:0')
+    elif self.distance_type == 'unet_enc_feat':
+      self.distance_metric = loss_ops.UnetEncFeat()
   
   def set_monitor(self):
     self.list_of_monitor = [
@@ -155,10 +157,15 @@ class UniformDiversityPrior(BaseTrain):
       recon_loss = recon_loss[:self.batch_size] + recon_loss[self.batch_size:]
       lmbda = torch.abs(hparams[:self.batch_size] - hparams[self.batch_size:])
 
-      batch1 = utils.unit_rescale(pred[:self.batch_size])
-      batch2 = utils.unit_rescale(pred[self.batch_size:])
-      diversity_loss = 1/(n_ch*n1*n2) * self.distance_metric(batch1, batch2)
-      return recon_loss - self.beta*lmbda*diversity_loss, recon_loss, diversity_loss
+      if isinstance(self.distance_metric, (loss_ops.L2Loss, pytorch_ssim.SSIM, loss_ops.Watson_DFT)):
+        batch1 = utils.unit_rescale(pred[:self.batch_size])
+        batch2 = utils.unit_rescale(pred[self.batch_size:])
+        diversity_loss = 1/(n_ch*n1*n2) * self.distance_metric(batch1, batch2)
+      elif isinstance(self.distance_metric, loss_ops.UnetEncFeat):
+        diversity_loss = self.distance_metric(self.network.unet)
+
+      total_loss = recon_loss - self.beta*lmbda*diversity_loss
+      return total_loss, recon_loss, diversity_loss
     else:
       return recon_loss
 

@@ -165,3 +165,11 @@ class DICE():
                   recon=pred,
                   seg_data=seg)
     return loss
+
+class UnetEncFeat(object):
+  def __call__(self, unet_network):
+    feat_mean = unet_network.get_feature_mean()
+    N = len(feat_mean)
+    batch1 = feat_mean[:N//2]
+    batch2 = feat_mean[N//2:]
+    return (batch1 - batch2).norm(p=2)
