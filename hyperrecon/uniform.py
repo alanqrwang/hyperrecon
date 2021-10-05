@@ -6,8 +6,8 @@ from hyperrecon.util.metric import bpsnr
 from hyperrecon.loss import loss_ops
 import time
 from tqdm import tqdm
-from perceptualloss.loss_provider import LossProvider
 import pytorch_ssim
+from hyperrecon.util import utils
 
 class Uniform(BaseTrain):
   """Uniform."""
@@ -150,14 +150,19 @@ class UniformDiversityPrior(BaseTrain):
     
     if is_training:
       # TODO: generalize to higher-order coefficients
-      recon_loss = recon_loss[:self.batch_size] + recon_loss[self.batch_size:]
       hparams = coeffs[:, 1]
+
+      recon_loss = recon_loss[:self.batch_size] + recon_loss[self.batch_size:]
       lmbda = torch.abs(hparams[:self.batch_size] - hparams[self.batch_size:])
-      diversity_loss = 1/(n_ch*n1*n2) * self.distance_metric(pred[:self.batch_size], pred[self.batch_size:])
+
+      batch1 = utils.unit_rescale(pred[:self.batch_size])
+      batch2 = utils.unit_rescale(pred[self.batch_size:])
+      diversity_loss = 1/(n_ch*n1*n2) * self.distance_metric(batch1, batch2)
       return recon_loss - self.beta*lmbda*diversity_loss, recon_loss, diversity_loss
     else:
       return recon_loss
 
   def set_eval_hparams(self):
     self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
-    self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
+    # self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
+    self.test_hparams = torch.tensor([0., 1.]).view(-1, 1)

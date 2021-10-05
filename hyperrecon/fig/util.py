@@ -147,6 +147,7 @@ def _collect_hypernet_subject(model_path, hparams, subject, cp):
       pred_path = os.path.join(model_path, 'img/pred{}sub{}.npy'.format(hparam, subject))
     else:
       pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{:04d}.npy'.format(hparam, subject, cp))
+    print('loading:', pred_path)
     preds.append(np.load(pred_path))
   return gt, zf, preds
 

@@ -100,7 +100,7 @@ class LoupeHyperUnet(nn.Module):
     return self.hnet(hyperparams)
 
 class Unet(nn.Module):
-  def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True, use_batchnorm=False):
+  def __init__(self, in_ch, out_ch, h_ch, hnet_hdim=None, residual=True, use_batchnorm=False, include_enc_feat_sum=False):
     '''Main Unet architecture.
     
     hnet_hdim activates hypernetwork for Unet.
@@ -110,6 +110,7 @@ class Unet(nn.Module):
     self.residual = residual
     self.hnet_hdim = hnet_hdim
     self.use_batchnorm = use_batchnorm
+    self.include_enc_feat_sum = include_enc_feat_sum
 
     self.dconv_down1 = self.double_conv(in_ch, h_ch)
     self.dconv_down2 = self.double_conv(h_ch, h_ch)
@@ -167,17 +168,22 @@ class Unet(nn.Module):
     
   def forward(self, zf, hyp_out=None):
     x = zf
+    feature_sum = 0
 
     conv1 = self.dconv_down1(x, hyp_out)
+    feature_sum = feature_sum + conv1.sum()
     x = self.maxpool(conv1)
 
     conv2 = self.dconv_down2(x, hyp_out)
+    feature_sum = feature_sum + conv2.sum()
     x = self.maxpool(conv2)
     
     conv3 = self.dconv_down3(x, hyp_out)
+    feature_sum = feature_sum + conv3.sum()
     x = self.maxpool(conv3)   
     
     x = self.dconv_down4(x, hyp_out)
+    feature_sum = feature_sum + x.sum()
     
     x = self.upsample(x)        
     x = torch.cat([x, conv3], dim=1)
@@ -200,4 +206,6 @@ class Unet(nn.Module):
       zf = zf.norm(p=2, dim=1, keepdim=True)
       out = zf + out 
     
+    if self.include_enc_feat_sum:
+      return out, feature_sum
     return out
