@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
+import sys
 
 class BaseMask(nn.Module):
   def __init__(self, dims, rate):
@@ -17,8 +17,6 @@ class BaseMask(nn.Module):
   def forward(self, num_samples):
     mask_stack = self.mask[None, None].repeat(num_samples, 1, 1, 1)
     return mask_stack
-
-
 
 class VDSPoisson(BaseMask):
   def _config(self):
@@ -99,14 +97,14 @@ class Loupe(nn.Module):
     self.pmask.data = -torch.log(1. / self.pmask.data - 1.) / self.pmask_slope
     self.pmask.data = self.pmask.data.cuda()
     
-  def sample_gumbel(self, shape, eps=1e-20):
+  def sample_gumbel(self, shape, eps=sys.float_info.epsilon):
     U = torch.rand(shape).cuda()
     return -torch.log(-torch.log(U + eps) + eps)
 
-  def gumbel_softmax_sample(self, p):
+  def gumbel_softmax_sample(self, p, eps=sys.float_info.epsilon):
     g1 = self.sample_gumbel(p.size())
     g2 = self.sample_gumbel(p.size())
-    return 1-self.sigmoid((torch.log(1-p) - torch.log(p) + g1 - g2)/self.temp)
+    return 1-self.sigmoid((torch.log(1-p+eps) - torch.log(p+eps) + g1 - g2)/self.temp)
 
   def binary_gumbel_softmax(self, pmask):
     """Shape-agnostic binary Gumbel-Softmax sampler
@@ -121,10 +119,10 @@ class Loupe(nn.Module):
   def squash_mask(self, mask):
     return self.sigmoid(self.pmask_slope*mask)
 
-  def sparsify(self, masks, rate, eps=1e-20):
+  def sparsify(self, masks, rate, eps=sys.float_info.epsilon):
     xbar = masks.mean(dim=(1, 2, 3))
     r = rate / (xbar+eps)
-    beta = (1-rate) / (1-xbar-eps)
+    beta = (1-rate) / (1-xbar+eps)
     le = (r <= 1).float()
     r = r[..., None, None, None]
     beta = beta[..., None, None, None]
@@ -132,7 +130,8 @@ class Loupe(nn.Module):
     return le * masks * r + (1-le) * (1 - (1 - masks) * beta)
 
   def forward(self, num_samples, rate):
-    mask = self.squash_mask(self.pmask)
+    mask = self.pmask.clone()
+    mask = self.squash_mask(mask)
     mask = mask[None, None].repeat(num_samples, 1, 1, 1)
     mask = self.sparsify(mask, rate.squeeze())
     mask = self.binary_gumbel_softmax(mask)
