@@ -7,6 +7,8 @@ from torch_radon.shearlet import ShearletTransform
 from perceptualloss.loss_provider import LossProvider
 import pytorch_ssim
 from unetsegmentation.predict import Segmenter
+from hyperrecon.model.layers import GaussianSmoothing
+from torch.nn import functional as F
 
 # class Data_Consistency(object):
 #   def __call__(self, pred, gt, y, seg):
@@ -173,3 +175,16 @@ class UnetEncFeat(object):
     batch1 = feat_mean[:N//2]
     batch2 = feat_mean[N//2:]
     return (batch1 - batch2).norm(p=2)
+
+class LPF_L2():
+  def __init__(self):
+    kernel_size = 5
+    sigma = 10
+    self.smoothing = GaussianSmoothing(1, kernel_size, sigma)
+  
+  def __call__(self, pred, gt, **kwargs):
+    pred = F.pad(pred, (2, 2, 2, 2), mode='reflect')
+    gt = F.pad(gt, (2, 2, 2, 2), mode='reflect')
+    pred_smooth = self.smoothing(pred)
+    gt_smooth = self.smoothing(gt)
+    return (pred_smooth - gt_smooth).norm(p=2)

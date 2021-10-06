@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import random
 from hyperrecon.util.train import BaseTrain
 from hyperrecon.util.metric import bpsnr
@@ -55,6 +54,8 @@ class UniformDiversityPrior(BaseTrain):
       self.distance_metric = pytorch_ssim.SSIM(size_average=False)
     elif self.distance_type == 'watson_dft':
       self.distance_metric = loss_ops.Watson_DFT('cuda:0')
+    elif self.distance_type == 'lpf_l2':
+      self.distance_metric = loss_ops.LPF_L2('cuda:0')
     elif self.distance_type == 'unet_enc_feat':
       self.distance_metric = loss_ops.UnetEncFeat()
   
@@ -157,7 +158,7 @@ class UniformDiversityPrior(BaseTrain):
       recon_loss = recon_loss[:self.batch_size] + recon_loss[self.batch_size:]
       lmbda = torch.abs(hparams[:self.batch_size] - hparams[self.batch_size:])
 
-      if isinstance(self.distance_metric, (loss_ops.L2Loss, pytorch_ssim.SSIM, loss_ops.Watson_DFT)):
+      if isinstance(self.distance_metric, (loss_ops.L2Loss, pytorch_ssim.SSIM, loss_ops.Watson_DFT, loss_ops.LPF_L2)):
         batch1 = utils.unit_rescale(pred[:self.batch_size])
         batch2 = utils.unit_rescale(pred[self.batch_size:])
         diversity_loss = 1/(n_ch*n1*n2) * self.distance_metric(batch1, batch2)
