@@ -1,6 +1,5 @@
 from hyperrecon.util.forward import CSMRIForward
 import torch
-from torchvision import transforms
 import numpy as np
 import os
 import time
@@ -14,10 +13,10 @@ from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
 from hyperrecon.model.unet import HyperUnet, Unet, LoupeHyperUnet
 from hyperrecon.model.unet_v2 import LastLayerHyperUnet
-from hyperrecon.model.layers import ClipByPercentile
 from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch
-from hyperrecon.data.brain import ArrDataset, SliceDataset, SliceVolDataset, get_train_data, get_train_gt
 from hyperrecon.util.forward import CSMRIForward, InpaintingForward
+from hyperrecon.data.knee import KneeArr
+from hyperrecon.data.brain import Abide, BrainArr
 
 
 class BaseTrain(object):
@@ -43,11 +42,11 @@ class BaseTrain(object):
     self.forward_type = args.forward_type
     self.distance_type = args.distance_type
     # ML
+    self.dataset = args.dataset
     self.num_epochs = args.num_epochs
     self.lr = args.lr
     self.batch_size = args.batch_size
     self.num_steps_per_epoch = args.num_steps_per_epoch
-    self.arr_dataset = args.arr_dataset
     self.hyperparameters = args.hyperparameters
     self.arch = args.arch
     self.hnet_hdim = args.hnet_hdim
@@ -145,38 +144,13 @@ class BaseTrain(object):
     return mask
 
   def get_dataloader(self):
-    if self.arr_dataset:
-      xdata = get_train_data(maskname=self.undersampling_rate)
-      gt_data = get_train_gt()
-      trainset = ArrDataset(
-        xdata[:int(len(xdata)*0.8)], gt_data[:int(len(gt_data)*0.8)])
-      valset = ArrDataset(
-        xdata[int(len(xdata)*0.8):], gt_data[int(len(gt_data)*0.8):])
-    else:
-      transform = transforms.Compose([ClipByPercentile()])
-      trainset = SliceDataset(
-        self.data_path, 'train', total_subjects=self.num_train_subjects, transform=transform)
-      valset = SliceDataset(
-        self.data_path, 'validate', total_subjects=self.num_val_subjects, transform=transform)
-      testset = SliceVolDataset(
-        self.data_path, 'validate', total_subjects=self.num_val_subjects, transform=transform,
-        subsample=False)
-
-    self.train_loader = torch.utils.data.DataLoader(trainset, 
-          batch_size=self.batch_size,
-          shuffle=True,
-          num_workers=0,
-          pin_memory=True)
-    self.val_loader = torch.utils.data.DataLoader(valset,
-          batch_size=self.batch_size*2,
-          shuffle=False,
-          num_workers=0,
-          pin_memory=True)
-    self.test_loader = torch.utils.data.DataLoader(testset,
-          batch_size=1,
-          shuffle=False,
-          num_workers=0,
-          pin_memory=True)
+    if self.dataset == 'brain_arr':
+      dataset = BrainArr(self.batch_size)
+    elif self.dataset == 'abide':
+      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects)
+    elif self.dataset == 'knee_arr':
+      dataset = KneeArr(self.batch_size)
+    self.train_loader, self.val_loader, self.test_loader = dataset.load()
 
   def get_model(self):
     if self.arch == 'hyperunet':

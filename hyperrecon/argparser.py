@@ -25,7 +25,7 @@ class Parser(argparse.ArgumentParser):
               help='gpu id to train on')
     self.add_argument('--date', type=str, default=None,
               help='Override date')
-    self.add_bool_arg('arr_dataset', default=False)
+    self.add_argument('--dataset', type=str, default='abide', choices=['brain_arr', 'abide', 'knee_arr'])
     self.add_argument('--num_train_subjects', type=int, default=50,
               help='Number of subjects to train on')
     self.add_argument('--num_val_subjects', type=int, default=5,
@@ -147,7 +147,8 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'arch{arch}_method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}'.format(
+                  'dataset{dataset}_arch{arch}_method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}'.format(
+                    dataset=args.dataset,
                     arch=args.arch,
                     method=args.method,
                     rate=args.undersampling_rate,

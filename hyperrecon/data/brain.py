@@ -10,6 +10,61 @@ import torchio as tio
 import numpy as np
 import os
 from glob import glob
+from torchvision import transforms
+from hyperrecon.model.layers import ClipByPercentile
+from .data_util import ArrDataset
+
+class BrainBase():
+  def __init__(self, batch_size):
+    self.batch_size = batch_size
+
+  def load(self):
+    train_loader = torch.utils.data.DataLoader(self.trainset, 
+          batch_size=self.batch_size,
+          shuffle=True,
+          num_workers=0,
+          pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(self.valset,
+          batch_size=self.batch_size*2,
+          shuffle=False,
+          num_workers=0,
+          pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(self.testset,
+          batch_size=1,
+          shuffle=False,
+          num_workers=0,
+          pin_memory=True)
+    return train_loader, val_loader, test_loader
+
+class BrainArr(BrainBase):
+  def __init__(self, batch_size, split_ratio=0.8):
+    super(BrainArr, self).__init__(batch_size)
+    self.split_ratio = split_ratio
+    train_gt = get_train_gt()
+    test_gt = get_test_gt()
+    self.trainset = ArrDataset(
+      train_gt[:int(len(train_gt)*self.split_ratio)], None)
+    self.valset = ArrDataset(
+      train_gt[int(len(train_gt)*self.split_ratio):], None)
+    self.testset = ArrDataset(
+      test_gt, None)
+
+class Abide(BrainBase):
+  def __init__(self, 
+               batch_size, 
+               num_train_subjects=50,
+               num_val_subjects=5):
+    super(Abide, self).__init__(batch_size)
+    self.data_path = '/share/sablab/nfs02/users/aw847/data/brain/abide/'
+
+    transform = transforms.Compose([ClipByPercentile()])
+    self.trainset = SliceDataset(
+      self.data_path, 'train', total_subjects=num_train_subjects, transform=transform)
+    self.valset = SliceDataset(
+      self.data_path, 'validate', total_subjects=num_val_subjects, transform=transform)
+    self.testset = SliceVolDataset(
+      self.data_path, 'validate', total_subjects=num_val_subjects, transform=transform,
+      subsample=False)
 
 class SliceDataset(data.Dataset):
   def __init__(self, data_path, split, total_subjects=None, transform=None):
@@ -167,71 +222,38 @@ class VolumeDataset(data.Dataset):
     return tio.SubjectsDataset(self.subjects, transform=self.transform)
 
 
-class ArrDataset(data.Dataset):
-  def __init__(self, data, labels):
-    self.data = data
-    self.labels = labels
-
-  def __len__(self):
-    return len(self.data)
-
-  def __getitem__(self, index):
-    # Load data and get label
-    x = self.data[index]
-    y = self.labels[index]
-    return x, y
-
-def get_data(data_path):
-  print('Loading from', data_path)
-  xdata = np.load(data_path)
-  assert len(xdata.shape) == 4
-  print('Shape:', xdata.shape)
-  return xdata
-
-def get_train_gt(img_dims='160_224', organ='brain'):
-  if organ == 'brain':
-    # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
-    gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/train_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
-    
-  else:
-    gt_path = '/share/sablab/nfs02/users/aw847/data/knee/knee_train_normalized.npy'
-  gt = get_data(gt_path)
+def get_train_gt(img_dims='160_224'):
+  # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
+  gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/train_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
+  gt = np.load(gt_path)
   return gt
 
-def get_train_data(maskname, img_dims='160_224', organ='brain', size='med'):
-  if organ == 'brain':
-    # data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_{maskname}.npy'.format(maskname=maskname)
-    data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/train_mri_normalized_{img_dims}_{maskname}.npy'.format(img_dims=img_dims, maskname=maskname)
-  elif organ == 'knee':
-    data_path = '/share/sablab/nfs02/users/aw847/data/knee/knee_train_normalized_{maskname}.npy'.format(maskname=maskname)
-  data = get_data(data_path)
+def get_train_data(maskname, img_dims='160_224', size='med'):
+  # data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_{maskname}.npy'.format(maskname=maskname)
+  data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/train_mri_normalized_{img_dims}_{maskname}.npy'.format(img_dims=img_dims, maskname=maskname)
+  data = np.load(data_path)
   return data
 
 
-def get_test_gt(img_dims='160_224', organ='brain', size='med'):
+def get_test_gt(img_dims='160_224', size='med'):
   if size=='small':
     gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_10slices.npy'
-  elif size=='med' and organ=='brain':
+  elif size=='med':
     gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
     # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/test_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
-  elif size=='med' and organ=='knee':
-    gt_path = '/share/sablab/nfs02/users/aw847/data/knee/knee_test_normalized.npy'
-  gt = get_data(gt_path)
+  gt = np.load(gt_path)
   return gt
 
-def get_test_data(maskname, img_dims='160_224', organ='brain', size='med'):
+def get_test_data(maskname, img_dims='160_224', size='med'):
   if size=='small':
     data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_4p2_10slices.npy'
   elif size=='med':
-    if organ == 'brain':
-      # data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_{maskname}.npy'.format(maskname=maskname)
-      data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/test_mri_normalized_{img_dims}_{maskname}.npy'.format(img_dims=img_dims, maskname=maskname)
-    elif organ == 'knee':
-      data_path = '/share/sablab/nfs02/users/aw847/data/knee/knee_test_normalized_{maskname}.npy'.format(maskname=maskname)
-  data = get_data(data_path)
+    # data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_{maskname}.npy'.format(maskname=maskname)
+    data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/test_mri_normalized_{img_dims}_{maskname}.npy'.format(img_dims=img_dims, maskname=maskname)
+  data = np.load(data_path)
   return data
 
 def get_seg_data(split, img_dims):
   seg_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/{split}_seg_{img_dims}.npy'.format(split=split, img_dims=img_dims)
-  seg = get_data(seg_path)
+  seg = np.load(seg_path)
   return seg
