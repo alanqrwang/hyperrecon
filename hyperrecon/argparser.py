@@ -43,7 +43,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--num_epochs', type=int, default=1024,
               help='Total training epochs')
     self.add_argument('--arch', type=str, default='hyperunet',
-              choices=['hyperunet', 'last_layer_hyperunet', 'unet', 'loupe_hyperunet'])
+              choices=['hyperunet', 'last_layer_hyperunet', 'unet', 'loupe_unet', 'loupe_hyperunet'])
     self.add_argument('--unet_hdim', type=int, default=32)
     self.add_argument('--hnet_hdim', type=int,
               help='Hypernetwork architecture', default=64)
@@ -63,8 +63,7 @@ class Parser(argparse.ArgumentParser):
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
-    self.add_argument('--undersampling_rate', type=str, default='4p2',
-              choices=['4', '8', '4p2', '8p2', '8p3', '16p2', '16p3'])
+    self.add_argument('--undersampling_rate', type=str, default='4p2')
     self.add_argument('--mask_type', type=str, default='poisson',
               choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch', 'loupe'])
     self.add_argument('--distance_type', type=str, default='l2',
@@ -76,7 +75,7 @@ class Parser(argparse.ArgumentParser):
                            'constant', 'binary', 'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', 'binary_constant_batch', \
                            'binary_anneal', 'categorical_constant', 'uniform_constant', \
-                           'uniform_diversity_prior', 'rate_agnostic'], type=str, help='Training method', required=True)
+                           'uniform_diversity_prior', 'loupe_agnostic', 'loupe'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_bool_arg('unet_residual', default=True)

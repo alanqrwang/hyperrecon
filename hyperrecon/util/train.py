@@ -11,7 +11,7 @@ import random
 from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
-from hyperrecon.model.unet import HyperUnet, Unet, LoupeHyperUnet
+from hyperrecon.model.unet import Unet, HyperUnet, LoupeUnet, LoupeHyperUnet
 # from hyperrecon.model.unet_v2 import Unet, HyperUnet, LastLayerHyperUnet
 from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch
 from hyperrecon.util.forward import CSMRIForward, InpaintingForward
@@ -176,13 +176,42 @@ class BaseTrain(object):
     self.train_loader, self.val_loader, self.test_loader = dataset.load()
 
   def get_model(self):
-    if self.arch == 'hyperunet':
+    if self.arch == 'unet':
+      self.network = Unet(
+                      in_ch=self.n_ch_in,
+                      out_ch=self.n_ch_out,
+                      h_ch=self.unet_hdim,
+                      residual=self.unet_residual,
+                      use_batchnorm=self.use_batchnorm
+                   ).to(self.device)
+    elif self.arch == 'hyperunet':
       self.network = HyperUnet(
                         self.num_coeffs,
                         self.hnet_hdim,
                         in_ch_main=self.n_ch_in,
                         out_ch_main=self.n_ch_out,
                         h_ch_main=self.unet_hdim,
+                        residual=self.unet_residual,
+                        use_batchnorm=self.use_batchnorm
+                      ).to(self.device)
+    elif self.arch == 'loupe_unet':
+      self.network = LoupeUnet(
+                        in_ch=self.n_ch_in,
+                        out_ch=self.n_ch_out,
+                        h_ch=self.unet_hdim,
+                        image_dims=self.image_dims,
+                        undersampling_rate=self.undersampling_rate,
+                        residual=self.unet_residual,
+                        use_batchnorm=self.use_batchnorm
+                      ).to(self.device)
+    elif self.arch == 'loupe_hyperunet':
+      self.network = LoupeHyperUnet(
+                        1,
+                        self.hnet_hdim,
+                        in_ch_main=self.n_ch_in,
+                        out_ch_main=self.n_ch_out,
+                        h_ch_main=self.unet_hdim,
+                        image_dims=self.image_dims,
                         residual=self.unet_residual,
                         use_batchnorm=self.use_batchnorm
                       ).to(self.device)
@@ -196,25 +225,6 @@ class BaseTrain(object):
     #                     residual=self.unet_residual,
     #                     use_batchnorm=self.use_batchnorm
     #                   ).to(self.device)
-    elif self.arch == 'loupe_hyperunet':
-      self.network = LoupeHyperUnet(
-                        1,
-                        self.hnet_hdim,
-                        in_ch_main=self.n_ch_in,
-                        out_ch_main=self.n_ch_out,
-                        h_ch_main=self.unet_hdim,
-                        image_dims=self.image_dims,
-                        residual=self.unet_residual,
-                        use_batchnorm=self.use_batchnorm
-                      ).to(self.device)
-    elif self.arch == 'unet':
-      self.network = Unet(
-                      in_ch=self.n_ch_in,
-                      out_ch=self.n_ch_out,
-                      h_ch=self.unet_hdim,
-                      residual=self.unet_residual,
-                      use_batchnorm=self.use_batchnorm
-                   ).to(self.device)
 
     utils.summary(self.network)
     return self.network

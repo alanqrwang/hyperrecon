@@ -11,7 +11,8 @@ class KneeBase():
           batch_size=self.batch_size,
           shuffle=True,
           num_workers=0,
-          pin_memory=True)
+          pin_memory=True,
+          drop_last=True)
     val_loader = torch.utils.data.DataLoader(self.valset,
           batch_size=self.batch_size*2,
           shuffle=False,

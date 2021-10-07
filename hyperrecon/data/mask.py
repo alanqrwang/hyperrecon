@@ -130,6 +130,11 @@ class Loupe(nn.Module):
     return le * masks * r + (1-le) * (1 - (1 - masks) * beta)
 
   def forward(self, num_samples, rate):
+    '''
+    Args:
+      num_samples: Number of masks to generate
+      rate: (num_samples, 1) Rates for each mask
+    '''
     mask = self.pmask.clone()
     mask = self.squash_mask(mask)
     mask = mask[None, None].repeat(num_samples, 1, 1, 1)
