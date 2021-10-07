@@ -6,7 +6,7 @@ from hyperrecon.util import metric
 import os
 from torchvision.utils import make_grid
 
-def viz_pixel_range(paths, slice_idx, hparams, subject, cp, title, base=False, ax=None):
+def viz_pixel_range(paths, slice_idx, hparams, subject, cp, title, base=False, ax=None, rot90=True):
   '''Visualize pixel-wise range across hyperparameters.'''
   ax = ax or plt.gca()
   if base:
@@ -20,7 +20,7 @@ def viz_pixel_range(paths, slice_idx, hparams, subject, cp, title, base=False, a
   error = _compute_pixel_range(slices)
 
   avg_error = np.mean(error)
-  _plot_img(_overlay_error(slices[0], error), ax=ax, rot90=True, title=title, xlabel='MAE=' + str(np.round(avg_error, 3)))
+  _plot_img(_overlay_error(slices[0], error), ax=ax, rot90=rot90, title=title, xlabel='MAE=' + str(np.round(avg_error, 3)))
   return avg_error
 
 def viz_pairwise_errors(paths, slices, hparams, subject, cp, base=False):
@@ -50,7 +50,7 @@ def viz_pairwise_errors(paths, slices, hparams, subject, cp, base=False):
           _plot_img(_overlay_error(slices[i], error), ax=axes[i, j], rot90=True, title=np.round(np.mean(error), 3))
     fig.show()
 
-def viz_all(paths, s, hparams, subject, cp, title, base=False):
+def viz_all(paths, s, hparams, subject, cp, title, base=False, rot90=True):
   if base:
     gt, zf, preds = _collect_base_subject(paths, hparams, subject, cp)
   else:
@@ -61,11 +61,11 @@ def viz_all(paths, s, hparams, subject, cp, title, base=False):
   zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice))
 
   fig, axes = plt.subplots(1, len(hparams)+2, figsize=(17, 7))
-  _plot_img(gt_slice, ax=axes[0], rot90=True, title='GT', ylabel=title)
-  _plot_img(zf_slice, ax=axes[1], rot90=True, title='ZF', xlabel=zf_psnr)
+  _plot_img(gt_slice, ax=axes[0], rot90=rot90, title='GT', ylabel=title)
+  _plot_img(zf_slice, ax=axes[1], rot90=rot90, title='ZF', xlabel=zf_psnr)
   for j in range(len(hparams)):
     pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice[j]))
-    _plot_img(pred_slice[j], ax=axes[j+2], rot90=True, title=hparams[j], xlabel=pred_psnr)
+    _plot_img(pred_slice[j], ax=axes[j+2], rot90=rot90, title=hparams[j], xlabel=pred_psnr)
   
   fig.tight_layout()
 
