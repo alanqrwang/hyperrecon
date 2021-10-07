@@ -32,7 +32,7 @@ class Parser(argparse.ArgumentParser):
               help='Number of subjects to validate on')
 
     # Machine learning parameters
-    self.add_argument('--image_dims', type=tuple, default=(160, 224),
+    self.add_argument('--image_dims', nargs='+', type=int, default=(160, 224),
               help='Image dimensions')
     self.add_argument('--lr', type=float, default=1e-3,
               help='Learning rate')
@@ -147,7 +147,7 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'dataset{dataset}_arch{arch}_method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}'.format(
+                  'dataset{dataset}_arch{arch}_method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}_res{res}'.format(
                     dataset=args.dataset,
                     arch=args.arch,
                     method=args.method,
@@ -160,7 +160,8 @@ class Parser(argparse.ArgumentParser):
                     range_restrict=args.range_restrict,
                     topK=args.topK,
                     hps=args.hyperparameters,
-                    beta=args.beta
+                    beta=args.beta,
+                    res=args.unet_residual
                   ))
     if not os.path.exists(args.run_dir):
       os.makedirs(args.run_dir)

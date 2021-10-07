@@ -30,15 +30,20 @@ class KneeArr(KneeBase):
 
     train_gt = get_train_gt()
     test_gt = get_test_gt()
+    train_gt = np.moveaxis(train_gt, [0,1,2,3], [0,2,3,1])
+    test_gt = np.moveaxis(test_gt, [0,1,2,3], [0,2,3,1])
     self.trainset = ArrDataset(
-      train_gt[:int(len(train_gt)*0.8)], None)
+      train_gt[:int(len(train_gt)*0.8)], 
+      train_gt[:int(len(train_gt)*0.8)])
     self.valset = ArrDataset(
-      train_gt[int(len(train_gt)*0.8):], None)
+      train_gt[int(len(train_gt)*0.8):], 
+      train_gt[int(len(train_gt)*0.8):])
     self.testset = ArrDataset(
-      test_gt, None)
+      test_gt, test_gt)
 
 def get_train_gt():
   gt_path = '/share/sablab/nfs02/users/aw847/data/knee/knee_train_normalized.npy'
+  print('loading', gt_path)
   gt = np.load(gt_path)
   return gt
 

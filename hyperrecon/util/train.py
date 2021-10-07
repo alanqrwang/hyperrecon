@@ -116,6 +116,7 @@ class BaseTrain(object):
 
   def config(self):
     self.set_random_seed()
+    self.per_loss_scale_constants = self.get_per_loss_scale_constants()
 
     self.get_dataloader()
     self.mask_module = self.get_mask()
@@ -125,6 +126,28 @@ class BaseTrain(object):
     self.optimizer = self.get_optimizer()
     self.scheduler = self.get_scheduler()
     self.losses = compose_loss_seq(self.loss_list, self.device)
+
+  def get_per_loss_scale_constants(self):
+    # Constants for mean losses on test sets.
+    # TODO: handle this better
+    # L1 + SSIM
+    if self.stringify_list(self.loss_list) == 'l1_ssim':
+      if self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide':
+        scales = [0.05797722685674671, 0.27206547738363346]
+      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide':
+        scales = [0.012755771, 0.0489692]
+      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'knee_arr':
+        scales = [0.04525472, 0.31786856]
+      elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '4' and self.dataset == 'knee_arr':
+        scales = [0.041984833776950836, 0.2628784775733948]
+      elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '8' and self.dataset == 'knee_arr':
+        scales = [0.062494032084941864, 0.39319753646850586]
+      else:
+        scales = [1, 1]
+    else:
+      raise ValueError('No loss scale constants found.')
+    print('using loss scales', scales)
+    return scales
 
   def get_mask(self):
     if self.mask_type == 'poisson':
@@ -375,7 +398,8 @@ class BaseTrain(object):
     for i in range(len(self.losses)):
       c = coeffs[:, i]
       l = self.losses[i]
-      loss += c * l(pred, gt, y=y, seg=seg)
+      per_loss_scale = self.per_loss_scale_constants[i]
+      loss += c * per_loss_scale * l(pred, gt, y=y, seg=seg)
     return loss
 
   def process_loss(self, loss):

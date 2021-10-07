@@ -25,6 +25,7 @@ class Total_Variation(object):
     x : torch.Tensor (batch_size, img_height, img_width, 2)
       Input image
     """
+    del kwargs
     tv_x = torch.sum((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
     tv_y = torch.sum((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
     if pred.shape[1] == 2:
@@ -57,6 +58,7 @@ class L1_Wavelets(object):
       Input image
 
     """
+    del kwargs
     Yl, Yh = self.xfm(pred)
 
     batch_size = pred.shape[0]
@@ -89,7 +91,8 @@ class L1_Shearlets(object):
     scales = [0.5] * 2
     self.shearlet = ShearletTransform(*dims, scales)
 
-  def __call__(self, pred, gt, y, seg):
+  def __call__(self, pred, **kwargs):
+    del kwargs
     pred = pred.norm(dim=-1) # Absolute value of complex image
     shears = self.shearlet.forward(pred)
     l1_shear = torch.sum(
@@ -102,15 +105,9 @@ class SSIM(object):
     self.ssim_loss = pytorch_ssim.SSIM(size_average=False)
 
   def __call__(self, pred, gt, **kwargs):
-    '''
-    Mean ssim loss on test set:
-    knee, 8p3: 0.31786856
-    brain, 8p3: 0.04896923
-    brain, 16p3, dataloader [0,1]: 0.27206547738363346
-    '''
+    del kwargs
     assert pred.shape[1] == 1 and gt.shape[1] == 1, 'Channel dimension incorrect'
     ssim_out = 1-self.ssim_loss(pred, gt)
-    ssim_out = ssim_out / 0.27206547738363346
     return ssim_out
 
 
@@ -121,6 +118,7 @@ class Watson_DFT(object):
       'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
 
   def __call__(self, pred, gt, **kwargs):
+    del kwargs
     loss = self.watson_dft(pred, gt) 
     return loss
 
@@ -129,14 +127,8 @@ class L1(object):
   def __init__(self):
     self.l1 = torch.nn.L1Loss(reduction='none')
   def __call__(self, pred, gt, **kwargs):
-    '''
-    Mean l1 loss on test set:
-    knee, 8p3: 0.045254722
-    brain, 8p3: 0.012755771
-    brain, 16p3, dataloader [0,1]: 0.05797722685674671
-    '''
+    del kwargs
     l1 = torch.mean(self.l1(pred, gt), dim=(1, 2, 3))
-    l1 = l1 / 0.05797722685674671
     return l1
 
 
@@ -144,10 +136,12 @@ class MSE(object):
   def __init__(self):
     self.mse_loss = torch.nn.MSELoss(reduction='none')
   def __call__(self, pred, gt, **kwargs):
+    del kwargs
     return torch.mean(self.mse_loss(pred, gt), dim=(1, 2, 3))
 
 class L2Loss(object):
   def __call__(self, pred, gt, **kwargs):
+    del kwargs
     pred_vec = pred.view(len(pred), -1)
     gt_vec = gt.view(len(gt), -1)
     return (pred_vec - gt_vec).norm(p=2, dim=1)
@@ -162,7 +156,8 @@ class DICE():
     pretrained_seg_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
     self.segmenter = Segmenter(pretrained_seg_path)
 
-  def __call__(self, pred, gt, y, seg):
+  def __call__(self, pred, **kwargs):
+    seg = kwargs['seg']
     loss = self.segmenter.predict(
                   recon=pred,
                   seg_data=seg)
@@ -183,6 +178,7 @@ class LPF_L2():
     self.smoothing = GaussianSmoothing(1, kernel_size, sigma)
   
   def __call__(self, pred, gt, **kwargs):
+    del kwargs
     pred = F.pad(pred, (2, 2, 2, 2), mode='reflect')
     gt = F.pad(gt, (2, 2, 2, 2), mode='reflect')
     pred_smooth = self.smoothing(pred)
