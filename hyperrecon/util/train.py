@@ -13,7 +13,7 @@ from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
 from hyperrecon.model.unet import Unet, HyperUnet, LoupeUnet, LoupeHyperUnet
 # from hyperrecon.model.unet_v2 import Unet, HyperUnet, LastLayerHyperUnet
 from hyperrecon.util.forward import CSMRIForward, InpaintingForward
-from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch
+from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch, RandomBox
 from hyperrecon.data.knee import KneeArr
 from hyperrecon.data.brain import Abide, BrainArr
 from hyperrecon.data.acdc import ACDC
@@ -143,8 +143,8 @@ class BaseTrain(object):
       elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '8' and self.dataset == 'knee_arr':
         scales = [0.062494032084941864, 0.39319753646850586]
       else:
-        # scales = [1, 1]
-        scales = [0.05797722685674671, 0.27206547738363346]
+        scales = [1, 1]
+        # scales = [0.05797722685674671, 0.27206547738363346]
     else:
       raise ValueError('No loss scale constants found.')
     print('using loss scales', scales)
@@ -158,11 +158,13 @@ class BaseTrain(object):
     elif self.mask_type == 'epi_vertical':
       mask = EPIVertical(self.image_dims, self.undersampling_rate)
     elif self.mask_type == 'first_half':
-      mask = FirstHalf(self.image_dims)
+      mask = FirstHalf(self.image_dims, self.undersampling_rate)
     elif self.mask_type == 'second_half':
-      mask = SecondHalf(self.image_dims)
+      mask = SecondHalf(self.image_dims, self.undersampling_rate)
     elif self.mask_type == 'center_patch':
-      mask = CenterPatch(self.image_dims)
+      mask = CenterPatch(self.image_dims, self.undersampling_rate)
+    elif self.mask_type == 'random_box':
+      mask = RandomBox(self.image_dims)
     elif self.mask_type == 'loupe':
       mask = None
     return mask

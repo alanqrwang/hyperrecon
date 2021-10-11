@@ -83,6 +83,48 @@ class CenterPatch(BaseMask):
         self.dims[1]//2 - p_dim[1]//2 : self.dims[1]//2 + p_dim[1]//2] = 0
     return torch.tensor(mask, requires_grad=False).float()
     
+class RandomBox(nn.Module):
+  def __init__(self, 
+               dims, 
+               scale=(0.02, 0.3),
+               ratio=3.3):
+    super(RandomBox, self).__init__()
+
+    self.dims = dims
+    self.scale = scale
+    self.ratio = ratio
+
+  def forward(self, num_samples):
+    mask_stack = None
+    for _ in range(num_samples):
+        ones = torch.ones(*self.dims)
+        mask = self._cutpatch(ones, self.scale, self.ratio)[None, None]
+        mask_stack = mask if mask_stack is None else torch.cat((mask_stack, mask), dim=0)
+    return mask_stack
+  
+  def _cutpatch(self, img, scale, ratio):
+    image_height, image_width = self.dims
+    area = image_height * image_width
+    erase_area = torch.FloatTensor(1).uniform_(scale[0], scale[1]) * area
+    aspect_ratio = torch.FloatTensor(1).uniform_(1, ratio)
+    aspect_ratio = aspect_ratio if torch.rand(1) > 0.5 else 1.0 / aspect_ratio
+    pad_h = int(torch.round(torch.sqrt(erase_area * aspect_ratio)).long())
+    pad_h = min(pad_h, image_height - 1)
+    pad_w = int(torch.round(torch.sqrt(erase_area / aspect_ratio)).long())
+    pad_w = min(pad_w, image_width - 1)
+
+    cutout_center_height = torch.FloatTensor(1).uniform_(0, (image_height - pad_h)).long()
+    cutout_center_width = torch.FloatTensor(1).uniform_(0, (image_width - pad_w)).long()
+
+    lower_pad = cutout_center_height
+    upper_pad = max(0, image_height - cutout_center_height - pad_h)
+    left_pad = cutout_center_width
+    right_pad = max(0, image_width - cutout_center_width - pad_w)
+
+    # randomly cut patch
+    img[lower_pad:image_height - upper_pad, left_pad:image_width - right_pad] = 0
+    return img
+
 class Loupe(nn.Module):
   def __init__(self, dims, pmask_slope=5, mask_eps=0.01, temp=0.8):
     super(Loupe, self).__init__()

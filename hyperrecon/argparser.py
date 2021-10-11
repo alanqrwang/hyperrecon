@@ -65,7 +65,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--topK', type=int, default=None)
     self.add_argument('--undersampling_rate', type=str, default='4p2')
     self.add_argument('--mask_type', type=str, default='poisson',
-              choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch', 'loupe'])
+              choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch', 'random_box', 'loupe'])
     self.add_argument('--distance_type', type=str, default='l2',
               choices=['l2', 'ssim', 'watson_dft', 'unet_enc_feat'])
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
@@ -127,7 +127,7 @@ class Parser(argparse.ArgumentParser):
     if args.forward_type == 'csmri':
       assert args.mask_type in ['poisson', 'epi_vertical', 'epi_horizontal', 'loupe'], 'Invalid mask_type for forward model'
     elif args.forward_type == 'inpainting':
-      assert args.mask_type in ['first_half', 'second_half', 'center_patch'], 'Invalid mask_type for forward model'
+      assert args.mask_type in ['first_half', 'second_half', 'center_patch', 'random_box'], 'Invalid mask_type for forward model'
     if args.method == 'rate_agnostic':
       assert args.mask_type == 'loupe'
 
@@ -146,10 +146,11 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'dataset{dataset}_arch{arch}_method{method}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}_res{res}'.format(
+                  'dataset{dataset}_arch{arch}_method{method}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}_res{res}'.format(
                     dataset=args.dataset,
                     arch=args.arch,
                     method=args.method,
+                    mask=args.mask_type,
                     rate=args.undersampling_rate,
                     lr=args.lr,
                     batch_size=args.batch_size,
