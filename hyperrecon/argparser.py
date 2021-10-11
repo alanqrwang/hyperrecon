@@ -25,7 +25,7 @@ class Parser(argparse.ArgumentParser):
               help='gpu id to train on')
     self.add_argument('--date', type=str, default=None,
               help='Override date')
-    self.add_argument('--dataset', type=str, default='abide', choices=['brain_arr', 'abide', 'knee_arr'])
+    self.add_argument('--dataset', type=str, default='abide', choices=['brain_arr', 'abide', 'knee_arr', 'acdc'])
     self.add_argument('--num_train_subjects', type=int, default=50,
               help='Number of subjects to train on')
     self.add_argument('--num_val_subjects', type=int, default=5,
