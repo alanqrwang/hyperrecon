@@ -5,6 +5,7 @@ from hyperrecon.model.unet_v2 import LastLayerHyperUnet
 from hyperrecon.util import utils
 import json
 import os
+from glob import glob
 
 def _overlay_error(img, error):
   img_rgb = np.dstack((img, img, img))
@@ -138,9 +139,15 @@ def _collect_hypernet_subject(model_path, hparams, subject, cp):
     preds: Predictions of subject for each hyperparameter (num_hparams, bs, nch, n1, n2)
   '''
   gt_path = os.path.join(model_path, 'img/gtsub{}.npy'.format(subject))
-  zf_path = os.path.join(model_path, 'img/zfsub{}.npy'.format(subject))
+  zf_paths = []
+  for hparam in hparams:
+    zf_path = os.path.join(model_path, 'img/zf{}sub{}.npy'.format(hparam, subject))
+    if os.path.exists(zf_path):
+      zf_paths.append(zf_path)
+  if len(zf_paths) == 0:
+    zf_paths = [os.path.join(model_path, 'img/zfsub{}.npy'.format(subject))]
   gt = np.load(gt_path)
-  zf = np.linalg.norm(np.load(zf_path), axis=1)
+  zfs = [np.linalg.norm(np.load(zf_path), axis=1, keepdims=True) for zf_path in zf_paths]
   preds = []
   for hparam in hparams:
     if cp is None:
@@ -149,7 +156,7 @@ def _collect_hypernet_subject(model_path, hparams, subject, cp):
       pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{:04d}.npy'.format(hparam, subject, cp))
     print('loading:', pred_path)
     preds.append(np.load(pred_path))
-  return gt, zf, preds
+  return gt, zfs, preds
 
 def _collect_base_subject(model_paths, hparams, subject, cps):
   '''For subject, get reconstructions from baseline for all hyperparams.
@@ -163,14 +170,15 @@ def _collect_base_subject(model_paths, hparams, subject, cps):
   if not isinstance(model_paths, (list, tuple)):
     model_paths = [model_paths]
   gt_path = os.path.join(model_paths[0], 'img/gtsub{}.npy'.format(subject))
-  zf_path = os.path.join(model_paths[0], 'img/zfsub{}.npy'.format(subject))
   gt = np.load(gt_path)
-  zf = np.linalg.norm(np.load(zf_path), axis=1)
   preds = []
+  zfs = []
   for hparam, model_path, cp in zip(hparams, model_paths, cps):
+    zf_path = os.path.join(model_path, 'img/zfsub{}.npy'.format(subject))
+    zfs.append(np.linalg.norm(np.load(zf_path), axis=1, keepdims=True))
     pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{:04d}.npy'.format(hparam, subject, cp))
     preds.append(np.load(pred_path))
-  return gt, zf, preds
+  return gt, zfs, preds
 
 def _parse_summary_json(model_path, metric_of_interest, split='test'):
   # Opening JSON file

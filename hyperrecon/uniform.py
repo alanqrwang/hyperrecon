@@ -150,7 +150,7 @@ class UniformDiversityPrior(BaseTrain):
       l = self.losses[i]
       c = coeffs[:, i]
       per_loss_scale = self.per_loss_scale_constants[i]
-      recon_loss += c * per_loss_scale * l(pred, gt, y=y, seg=seg)
+      recon_loss += c / per_loss_scale * l(pred, gt, y=y, seg=seg)
     
     if is_training:
       # TODO: generalize to higher-order coefficients

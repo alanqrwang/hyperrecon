@@ -56,7 +56,7 @@ def viz_all(paths, s, hparams, subject, cp, title, base=False, rot90=True):
   else:
     gt, zf, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
   gt_slice = gt[s,0]
-  zf_slice = zf[s]
+  zf_slice = _extract_slices(zf, s)[0]
   pred_slice = _extract_slices(preds, s)
   zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice))
 
@@ -65,7 +65,27 @@ def viz_all(paths, s, hparams, subject, cp, title, base=False, rot90=True):
   _plot_img(zf_slice, ax=axes[1], rot90=rot90, title='ZF', xlabel=zf_psnr)
   for j in range(len(hparams)):
     pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice[j]))
-    _plot_img(pred_slice[j], ax=axes[j+2], rot90=rot90, title=hparams[j], xlabel=pred_psnr)
+    _plot_img(pred_slice[j], ax=axes[j+2], rot90=rot90, title=hparams[j], xlabel=pred_psnr, vlim=[0, 1])
+  
+  fig.tight_layout()
+
+def viz_all_loupe(paths, s, hparams, subject, cp, title, base=False, rot90=True):
+  if base:
+    gt, zfs, preds = _collect_base_subject(paths, hparams, subject, cp)
+  else:
+    gt, zfs, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
+  gt_slice = gt[s,0]
+  zf_slice = _extract_slices(zfs, s)
+  pred_slice = _extract_slices(preds, s)
+
+  fig, axes = plt.subplots(2, len(hparams)+1, figsize=(len(hparams)*4, 2*4))
+  _plot_img(gt_slice, ax=axes[0,0], rot90=rot90, title='GT', ylabel=title+ ' zf')
+  _plot_img(gt_slice, ax=axes[1,0], rot90=rot90, title='GT', ylabel=title + ' pred')
+  for j in range(len(hparams)):
+    zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice[j]))
+    _plot_img(zf_slice[j], ax=axes[0, j+1], rot90=rot90, title=hparams[j], xlabel=zf_psnr)
+    pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice[j]))
+    _plot_img(pred_slice[j], ax=axes[1, j+1], rot90=rot90, title=hparams[j], xlabel=pred_psnr)
   
   fig.tight_layout()
 

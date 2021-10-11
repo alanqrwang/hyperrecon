@@ -143,7 +143,8 @@ class BaseTrain(object):
       elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '8' and self.dataset == 'knee_arr':
         scales = [0.062494032084941864, 0.39319753646850586]
       else:
-        scales = [1, 1]
+        # scales = [1, 1]
+        scales = [0.05797722685674671, 0.27206547738363346]
     else:
       raise ValueError('No loss scale constants found.')
     print('using loss scales', scales)
@@ -409,7 +410,7 @@ class BaseTrain(object):
       c = coeffs[:, i]
       l = self.losses[i]
       per_loss_scale = self.per_loss_scale_constants[i]
-      loss += c * per_loss_scale * l(pred, gt, y=y, seg=seg)
+      loss += c / per_loss_scale * l(pred, gt, y=y, seg=seg)
     return loss
 
   def process_loss(self, loss):

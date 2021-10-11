@@ -64,7 +64,7 @@ class BatchConv2d(nn.Module):
     self.hyperbias = nn.Linear(hyp_out_units, bias_units)
 
   def forward(self, x, hyp_out, include_bias=True):
-    assert x.shape[0] == hyp_out.shape[0], "dim=0 of x must be equal in size to dim=0 of hypernet output"
+    assert x.shape[0] == hyp_out.shape[0], 'dim=0 of x ({}) must be equal in size to dim=0 ({}) of hypernet output'.format(x.shape[0], hyp_out.shape[0])
 
     x = x.unsqueeze(1)
     b_i, b_j, c, h, w = x.shape

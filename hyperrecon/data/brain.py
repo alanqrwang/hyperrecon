@@ -6,7 +6,7 @@ For more details, please read:
 """
 import torch
 from torch.utils import data
-import torchio as tio
+# import torchio as tio
 import numpy as np
 import os
 from glob import glob
