@@ -16,7 +16,7 @@ from hyperrecon.util.forward import CSMRIForward, InpaintingForward
 from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch, RandomBox
 from hyperrecon.data.knee import KneeArr
 from hyperrecon.data.brain import Abide, BrainArr
-from hyperrecon.data.acdc import ACDC
+from hyperrecon.data.cardiac import ACDC
 
 
 class BaseTrain(object):
