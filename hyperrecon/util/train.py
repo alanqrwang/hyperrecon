@@ -12,7 +12,7 @@ from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
 from hyperrecon.model.unet import Unet, HyperUnet, LoupeUnet, LoupeHyperUnet
 # from hyperrecon.model.unet_v2 import Unet, HyperUnet, LastLayerHyperUnet
-from hyperrecon.util.forward import CSMRIForward, InpaintingForward, SuperresolutionForward
+from hyperrecon.util.forward import CSMRIForward, DenoisingForward, InpaintingForward, SuperresolutionForward
 from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch, RandomBox
 from hyperrecon.data.knee import FastMRI, KneeArr
 from hyperrecon.data.brain import Abide, BrainArr
@@ -41,6 +41,7 @@ class BaseTrain(object):
     self.unet_residual = args.unet_residual
     self.forward_type = args.forward_type
     self.distance_type = args.distance_type
+    self.denoising_sigma = args.denoising_sigma
     # ML
     self.dataset = args.dataset
     self.num_epochs = args.num_epochs
@@ -254,6 +255,8 @@ class BaseTrain(object):
       self.forward_model = InpaintingForward()
     elif self.forward_type == 'superresolution':
       self.forward_model = SuperresolutionForward(self.undersampling_rate)
+    elif self.forward_type == 'denoising':
+      self.forward_model = DenoisingForward(self.denoising_sigma)
     return self.forward_model
 
   def train(self):

@@ -67,3 +67,20 @@ class SuperresolutionForward(BaseForward):
     x_down = F.upsample(x_down, scale_factor=int(1/self.factor), mode='nearest')
     x_down = torch.cat((x_down, torch.zeros_like(x_down)), dim=1)
     return x_down, fft(x_down)
+
+class DenoisingForward(BaseForward):
+  '''Forward model for de-noising.'''
+  def __init__(self, sigma):
+    super(DenoisingForward, self).__init__()
+    self.sigma = sigma
+
+  def generate_measurement(self, x, *args):
+    '''Downsample input.
+    
+    Args:
+      x: Clean image in image space (N, n_ch, l, w)
+    '''
+    del args
+    x_noise = x + torch.normal(0, self.sigma, size=x.shape).cuda()
+    x_noise = torch.cat((x_noise, torch.zeros_like(x_noise)), dim=1)
+    return x_noise, fft(x_noise)

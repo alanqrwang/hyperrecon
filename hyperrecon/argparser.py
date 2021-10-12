@@ -59,11 +59,12 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--optimizer_type', type=str, default='adam',
               choices=['sgd', 'adam'])
     self.add_argument('--forward_type', type=str, default='csmri',
-              choices=['csmri', 'inpainting', 'superresolution'])
+              choices=['csmri', 'inpainting', 'superresolution', 'denoising'])
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
     self.add_argument('--undersampling_rate', type=str, default='4p2')
+    self.add_argument('--denoising_sigma', type=float, default=None)
     self.add_argument('--mask_type', type=str, default='poisson',
               choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch', 'random_box', 'loupe'])
     self.add_argument('--distance_type', type=str, default='l2',
@@ -130,6 +131,8 @@ class Parser(argparse.ArgumentParser):
       assert args.mask_type in ['first_half', 'second_half', 'center_patch', 'random_box'], 'Invalid mask_type for forward model'
     if args.method == 'rate_agnostic':
       assert args.mask_type == 'loupe'
+    if args.forward_type == 'denoising':
+      assert args.denoising_sigma is not None
 
   def parse(self):
     args = self.parse_args()
