@@ -54,6 +54,7 @@ def get_train_gt():
 
 def get_test_gt():
   gt_path = '/share/sablab/nfs02/users/aw847/data/knee/knee_test_normalized.npy'
+  print('loading', gt_path)
   gt = np.load(gt_path)
   return gt
 

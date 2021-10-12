@@ -226,7 +226,7 @@ def plot_metrics(metric, model_paths,
 
     if os.path.exists(train_path):
       loss = np.loadtxt(train_path) 
-      print(len(loss))
+      print('num epochs:', len(loss))
     else:
       raise ValueError('Invalid train path found')
     val_losses = [np.loadtxt(val_path)
@@ -240,6 +240,7 @@ def plot_metrics(metric, model_paths,
       if len(val_losses) == 0:
         continue
       if len(val_losses) == 1:
+        print('last loss:', val_losses[0][-1])
         _plot_1d(xs, val_losses[0], label=val_paths[0].split(
           '/')[-1], color=color_t, linestyle='--', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
       else:
@@ -260,6 +261,7 @@ def plot_metrics(metric, model_paths,
       ax.axvline(x=x, color='k')
   if show_legend:
     ax.legend(loc='best')
+  print()
   return ax
 
 def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, vlim=None, colorbar=False):

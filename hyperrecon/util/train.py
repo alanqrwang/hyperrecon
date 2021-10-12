@@ -143,6 +143,10 @@ class BaseTrain(object):
         scales = [0.041984833776950836, 0.2628784775733948]
       elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '8' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
         scales = [0.062494032084941864, 0.39319753646850586]
+      elif self.undersampling_rate == '4' and self.dataset == 'knee_arr' and self.forward_type == 'superresolution':
+        scales = [0.037357181310653687, 0.3851676881313324]
+      elif self.denoising_sigma == 0.1 and self.dataset == 'knee_arr' and self.forward_type == 'denoising':
+        scales = [0.03143206238746643, 0.27412155270576477]
       else:
         scales = [1, 1]
         # scales = [0.05797722685674671, 0.27206547738363346]
