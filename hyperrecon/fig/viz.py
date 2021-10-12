@@ -62,7 +62,7 @@ def viz_all(paths, s, hparams, subject, cp, title, base=False, rot90=True):
 
   fig, axes = plt.subplots(1, len(hparams)+2, figsize=(17, 7))
   _plot_img(gt_slice, ax=axes[0], rot90=rot90, title='GT', ylabel=title)
-  _plot_img(zf_slice, ax=axes[1], rot90=rot90, title='ZF', xlabel=zf_psnr)
+  _plot_img(zf_slice, ax=axes[1], rot90=rot90, title='Input', xlabel=zf_psnr)
   for j in range(len(hparams)):
     pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice[j]))
     _plot_img(pred_slice[j], ax=axes[j+2], rot90=rot90, title=hparams[j], xlabel=pred_psnr, vlim=[0, 1])
