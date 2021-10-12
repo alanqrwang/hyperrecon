@@ -14,7 +14,7 @@ from hyperrecon.model.unet import Unet, HyperUnet, LoupeUnet, LoupeHyperUnet
 # from hyperrecon.model.unet_v2 import Unet, HyperUnet, LastLayerHyperUnet
 from hyperrecon.util.forward import CSMRIForward, InpaintingForward
 from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch, RandomBox
-from hyperrecon.data.knee import KneeArr
+from hyperrecon.data.knee import FastMRI, KneeArr
 from hyperrecon.data.brain import Abide, BrainArr
 from hyperrecon.data.cardiac import ACDC
 
@@ -176,6 +176,8 @@ class BaseTrain(object):
       dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects)
     elif self.dataset == 'knee_arr':
       dataset = KneeArr(self.batch_size)
+    elif self.dataset == 'fastmri':
+      dataset = FastMRI(self.batch_size, img_dims=self.image_dims)
     elif self.dataset == 'acdc':
       dataset = ACDC(self.batch_size, img_dims=self.image_dims)
     self.train_loader, self.val_loader, self.test_loader = dataset.load()
