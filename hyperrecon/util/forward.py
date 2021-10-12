@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import torch
+import torch.nn.functional as F
 from .utils import fft, ifft, scale
 
 class BaseForward(ABC):
@@ -48,3 +49,21 @@ class InpaintingForward(BaseForward):
     masked = fullysampled * mask
     masked = torch.cat((masked, torch.zeros_like(masked)), dim=1)
     return masked, fft(masked)
+  
+class SuperresolutionForward(BaseForward):
+  '''Forward model for super-resolution.'''
+  def __init__(self, factor):
+    super(SuperresolutionForward, self).__init__()
+    self.factor = float(1/int(factor))
+
+  def generate_measurement(self, x, *args):
+    '''Downsample input.
+    
+    Args:
+      x: Clean image in image space (N, n_ch, l, w)
+    '''
+    del args
+    x_down = F.interpolate(x, scale_factor=self.factor, mode='bicubic', align_corners=False) 
+    x_down = F.upsample(x_down, scale_factor=int(1/self.factor), mode='nearest')
+    x_down = torch.cat((x_down, torch.zeros_like(x_down)), dim=1)
+    return x_down, fft(x_down)

@@ -12,7 +12,7 @@ from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
 from hyperrecon.model.unet import Unet, HyperUnet, LoupeUnet, LoupeHyperUnet
 # from hyperrecon.model.unet_v2 import Unet, HyperUnet, LastLayerHyperUnet
-from hyperrecon.util.forward import CSMRIForward, InpaintingForward
+from hyperrecon.util.forward import CSMRIForward, InpaintingForward, SuperresolutionForward
 from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch, RandomBox
 from hyperrecon.data.knee import FastMRI, KneeArr
 from hyperrecon.data.brain import Abide, BrainArr
@@ -132,15 +132,15 @@ class BaseTrain(object):
     # TODO: handle this better
     # L1 + SSIM
     if self.stringify_list(self.loss_list) == 'l1_ssim':
-      if self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide':
+      if self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
         scales = [0.05797722685674671, 0.27206547738363346]
-      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide':
+      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
         scales = [0.012755771, 0.0489692]
-      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'knee_arr':
+      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
         scales = [0.04525472, 0.31786856]
-      elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '4' and self.dataset == 'knee_arr':
+      elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '4' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
         scales = [0.041984833776950836, 0.2628784775733948]
-      elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '8' and self.dataset == 'knee_arr':
+      elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '8' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
         scales = [0.062494032084941864, 0.39319753646850586]
       else:
         scales = [1, 1]
@@ -252,6 +252,8 @@ class BaseTrain(object):
       self.forward_model = CSMRIForward()
     elif self.forward_type == 'inpainting':
       self.forward_model = InpaintingForward()
+    elif self.forward_type == 'superresolution':
+      self.forward_model = SuperresolutionForward(self.undersampling_rate)
     return self.forward_model
 
   def train(self):

@@ -59,7 +59,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--optimizer_type', type=str, default='adam',
               choices=['sgd', 'adam'])
     self.add_argument('--forward_type', type=str, default='csmri',
-              choices=['csmri', 'inpainting'])
+              choices=['csmri', 'inpainting', 'superresolution'])
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
@@ -146,10 +146,11 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'dataset{dataset}_arch{arch}_method{method}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}_res{res}'.format(
+                  'dataset{dataset}_arch{arch}_method{method}_forward{forward}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}_res{res}'.format(
                     dataset=args.dataset,
                     arch=args.arch,
                     method=args.method,
+                    forward=args.forward_type,
                     mask=args.mask_type,
                     rate=args.undersampling_rate,
                     lr=args.lr,
