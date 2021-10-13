@@ -24,7 +24,7 @@ def plot_over_hyperparams(path, metric_of_interest, label, flip=False, ax=None, 
   ax = ax or plt.gca()
   if metric_of_interest in ['psnr', 'ssim', 'dice']:
     ann_min, ann_max = False, True
-  elif metric_of_interest in ['loss', 'hfen']:
+  elif metric_of_interest in ['loss', 'hfen', 'mae']:
     ann_min, ann_max = True, False
 
   if base:
@@ -44,8 +44,8 @@ def plot_over_hyperparams(path, metric_of_interest, label, flip=False, ax=None, 
     ys = 1 - ys
 
   _plot_1d(xs, ys, color=color, label=label, linestyle=linestyle, annotate_min=ann_min, annotate_max=ann_max, ax=ax)
-  ax.set_title(metric_of_interest)
-  ax.set_xlabel('alpha')
+  ax.set_title(metric_of_interest.upper())
+  ax.set_xlabel(r'$\alpha$')
   if ylim is not None:
     ax.set_ylim(ylim)
   ax.legend()

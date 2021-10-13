@@ -126,14 +126,17 @@ class RandomBox(nn.Module):
     return img
 
 class Loupe(nn.Module):
-  def __init__(self, dims, pmask_slope=5, mask_eps=0.01, temp=0.8):
+  def __init__(self, dims, pmask_slope=5, temp=0.8):
     super(Loupe, self).__init__()
 
+    self.dims = dims
     self.pmask_slope = pmask_slope
     self.temp = temp
     self.sigmoid = nn.Sigmoid()
+    self.init_parameters()
 
-    self.pmask = nn.Parameter(torch.FloatTensor(*dims))         
+  def init_parameters(self, mask_eps=0.01):
+    self.pmask = nn.Parameter(torch.FloatTensor(*self.dims))         
     self.pmask.requires_grad = True
     self.pmask.data.uniform_(mask_eps, 1-mask_eps)
     self.pmask.data = -torch.log(1. / self.pmask.data - 1.) / self.pmask_slope
@@ -180,6 +183,27 @@ class Loupe(nn.Module):
     mask = self.pmask.clone()
     mask = self.squash_mask(mask)
     mask = mask[None, None].repeat(num_samples, 1, 1, 1)
+    mask = self.sparsify(mask, rate.squeeze())
+    mask = self.binary_gumbel_softmax(mask)
+    return mask
+
+class ConditionalLoupe(Loupe):
+  def init_parameters(self, mask_eps=0.01):
+    self.fc1 = nn.Linear(1, 32) 
+    self.fc2 = nn.Linear(32, 128)
+    self.fc_last = nn.Linear(128, np.prod(self.dims))
+    self.relu = nn.ReLU()
+
+  def forward(self, rate):
+    '''
+    Args:
+      num_samples: Number of masks to generate
+      rate: (num_samples, 1) Rates for each mask
+    '''
+    x = self.relu(self.fc1(rate))
+    x = self.relu(self.fc2(x))
+    x = self.fc_last(x).view(-1, 1, *self.dims)
+    mask = self.squash_mask(x)
     mask = self.sparsify(mask, rate.squeeze())
     mask = self.binary_gumbel_softmax(mask)
     return mask

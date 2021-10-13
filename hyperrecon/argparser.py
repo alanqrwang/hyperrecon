@@ -43,7 +43,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--num_epochs', type=int, default=1024,
               help='Total training epochs')
     self.add_argument('--arch', type=str, default='hyperunet',
-              choices=['hyperunet', 'last_layer_hyperunet', 'unet', 'loupe_unet', 'loupe_hyperunet'])
+              choices=['hyperunet', 'last_layer_hyperunet', 'unet', 'loupe_unet', 'loupe_hyperunet', 'condloupe_hyperunet'])
     self.add_argument('--unet_hdim', type=int, default=32)
     self.add_argument('--hnet_hdim', type=int,
               help='Hypernetwork architecture', default=64)
@@ -129,7 +129,7 @@ class Parser(argparse.ArgumentParser):
       assert args.mask_type in ['poisson', 'epi_vertical', 'epi_horizontal', 'loupe'], 'Invalid mask_type for forward model'
     elif args.forward_type == 'inpainting':
       assert args.mask_type in ['first_half', 'second_half', 'center_patch', 'random_box'], 'Invalid mask_type for forward model'
-    if args.method == 'rate_agnostic':
+    if args.method == 'loupe_agnostic':
       assert args.mask_type == 'loupe'
     if args.forward_type == 'denoising':
       assert args.denoising_sigma is not None

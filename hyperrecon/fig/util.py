@@ -177,6 +177,7 @@ def _collect_base_subject(model_paths, hparams, subject, cps):
     zf_path = os.path.join(model_path, 'img/zfsub{}.npy'.format(subject))
     zfs.append(np.linalg.norm(np.load(zf_path), axis=1, keepdims=True))
     pred_path = os.path.join(model_path, 'img/pred{}sub{}cp{:04d}.npy'.format(hparam, subject, cp))
+    print('loading:', pred_path)
     preds.append(np.load(pred_path))
   return gt, zfs, preds
 
