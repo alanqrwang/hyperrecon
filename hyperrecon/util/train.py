@@ -422,7 +422,7 @@ class BaseTrain(object):
       utils.save_checkpoint(self.epoch, self.network, self.optimizer,
                   self.ckpt_dir, self.scheduler)
 
-  def compute_loss(self, pred, gt, y, coeffs, is_training=False):
+  def compute_loss(self, pred, gt, coeffs, is_training=False):
     '''Compute loss.
 
     Args:
@@ -440,7 +440,7 @@ class BaseTrain(object):
       c = coeffs[:, i]
       l = self.losses[i]
       per_loss_scale = self.per_loss_scale_constants[i]
-      loss += c / per_loss_scale * l(pred, gt, y=y)
+      loss += c / per_loss_scale * l(pred, gt)
     return loss
 
   def process_loss(self, loss):
@@ -518,18 +518,18 @@ class BaseTrain(object):
       inputs = utils.ifft(measurements)
     else:
       inputs = measurements
-    return inputs, targets, measurements, bs
+    return inputs, targets, bs
 
   def train_step(self, batch):
     '''Train for one step.'''
-    inputs, targets, measurements, batch_size = self.prepare_batch(batch)
+    inputs, targets, batch_size = self.prepare_batch(batch)
     hparams = self.sample_hparams(batch_size)
     coeffs = self.generate_coefficients(hparams)
 
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
       pred = self.inference(inputs, coeffs)
-      loss = self.compute_loss(pred, targets, measurements, coeffs, is_training=True)
+      loss = self.compute_loss(pred, targets, coeffs, is_training=True)
       loss = self.process_loss(loss)
       loss.backward()
       self.optimizer.step()
@@ -553,10 +553,10 @@ class BaseTrain(object):
     for hparam in self.val_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Validating with hparam', hparam_str)
-      zf, gt, y, pred, coeffs = self.get_predictions(hparam)
+      _, gt, pred, coeffs = self.get_predictions(hparam)
       for key in self.val_metrics:
         if 'loss' in key and hparam_str in key:
-          loss = self.compute_loss(pred, gt, y, coeffs, is_training=False)
+          loss = self.compute_loss(pred, gt, coeffs, is_training=False)
           loss = self.process_loss(loss).item()
           self.val_metrics[key].append(loss)
         elif 'psnr' in key and hparam_str in key:
@@ -570,8 +570,8 @@ class BaseTrain(object):
     for hparam in self.test_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Testing with hparam', hparam_str)
-      zf, gt, y, pred, coeffs = self.get_predictions(hparam, by_subject=True)
-      for i in range(len(zf)):
+      input, gt, pred, coeffs = self.get_predictions(hparam, by_subject=True)
+      for i in range(len(input)):
         # Save predictions to disk
         if save_preds:
           gt_path = os.path.join(self.img_dir, 'gt' + 'sub{}'.format(i) + '.npy')
@@ -581,10 +581,10 @@ class BaseTrain(object):
           if not os.path.exists(gt_path):
             np.save(gt_path, gt[i].cpu().detach().numpy())
           if not os.path.exists(zf_path):
-            np.save(zf_path, zf[i].cpu().detach().numpy())
+            np.save(zf_path, input[i].cpu().detach().numpy())
         for key in self.test_metrics:
           if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            loss = self.compute_loss(pred[i], gt[i], y[i], coeffs[i], is_training=False)
+            loss = self.compute_loss(pred[i], gt[i], coeffs[i], is_training=False)
             loss = self.process_loss(loss).item()
             self.test_metrics[key].append(loss)
           elif 'psnr' in key and hparam_str in key and 'sub{}'.format(i) in key:
@@ -603,28 +603,25 @@ class BaseTrain(object):
 
   def get_predictions(self, hparam, by_subject=False):
     '''Get predictions, optionally separated by subject'''
-    all_zfs = []
-    all_ys = []
+    all_inputs = []
     all_gts = []
     all_preds = []
     all_coeffs = []
 
     loader = self.test_loader if by_subject else self.val_loader
     for batch in tqdm(loader, total=len(loader)):
-      zf, y, gt, pred, coeff = self.eval_step(batch, hparam)
+      input, gt, pred, coeff = self.eval_step(batch, hparam)
 
-      all_zfs.append(zf)
-      all_ys.append(y)
+      all_inputs.append(input)
       all_gts.append(gt)
       all_preds.append(pred)
       all_coeffs.append(coeff)
 
     if by_subject:
-      return all_zfs, all_gts, all_ys, all_preds, all_coeffs
+      return all_inputs, all_gts, all_preds, all_coeffs
     else:
-      return torch.cat(all_zfs, dim=0), torch.cat(all_gts, dim=0),  \
-             torch.cat(all_ys, dim=0), torch.cat(all_preds, dim=0), \
-             torch.cat(all_coeffs, dim=0)
+      return torch.cat(all_inputs, dim=0), torch.cat(all_gts, dim=0),  \
+             torch.cat(all_preds, dim=0), torch.cat(all_coeffs, dim=0)
 
 
   def eval_step(self, batch, hparams):
@@ -634,12 +631,12 @@ class BaseTrain(object):
       batch: Single batch from dataloader
       hparams: Single hyperparameter vector (1, num_hyperparams)
     '''
-    inputs, targets, measurements, batch_size = self.prepare_batch(batch)
+    inputs, targets, batch_size = self.prepare_batch(batch)
     hparams = hparams.repeat(batch_size, 1)
     coeffs = self.generate_coefficients(hparams)
     with torch.set_grad_enabled(False):
       pred = self.inference(inputs, coeffs)
-    return inputs, measurements, targets, pred, coeffs
+    return inputs, targets, pred, coeffs
 
   @staticmethod
   def stringify_list(l):

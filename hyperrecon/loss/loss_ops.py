@@ -16,21 +16,22 @@ class Data_Consistency(object):
     self.mask_module = mask_module
     self.l2 = torch.nn.MSELoss(reduction='none')
 
-  def __call__(self, pred, gt, y):
+  def __call__(self, pred, gt):
     batch_size = len(pred)
     mask = self.mask_module(batch_size).cuda()
-    measurement, measurement_fft = self.forward_model(pred, mask)
-    dc = torch.sum(self.l2(measurement, y), dim=(1, 2, 3))
+    measurement = self.forward_model(pred, mask)
+    measurement_gt = self.forward_model(gt, mask)
+    dc = torch.sum(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
     return dc
 
 class Total_Variation(object):
-  def __call__(self, pred, **kwargs):
+  def __call__(self, pred, gt):
     """Total variation loss.
 
     x : torch.Tensor (batch_size, img_height, img_width, 2)
       Input image
     """
-    del kwargs
+    del gt
     tv_x = torch.sum((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
     tv_y = torch.sum((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
     if pred.shape[1] == 2:
@@ -45,7 +46,7 @@ class L1_Wavelets(object):
   def __init__(self, device):
     self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(device)
 
-  def __call__(self, pred, **kwargs):
+  def __call__(self, pred, gt):
 
     def nextPowerOf2(n):
       """Get next power of 2"""
@@ -63,7 +64,7 @@ class L1_Wavelets(object):
       Input image
 
     """
-    del kwargs
+    del gt
     Yl, Yh = self.xfm(pred)
 
     batch_size = pred.shape[0]
@@ -96,8 +97,8 @@ class L1_Shearlets(object):
     scales = [0.5] * 2
     self.shearlet = ShearletTransform(*dims, scales)
 
-  def __call__(self, pred, **kwargs):
-    del kwargs
+  def __call__(self, pred, gt):
+    del gt
     pred = pred.norm(dim=-1) # Absolute value of complex image
     shears = self.shearlet.forward(pred)
     l1_shear = torch.sum(
@@ -109,8 +110,7 @@ class SSIM(object):
   def __init__(self):
     self.ssim_loss = pytorch_ssim.SSIM(size_average=False)
 
-  def __call__(self, pred, gt, **kwargs):
-    del kwargs
+  def __call__(self, pred, gt):
     assert pred.shape[1] == 1 and gt.shape[1] == 1, 'Channel dimension incorrect'
     ssim_out = 1-self.ssim_loss(pred, gt)
     return ssim_out
@@ -122,8 +122,7 @@ class Watson_DFT(object):
     self.watson_dft = provider.get_loss_function(
       'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
 
-  def __call__(self, pred, gt, **kwargs):
-    del kwargs
+  def __call__(self, pred, gt):
     loss = self.watson_dft(pred, gt) 
     return loss
 
@@ -131,8 +130,7 @@ class Watson_DFT(object):
 class L1(object):
   def __init__(self):
     self.l1 = torch.nn.L1Loss(reduction='none')
-  def __call__(self, pred, gt, **kwargs):
-    del kwargs
+  def __call__(self, pred, gt):
     l1 = torch.mean(self.l1(pred, gt), dim=(1, 2, 3))
     return l1
 
@@ -140,13 +138,11 @@ class L1(object):
 class MSE(object):
   def __init__(self):
     self.mse_loss = torch.nn.MSELoss(reduction='none')
-  def __call__(self, pred, gt, **kwargs):
-    del kwargs
+  def __call__(self, pred, gt):
     return torch.mean(self.mse_loss(pred, gt), dim=(1, 2, 3))
 
 class L2Loss(object):
-  def __call__(self, pred, gt, **kwargs):
-    del kwargs
+  def __call__(self, pred, gt):
     pred_vec = pred.view(len(pred), -1)
     gt_vec = gt.view(len(gt), -1)
     return (pred_vec - gt_vec).norm(p=2, dim=1)
@@ -182,8 +178,7 @@ class LPF_L2():
     sigma = 10
     self.smoothing = GaussianSmoothing(1, kernel_size, sigma)
   
-  def __call__(self, pred, gt, **kwargs):
-    del kwargs
+  def __call__(self, pred, gt):
     pred = F.pad(pred, (2, 2, 2, 2), mode='reflect')
     gt = F.pad(gt, (2, 2, 2, 2), mode='reflect')
     pred_smooth = self.smoothing(pred)
