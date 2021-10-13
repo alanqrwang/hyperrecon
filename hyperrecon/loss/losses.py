@@ -16,7 +16,7 @@ REGISTERED_UNSUP_LOSSES = [
                             ]
 
 
-def compose_loss_seq(loss_list, device):
+def compose_loss_seq(loss_list, forward_model, mask, device):
   """Compose loss list.
 
   Args:
@@ -25,11 +25,11 @@ def compose_loss_seq(loss_list, device):
     device: Cuda device
   """
   return [
-    generate_loss_ops(loss_type, device)
+    generate_loss_ops(loss_type, forward_model, mask, device)
     for loss_type in loss_list
   ]
 
-def generate_loss_ops(loss_type, device):
+def generate_loss_ops(loss_type, forward_model, mask, device):
   """Generate Loss Operators."""
   assert loss_type.lower() in REGISTERED_SUP_LOSSES + REGISTERED_UNSUP_LOSSES
 
@@ -43,8 +43,8 @@ def generate_loss_ops(loss_type, device):
     tx_op = loss_ops.SSIM()
   elif loss_type.lower() == 'watson-dft':
     tx_op = loss_ops.Watson_DFT(device)
-  # elif loss_type.lower() == 'dc':
-  #   tx_op = loss_ops.Data_Consistency(mask)
+  elif loss_type.lower() == 'dc':
+    tx_op = loss_ops.Data_Consistency(forward_model, mask)
   elif loss_type.lower() == 'l1':
     tx_op = loss_ops.L1()
   elif loss_type.lower() == 'mse':

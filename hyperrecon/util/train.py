@@ -126,7 +126,7 @@ class BaseTrain(object):
     self.network = self.get_model()
     self.optimizer = self.get_optimizer()
     self.scheduler = self.get_scheduler()
-    self.losses = compose_loss_seq(self.loss_list, self.device)
+    self.losses = compose_loss_seq(self.loss_list, self.forward_model, self.mask_module, self.device)
 
   def get_per_loss_scale_constants(self):
     # Constants for mean losses on test sets.
@@ -150,9 +150,12 @@ class BaseTrain(object):
       else:
         scales = [1, 1]
         # scales = [0.05797722685674671, 0.27206547738363346]
+    # DC + TV
+    elif self.stringify_list(self.loss_list) == 'dc_tv':
+      scales = [1, 1]
     else:
       raise ValueError('No loss scale constants found.')
-    print('using loss scales', scales)
+    print('\nusing loss scales', scales)
     return scales
 
   def get_mask(self):
@@ -485,8 +488,9 @@ class BaseTrain(object):
     epoch_psnr = 0
 
     start_time = time.time()
-    for i, (targets, segs) in tqdm(enumerate(self.train_loader), total=self.num_steps_per_epoch):
-      loss, psnr, batch_size = self.train_step(targets, segs)
+    for i, batch in tqdm(enumerate(self.train_loader), 
+      total=min(len(self.train_loader), self.num_steps_per_epoch)):
+      loss, psnr, batch_size = self.train_step(batch)
       epoch_loss += loss * batch_size
       epoch_psnr += psnr * batch_size
       epoch_samples += batch_size
@@ -505,19 +509,31 @@ class BaseTrain(object):
     print("train loss={:.6f}, train psnr={:.6f}, train time={:.6f}".format(
       epoch_loss, epoch_psnr, epoch_time))
 
-  def train_step(self, targets, segs):
+  def prepare_batch(self, batch):
+    targets, segs = batch[0], batch[1]
+    targets = targets.view(-1, 1, *targets.shape[-2:])
+    segs = segs.view(-1, 1, *targets.shape[-2:])
+    targets, segs = targets.float().to(self.device), segs.float().to(self.device)
+    bs = len(targets)
+
+    undersample_mask = self.mask_module(bs).to(self.device)
+    measurements = self.forward_model(targets, undersample_mask)
+    if self.forward_type == 'csmri':
+      inputs = utils.ifft(measurements)
+    else:
+      inputs = measurements
+    return inputs, targets, measurements, segs, bs
+
+  def train_step(self, batch):
     '''Train for one step.'''
-    batch_size = len(targets)
+    inputs, targets, measurements, segs, batch_size = self.prepare_batch(batch)
     hparams = self.sample_hparams(batch_size)
     coeffs = self.generate_coefficients(hparams)
 
-    targets, segs = targets.float().to(self.device), segs.float().to(self.device)
-    undersample_mask = self.mask_module(batch_size).to(self.device)
-    measurement, measurement_ksp = self.forward_model.generate_measurement(targets, undersample_mask)
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
-      pred = self.inference(measurement, coeffs)
-      loss = self.compute_loss(pred, targets, measurement_ksp, segs, coeffs, is_training=True)
+      pred = self.inference(inputs, coeffs)
+      loss = self.compute_loss(pred, targets, measurements, segs, coeffs, is_training=True)
       loss = self.process_loss(loss)
       loss.backward()
       self.optimizer.step()
@@ -599,8 +615,8 @@ class BaseTrain(object):
     all_coeffs = []
 
     loader = self.test_loader if by_subject else self.val_loader
-    for _, (targets, segs) in tqdm(enumerate(loader), total=len(loader)):
-      zf, y, gt, pred, segs, coeff = self.eval_step(targets, segs, hparam)
+    for batch in tqdm(loader, total=len(loader)):
+      zf, y, gt, pred, segs, coeff = self.eval_step(batch, hparam)
 
       all_zfs.append(zf)
       all_ys.append(y)
@@ -617,25 +633,19 @@ class BaseTrain(object):
              torch.cat(all_segs, dim=0), torch.cat(all_coeffs, dim=0)
 
 
-  def eval_step(self, targets, segs, hparams):
+  def eval_step(self, batch, hparams):
     '''Eval for one step.
     
     Args:
       batch: Single batch from dataloader
       hparams: Single hyperparameter vector (1, num_hyperparams)
     '''
-    targets, segs = targets.float().to(self.device), segs.float().to(self.device)
-    targets = targets.view(-1, 1, *targets.shape[-2:])
-    segs = segs.view(-1, 1, *targets.shape[-2:])
-    batch_size = len(targets)
+    inputs, targets, measurements, segs, batch_size = self.prepare_batch(batch)
     hparams = hparams.repeat(batch_size, 1)
     coeffs = self.generate_coefficients(hparams)
-
-    undersample_mask = self.mask_module(batch_size).to(self.device)
-    measurement, measurement_ksp = self.forward_model.generate_measurement(targets, undersample_mask)
     with torch.set_grad_enabled(False):
-      pred = self.inference(measurement, coeffs)
-    return measurement, measurement_ksp, targets, pred, segs, coeffs
+      pred = self.inference(inputs, coeffs)
+    return inputs, measurements, targets, pred, segs, coeffs
 
   @staticmethod
   def stringify_list(l):

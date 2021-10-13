@@ -13,7 +13,7 @@ class BaseForward(ABC):
     super().__init__()
 
   @abstractmethod
-  def generate_measurement(self, fullysampled, mask):
+  def __call__(self, fullysampled, mask):
     pass
 
 class CSMRIForward(BaseForward):
@@ -21,7 +21,7 @@ class CSMRIForward(BaseForward):
   def __init__(self):
     super(CSMRIForward, self).__init__()
 
-  def generate_measurement(self, fullysampled, mask):
+  def __call__(self, fullysampled, mask):
     '''Generate under-sampled k-space data with given binary mask.
     
     Args:
@@ -32,14 +32,14 @@ class CSMRIForward(BaseForward):
     under_ksp = ksp * mask
     zf = ifft(under_ksp)
     under_ksp, zf = scale(under_ksp, zf)
-    return zf, under_ksp
+    return under_ksp
 
 class InpaintingForward(BaseForward):
   '''Forward model for inpainting.'''
   def __init__(self):
     super(InpaintingForward, self).__init__()
 
-  def generate_measurement(self, fullysampled, mask):
+  def __call__(self, fullysampled, mask):
     '''Generate masked version of input.
     
     Args:
@@ -48,7 +48,7 @@ class InpaintingForward(BaseForward):
     '''
     masked = fullysampled * mask
     masked = torch.cat((masked, torch.zeros_like(masked)), dim=1)
-    return masked, fft(masked)
+    return masked
   
 class SuperresolutionForward(BaseForward):
   '''Forward model for super-resolution.'''
@@ -56,7 +56,7 @@ class SuperresolutionForward(BaseForward):
     super(SuperresolutionForward, self).__init__()
     self.factor = float(1/int(factor))
 
-  def generate_measurement(self, x, *args):
+  def __call__(self, x, *args):
     '''Downsample input.
     
     Args:
@@ -66,7 +66,7 @@ class SuperresolutionForward(BaseForward):
     x_down = F.interpolate(x, scale_factor=self.factor, mode='bicubic', align_corners=False) 
     x_down = F.upsample(x_down, scale_factor=int(1/self.factor), mode='nearest')
     x_down = torch.cat((x_down, torch.zeros_like(x_down)), dim=1)
-    return x_down, fft(x_down)
+    return x_down
 
 class DenoisingForward(BaseForward):
   '''Forward model for de-noising.'''
@@ -74,7 +74,7 @@ class DenoisingForward(BaseForward):
     super(DenoisingForward, self).__init__()
     self.sigma = sigma
 
-  def generate_measurement(self, x, *args):
+  def __call__(self, x, *args):
     '''Downsample input.
     
     Args:
@@ -83,4 +83,4 @@ class DenoisingForward(BaseForward):
     del args
     x_noise = x + torch.normal(0, self.sigma, size=x.shape).cuda()
     x_noise = torch.cat((x_noise, torch.zeros_like(x_noise)), dim=1)
-    return x_noise, fft(x_noise)
+    return x_noise

@@ -10,13 +10,18 @@ from unetsegmentation.predict import Segmenter
 from hyperrecon.model.layers import GaussianSmoothing
 from torch.nn import functional as F
 
-# class Data_Consistency(object):
-#   def __call__(self, pred, gt, y, seg):
-#     l2 = torch.nn.MSELoss(reduction='none')
+class Data_Consistency(object):
+  def __init__(self, forward_model, mask_module):
+    self.forward_model = forward_model
+    self.mask_module = mask_module
+    self.l2 = torch.nn.MSELoss(reduction='none')
 
-#     UFx_hat = utils.generate_measurement(pred, self.mask)
-#     dc = torch.sum(l2(UFx_hat, y), dim=(1, 2, 3))
-#     return dc
+  def __call__(self, pred, gt, y, seg):
+    batch_size = len(pred)
+    mask = self.mask_module(batch_size).cuda()
+    measurement, measurement_fft = self.forward_model(pred, mask)
+    dc = torch.sum(self.l2(measurement, y), dim=(1, 2, 3))
+    return dc
 
 class Total_Variation(object):
   def __call__(self, pred, **kwargs):
