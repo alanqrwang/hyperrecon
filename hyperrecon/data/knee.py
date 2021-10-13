@@ -38,13 +38,10 @@ class KneeArr(KneeBase):
     train_gt = np.moveaxis(train_gt, [0,1,2,3], [0,2,3,1])
     test_gt = np.moveaxis(test_gt, [0,1,2,3], [0,2,3,1])
     self.trainset = ArrDataset(
-      train_gt[:int(len(train_gt)*0.8)], 
       train_gt[:int(len(train_gt)*0.8)])
     self.valset = ArrDataset(
-      train_gt[int(len(train_gt)*0.8):], 
       train_gt[int(len(train_gt)*0.8):])
-    self.testset = ArrDataset(
-      test_gt, test_gt)
+    self.testset = ArrDataset(test_gt)
 
 def get_train_gt():
   gt_path = '/share/sablab/nfs02/users/aw847/data/knee/knee_train_normalized.npy'
@@ -103,4 +100,4 @@ class SliceDataset(torch.utils.data.Dataset):
     if self.transform is not None:
       x = self.transform(x)
 
-    return x, x
+    return x

@@ -43,11 +43,10 @@ class BrainArr(BrainBase):
     train_gt = get_train_gt()
     test_gt = get_test_gt()
     self.trainset = ArrDataset(
-      train_gt[:int(len(train_gt)*self.split_ratio)], None)
+      train_gt[:int(len(train_gt)*self.split_ratio)])
     self.valset = ArrDataset(
-      train_gt[int(len(train_gt)*self.split_ratio):], None)
-    self.testset = ArrDataset(
-      test_gt, None)
+      train_gt[int(len(train_gt)*self.split_ratio):])
+    self.testset = ArrDataset(test_gt)
 
 class Abide(BrainBase):
   def __init__(self, 
@@ -107,11 +106,11 @@ class SliceDataset(data.Dataset):
     # Load data and get label
     path, aseg_path = self.slices[index]
     x = np.load(path)[np.newaxis]
-    y = np.load(aseg_path)[np.newaxis]
+    # y = np.load(aseg_path)[np.newaxis]
     if self.transform is not None:
       x = self.transform(x)
 
-    return x, y
+    return x
 
 class SliceVolDataset(data.Dataset):
   def __init__(self, data_path, split, total_subjects=None, transform=None, subsample=False):

@@ -67,4 +67,4 @@ class SliceDataset(torch.utils.data.Dataset):
     if self.transform is not None:
       x = self.transform(x)
 
-    return x, x
+    return x
