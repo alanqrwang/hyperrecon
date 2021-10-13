@@ -57,7 +57,7 @@ class EPIVertical(BaseMask):
     # mask[:, random_line_idx] = 1.
     # print('Generated EPI Vertical with mean', mask.mean())
 
-    path = '/share/sablab/nfs02/users/aw847/data/masks/EPI_vertical_{rate}_{dim1}_{dim2}.npy'.format(rate=self.rate, dim1=self.dims[0], dim2=self.dims[1])
+    path = '/share/sablab/nfs02/users/aw847/data/masks/EPI_vertical_{rate}_percentacs50_{dim1}_{dim2}.npy'.format(rate=self.rate, dim1=self.dims[0], dim2=self.dims[1])
     print('Loading mask:', path)
     mask = np.load(path)
     mask = np.fft.fftshift(mask)

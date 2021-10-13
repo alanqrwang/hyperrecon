@@ -21,23 +21,23 @@ class Data_Consistency(object):
     mask = self.mask_module(batch_size).cuda()
     measurement = self.forward_model(pred, mask)
     measurement_gt = self.forward_model(gt, mask)
-    dc = torch.sum(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
+    dc = torch.mean(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
     return dc
 
 class Total_Variation(object):
   def __call__(self, pred, gt):
     """Total variation loss.
 
-    x : torch.Tensor (batch_size, img_height, img_width, 2)
+    x : torch.Tensor (batch_size, n_ch, img_height, img_width)
       Input image
     """
     del gt
-    tv_x = torch.sum((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
-    tv_y = torch.sum((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
+    tv_x = torch.mean((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
+    tv_y = torch.mean((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
     if pred.shape[1] == 2:
-      tv_x += torch.sum((pred[:, 1, :, :-1] -
+      tv_x += torch.mean((pred[:, 1, :, :-1] -
                  pred[:, 1, :, 1:]).abs(), dim=(1, 2))
-      tv_y += torch.sum((pred[:, 1, :-1, :] -
+      tv_y += torch.mean((pred[:, 1, :-1, :] -
                  pred[:, 1, 1:, :]).abs(), dim=(1, 2))
     return tv_x + tv_y
 
@@ -45,6 +45,7 @@ class Total_Variation(object):
 class L1_Wavelets(object):
   def __init__(self, device):
     self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(device)
+    self.l1 = torch.nn.L1Loss(reduction='none')
 
   def __call__(self, pred, gt):
 
@@ -87,7 +88,7 @@ class L1_Wavelets(object):
     # Put in LL coefficients
     wavelets[:, :, :Yl.shape[-2], :Yl.shape[-1]] = Yl
 
-    l1_wave = torch.sum(
+    l1_wave = torch.mean(
       self.l1(wavelets, torch.zeros_like(wavelets)), dim=(1, 2, 3))
     return l1_wave
 
