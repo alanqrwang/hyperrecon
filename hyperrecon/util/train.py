@@ -385,8 +385,6 @@ class BaseTrain(object):
     """
     if verbose:
       summary_dict = {}
-      # summary_dict.update({key: self.val_metrics[key][-1]
-      #            for key in self.list_of_val_metrics})
       summary_dict.update({key: self.test_metrics[key][-1]
                  for key in self.list_of_test_metrics})
       

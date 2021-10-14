@@ -9,6 +9,7 @@ import pytorch_ssim
 # from unetsegmentation.predict import Segmenter
 from hyperrecon.model.layers import GaussianSmoothing
 from torch.nn import functional as F
+from hyperrecon.util import utils
 
 class Data_Consistency(object):
   def __init__(self, forward_model, mask_module):
@@ -16,12 +17,17 @@ class Data_Consistency(object):
     self.mask_module = mask_module
     self.l2 = torch.nn.MSELoss(reduction='none')
 
+  def forward(self, x_hat, mask):
+    Fx_hat = utils.fft(x_hat)
+    UFx_hat = Fx_hat * mask
+    return UFx_hat
+
   def __call__(self, pred, gt):
     batch_size = len(pred)
     mask = self.mask_module(batch_size).cuda()
-    measurement = self.forward_model(pred, mask)
-    measurement_gt = self.forward_model(gt, mask)
-    dc = torch.mean(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
+    measurement = self.forward(pred, mask)
+    measurement_gt = self.forward(gt, mask)
+    dc = torch.sum(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
     return dc
 
 class Total_Variation(object):
@@ -32,12 +38,12 @@ class Total_Variation(object):
       Input image
     """
     del gt
-    tv_x = torch.mean((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
-    tv_y = torch.mean((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
+    tv_x = torch.sum((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
+    tv_y = torch.sum((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
     if pred.shape[1] == 2:
-      tv_x += torch.mean((pred[:, 1, :, :-1] -
+      tv_x += torch.sum((pred[:, 1, :, :-1] -
                  pred[:, 1, :, 1:]).abs(), dim=(1, 2))
-      tv_y += torch.mean((pred[:, 1, :-1, :] -
+      tv_y += torch.sum((pred[:, 1, :-1, :] -
                  pred[:, 1, 1:, :]).abs(), dim=(1, 2))
     return tv_x + tv_y
 
