@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import matplotlib
 import numpy as np
 from .util import _parse_summary_json, extract_kernel_layer
@@ -20,8 +21,9 @@ plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-def plot_over_hyperparams(path, metric_of_interest, label, flip=False, ax=None, ylim=None, base=False, color='blue'):
+def plot_over_hyperparams(path, metric_of_interest, label, legend=False, flip=False, ax=None, ylim=None, xlim=None, base=False, color='blue'):
   ax = ax or plt.gca()
+  ax.grid()
   if metric_of_interest in ['psnr', 'ssim', 'dice']:
     ann_min, ann_max = False, True
   elif metric_of_interest in ['loss', 'hfen', 'mae']:
@@ -38,6 +40,9 @@ def plot_over_hyperparams(path, metric_of_interest, label, flip=False, ax=None, 
     hyp_parsed = _parse_summary_json(path, metric_of_interest)
     xs = [float(n) for n in hyp_parsed.keys()]
     ys = np.array([np.mean(l) for l in hyp_parsed.values()])
+    ind_sort = np.argsort(xs)
+    xs = np.sort(xs)
+    ys = ys[ind_sort]
     linestyle='-'
 
   if flip:
@@ -45,11 +50,17 @@ def plot_over_hyperparams(path, metric_of_interest, label, flip=False, ax=None, 
 
   _plot_1d(xs, ys, color=color, label=label, linestyle=linestyle, annotate_min=ann_min, annotate_max=ann_max, ax=ax)
   ax.set_title(metric_of_interest.upper())
-  ax.set_xlabel(r'$\alpha$')
+  ax.set_xlabel(r'$\lambda$', fontsize=20)
+  # ax.set_xticks([0, 0.5, 1])
+  start, end = ax.get_ylim()
+  ax.set_yticks([start, (start+end)/2, end])
+  ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%0.2f'))
   if ylim is not None:
     ax.set_ylim(ylim)
-  ax.legend()
-  ax.grid()
+  if xlim is not None:
+    ax.set_xlim(xlim)
+  if legend:
+    ax.legend()
 
 def plot_over_hyperparams_per_subject(model_path, base_paths, metric_of_interest, flip=False, ax=None, ylim=None):
   ax = ax or plt.gca()
@@ -264,7 +275,7 @@ def plot_metrics(metric, model_paths,
   print()
   return ax
 
-def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, vlim=None, colorbar=False):
+def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, vlim=None, colorbar=False, white_text=None, top_white_text=None):
   ax = ax or plt.gca()
   if rot90:
     img = np.rot90(img, k=1)
@@ -274,15 +285,25 @@ def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, v
   else:
     im = ax.imshow(img, cmap='gray')
   if title is not None:
-    ax.set_title(title, fontsize=16)
+    ax.set_title(title, fontsize=24)
   ax.set_xticks([])
   ax.set_yticks([])
   if ylabel is not None:
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(ylabel, fontsize=20)
   if xlabel is not None:
-    ax.set_xlabel(xlabel)
+    ax.set_xlabel(xlabel, fontsize=20)
   if colorbar:
     plt.colorbar(im, ax=ax)
+  if white_text is not None:
+    ax.text(1, 0, white_text,
+        verticalalignment='bottom', horizontalalignment='right',
+        transform=ax.transAxes,
+        fontsize=20, color="white")
+  if top_white_text is not None:
+    ax.text(0.5, 0.9, top_white_text,
+        verticalalignment='center', horizontalalignment='center',
+        transform=ax.transAxes,
+        fontsize=20, color="white")
   return ax, im
 
 

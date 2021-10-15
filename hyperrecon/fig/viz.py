@@ -5,6 +5,20 @@ from .plot import _plot_img
 from hyperrecon.util import metric
 import os
 from torchvision.utils import make_grid
+import matplotlib
+
+# global settings for plotting
+matplotlib.rcParams['lines.linewidth'] = 2
+SMALL_SIZE = 8
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 22
+plt.rc('font', size=BIGGER_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 def viz_pixel_range(paths, slice_idx, hparams, subject, cp, title, base=False, ax=None, rot90=True):
   '''Visualize pixel-wise range across hyperparameters.'''
@@ -61,13 +75,38 @@ def viz_all(paths, s, hparams, subject, cp, title, base=False, rot90=True):
   zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice))
 
   fig, axes = plt.subplots(1, len(hparams)+2, figsize=(17, 7))
-  _plot_img(gt_slice, ax=axes[0], rot90=rot90, title='GT', ylabel=title)
+  _plot_img(gt_slice, ax=axes[0], rot90=rot90, title='Ground Truth', ylabel=title)
   _plot_img(zf_slice, ax=axes[1], rot90=rot90, title='Input', xlabel=zf_psnr)
   for j in range(len(hparams)):
+    title = 'Recon, ' + r'$\lambda = $' + str(hparams[j])
     pred_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, pred_slice[j]))
-    _plot_img(pred_slice[j], ax=axes[j+2], rot90=rot90, title=hparams[j], xlabel=pred_psnr, vlim=[0, 1])
+    _plot_img(pred_slice[j], ax=axes[j+2], rot90=rot90, title=title, xlabel=pred_psnr, vlim=[0, 1])
   
   fig.tight_layout()
+
+def viz_base_and_hyp(hyp_path, base_paths, s, hparams, subject, base_cps, hyp_cp, rot90=True):
+  gt, zf, base_preds = _collect_base_subject(base_paths, hparams, subject, base_cps)
+  _, _, hyp_preds = _collect_hypernet_subject(hyp_path, hparams, subject, hyp_cp)
+  gt_slice = gt[s,0]
+  zf_slice = _extract_slices(zf, s)[0]
+  base_slice = _extract_slices(base_preds, s)
+  hyp_slice = _extract_slices(hyp_preds, s)
+  zf_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, zf_slice))
+
+  fig, axes = plt.subplots(2, len(hparams)+1, figsize=((len(hparams)+1)*5, 2*5))
+  _plot_img(gt_slice, ax=axes[0,0], rot90=rot90, top_white_text='Ground Truth')
+  _plot_img(zf_slice, ax=axes[1,0], rot90=rot90, top_white_text='Input', white_text=zf_psnr)
+  for j in range(len(hparams)):
+    title = r'$\lambda = $' + str(hparams[j])
+    pred_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, base_slice[j]))
+    _plot_img(base_slice[j], ax=axes[0, j+1], rot90=rot90, title=title, white_text=pred_psnr, top_white_text='Unet', vlim=[0, 1])
+  for j in range(len(hparams)):
+    title = r'$\lambda = $' + str(hparams[j])
+    pred_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, hyp_slice[j]))
+    _plot_img(hyp_slice[j], ax=axes[1, j+1], rot90=rot90, white_text=pred_psnr, top_white_text='HyperUnet', vlim=[0, 1])
+  
+  plt.subplots_adjust(wspace=0, hspace=0)
+  # fig.tight_layout()
 
 def viz_all_loupe(paths, s, hparams, subject, cp, title, base=False, rot90=True):
   if base:
