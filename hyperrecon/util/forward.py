@@ -70,9 +70,12 @@ class SuperresolutionForward(BaseForward):
 
 class DenoisingForward(BaseForward):
   '''Forward model for de-noising.'''
-  def __init__(self, sigma):
+  def __init__(self, sigma, image_dims, fixed_noise=False):
     super(DenoisingForward, self).__init__()
     self.sigma = sigma
+    self.fixed_noise = fixed_noise
+    if fixed_noise:
+      self.noise = torch.normal(0, self.sigma, size=image_dims).cuda()
 
   def __call__(self, x, *args):
     '''Downsample input.
@@ -81,6 +84,11 @@ class DenoisingForward(BaseForward):
       x: Clean image in image space (N, n_ch, l, w)
     '''
     del args
-    x_noise = x + torch.normal(0, self.sigma, size=x.shape).cuda()
+    if self.fixed_noise:
+      noise = self.noise
+    else:
+      noise = torch.normal(0, self.sigma, size=x.shape).cuda()
+
+    x_noise = x + noise
     x_noise = torch.cat((x_noise, torch.zeros_like(x_noise)), dim=1)
     return x_noise

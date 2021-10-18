@@ -285,7 +285,7 @@ def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, v
   else:
     im = ax.imshow(img, cmap='gray')
   if title is not None:
-    ax.set_title(title, fontsize=24)
+    ax.set_title(title, fontsize=28)
   ax.set_xticks([])
   ax.set_yticks([])
   if ylabel is not None:
@@ -298,7 +298,7 @@ def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, v
     ax.text(1, 0, white_text,
         verticalalignment='bottom', horizontalalignment='right',
         transform=ax.transAxes,
-        fontsize=20, color="white")
+        fontsize=24, color="white")
   if top_white_text is not None:
     ax.text(0.5, 0.9, top_white_text,
         verticalalignment='center', horizontalalignment='center',
