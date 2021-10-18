@@ -171,54 +171,54 @@ class SliceVolDataset(data.Dataset):
 
     return xs#, ys
 
-class VolumeDataset(data.Dataset):
-  def __init__(self, data_path, split, total_subjects=None, transform=None, include_seg=False):
-    super(VolumeDataset, self).__init__()
-    self.data_path = data_path
-    self.split = split
-    self.transform = transform
-    self.include_seg = include_seg
-    self.total_subjects = total_subjects
+# class VolumeDataset(data.Dataset):
+#   def __init__(self, data_path, split, total_subjects=None, transform=None, include_seg=False):
+#     super(VolumeDataset, self).__init__()
+#     self.data_path = data_path
+#     self.split = split
+#     self.transform = transform
+#     self.include_seg = include_seg
+#     self.total_subjects = total_subjects
 
-    print('Gathering subjects for dataloader')
-    self.subjects = self._gather_subjects()
-    print('done')
+#     print('Gathering subjects for dataloader')
+#     self.subjects = self._gather_subjects()
+#     print('done')
 
-  def _gather_subjects(self):
-    vol_base_path = os.path.join(self.data_path, self.split, 'origs/')
-    seg_base_path = os.path.join(self.data_path, self.split, 'asegs/')
-    vol_names = os.listdir(vol_base_path)
-    num_subjects = len(vol_names) if self.total_subjects is None else self.total_subjects
+#   def _gather_subjects(self):
+#     vol_base_path = os.path.join(self.data_path, self.split, 'origs/')
+#     seg_base_path = os.path.join(self.data_path, self.split, 'asegs/')
+#     vol_names = os.listdir(vol_base_path)
+#     num_subjects = len(vol_names) if self.total_subjects is None else self.total_subjects
 
-    subjects = []
-    for vol_name in vol_names:
-      if 'ABIDE' in vol_name and vol_name.endswith('.npz'):
-        name = vol_name[:-8]
-        vol_path = os.path.join(vol_base_path, name + 'orig.npz')
-        seg_path = os.path.join(seg_base_path, name + 'aseg.npz')
-        if self.include_seg:
-          subject = tio.Subject(
-                 mri=tio.ScalarImage(vol_path, reader=self._reader),
-                 seg=tio.ScalarImage(seg_path, reader=self._reader),
-               )
-        else:
-          subject = tio.Subject(
-                 mri=tio.ScalarImage(vol_path, reader=self._reader),
-               )
-        subjects.append(subject)
-    return subjects[:num_subjects]
+#     subjects = []
+#     for vol_name in vol_names:
+#       if 'ABIDE' in vol_name and vol_name.endswith('.npz'):
+#         name = vol_name[:-8]
+#         vol_path = os.path.join(vol_base_path, name + 'orig.npz')
+#         seg_path = os.path.join(seg_base_path, name + 'aseg.npz')
+#         if self.include_seg:
+#           subject = tio.Subject(
+#                  mri=tio.ScalarImage(vol_path, reader=self._reader),
+#                  seg=tio.ScalarImage(seg_path, reader=self._reader),
+#                )
+#         else:
+#           subject = tio.Subject(
+#                  mri=tio.ScalarImage(vol_path, reader=self._reader),
+#                )
+#         subjects.append(subject)
+#     return subjects[:num_subjects]
 
-  def _reader(self, path):
-    print('loading', path)
-    img = np.load(path)
-    img = img['vol_data']
-    img = torch.from_numpy(img).unsqueeze(0)
-    img = img.permute(0, 2, 1, 3).float()
-    # img = img[:,30:140] # Strip beginning and end slices
-    return img, np.eye(4)
+#   def _reader(self, path):
+#     print('loading', path)
+#     img = np.load(path)
+#     img = img['vol_data']
+#     img = torch.from_numpy(img).unsqueeze(0)
+#     img = img.permute(0, 2, 1, 3).float()
+#     # img = img[:,30:140] # Strip beginning and end slices
+#     return img, np.eye(4)
 
-  def get_tio_dataset(self):
-    return tio.SubjectsDataset(self.subjects, transform=self.transform)
+#   def get_tio_dataset(self):
+#     return tio.SubjectsDataset(self.subjects, transform=self.transform)
 
 
 def get_train_gt(img_dims='160_224'):
