@@ -6,6 +6,7 @@ from hyperrecon.util import metric
 import os
 from torchvision.utils import make_grid
 import matplotlib
+from hyperrecon.util import utils
 
 # global settings for plotting
 matplotlib.rcParams['lines.linewidth'] = 2
@@ -69,9 +70,13 @@ def viz_all(paths, s, hparams, subject, cp, title, base=False, rot90=True):
     gt, zf, preds = _collect_base_subject(paths, hparams, subject, cp)
   else:
     gt, zf, preds = _collect_hypernet_subject(paths, hparams, subject, cp)
+  
   gt_slice = gt[s,0]
+  gt_slice = (gt_slice - gt_slice.min()) / (gt_slice.max() - gt_slice.min())
   zf_slice = _extract_slices(zf, s)[0]
+  zf_slice = (zf_slice - zf_slice.min()) / (zf_slice.max() - zf_slice.min())
   pred_slice = _extract_slices(preds, s)
+  pred_slice = (pred_slice - pred_slice.min()) / (pred_slice.max() - pred_slice.min())
   zf_psnr = 'PSNR={:.04f}'.format(metric.psnr(gt_slice, zf_slice))
 
   fig, axes = plt.subplots(1, len(hparams)+2, figsize=(17, 7))
@@ -84,29 +89,32 @@ def viz_all(paths, s, hparams, subject, cp, title, base=False, rot90=True):
   
   fig.tight_layout()
 
-def viz_base_and_hyp(hyp_path, base_paths, s, hparams, subject, base_cps, hyp_cp, rot90=True):
+def viz_base_and_hyp(hyp_path, base_paths, slices, hparams, subject, base_cps, hyp_cp, rot90=True):
   gt, zf, base_preds = _collect_base_subject(base_paths, hparams, subject, base_cps)
   _, _, hyp_preds = _collect_hypernet_subject(hyp_path, hparams, subject, hyp_cp)
-  gt_slice = gt[s,0]
-  zf_slice = _extract_slices(zf, s)[0]
-  base_slice = _extract_slices(base_preds, s)
-  hyp_slice = _extract_slices(hyp_preds, s)
-  zf_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, zf_slice))
+  fig, axes = plt.subplots(len(slices)*2, len(hparams)+1, figsize=((len(hparams)+1)*5, len(slices)*2*5))
+  for i, s in enumerate(slices):
+    gt_slice = gt[s,0]
+    zf_slice = _extract_slices(zf, s)[0]
+    base_slice = _extract_slices(base_preds, s)
+    hyp_slice = _extract_slices(hyp_preds, s)
+    zf_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, zf_slice))
 
-  fig, axes = plt.subplots(2, len(hparams)+1, figsize=((len(hparams)+1)*5, 2*5))
-  _plot_img(gt_slice, ax=axes[0,0], rot90=rot90, top_white_text='Ground Truth')
-  _plot_img(zf_slice, ax=axes[1,0], rot90=rot90, top_white_text='Input', white_text=zf_psnr)
-  for j in range(len(hparams)):
-    title = r'$\lambda = $' + str(hparams[j])
-    pred_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, base_slice[j]))
-    _plot_img(base_slice[j], ax=axes[0, j+1], rot90=rot90, title=title, white_text=pred_psnr, top_white_text='Unet', vlim=[0, 1])
-  for j in range(len(hparams)):
-    title = r'$\lambda = $' + str(hparams[j])
-    pred_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, hyp_slice[j]))
-    _plot_img(hyp_slice[j], ax=axes[1, j+1], rot90=rot90, white_text=pred_psnr, top_white_text='HyperUnet', vlim=[0, 1])
-  
-  plt.subplots_adjust(wspace=0, hspace=0)
-  # fig.tight_layout()
+    _plot_img(gt_slice, ax=axes[i*2+0,0], rot90=rot90, top_white_text='Ground Truth')
+    _plot_img(zf_slice, ax=axes[i*2+1,0], rot90=rot90, top_white_text='Input', white_text=zf_psnr)
+    for j in range(len(hparams)):
+      title = r'$\lambda = $' + str(hparams[j]) if i == 0 else None
+      pred_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, base_slice[j]))
+      _plot_img(base_slice[j], ax=axes[i*2+0, j+1], rot90=rot90, title=title, white_text=pred_psnr, vlim=[0, 1])
+    for j in range(len(hparams)):
+      title = r'$\lambda = $' + str(hparams[j])
+      pred_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, hyp_slice[j]))
+      _plot_img(hyp_slice[j], ax=axes[i*2+1, j+1], rot90=rot90, white_text=pred_psnr, vlim=[0, 1])
+      axes[i*2+1, j+1].patch.set_edgecolor('red')  
+      axes[i*2+1, j+1].patch.set_linewidth('8')  
+    
+    plt.subplots_adjust(wspace=0.01, hspace=0.03)
+  return fig
 
 def viz_all_loupe(paths, s, hparams, subject, cp, title, base=False, rot90=True):
   if base:

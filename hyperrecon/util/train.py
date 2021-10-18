@@ -142,7 +142,7 @@ class BaseTrain(object):
       elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '4' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
         scales = [0.041984833776950836, 0.2628784775733948]
       elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '8' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
-        scales = [0.062494032084941864, 0.39319753646850586]
+        scales = [1, 1]
       elif self.undersampling_rate == '4' and self.dataset == 'knee_arr' and self.forward_type == 'superresolution':
         scales = [0.037357181310653687, 0.3851676881313324]
       elif self.denoising_sigma == 0.1 and self.dataset == 'knee_arr' and self.forward_type == 'denoising':
@@ -276,7 +276,8 @@ class BaseTrain(object):
     elif self.forward_type == 'superresolution':
       self.forward_model = SuperresolutionForward(self.undersampling_rate)
     elif self.forward_type == 'denoising':
-      self.forward_model = DenoisingForward(self.denoising_sigma)
+      fixed_noise = True if self.num_epochs == 0 else False
+      self.forward_model = DenoisingForward(self.denoising_sigma, self.image_dims, fixed_noise)
     return self.forward_model
 
   def train(self):

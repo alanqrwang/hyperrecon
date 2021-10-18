@@ -27,6 +27,8 @@ class Data_Consistency(object):
     mask = self.mask_module(batch_size).cuda()
     measurement = self.forward(pred, mask)
     measurement_gt = self.forward(gt, mask)
+    zf = utils.ifft(measurement_gt)
+    measurement_gt, zf = utils.scale(measurement_gt, zf)
     dc = torch.sum(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
     return dc
 

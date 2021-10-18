@@ -4,6 +4,7 @@ import math
 import scipy.ndimage as nd
 from unetsegmentation import test as segtest
 from perceptualloss.loss_provider import LossProvider
+from hyperrecon.util import utils
 
 def psnr(img1, img2):
   '''PSNR of two images.  
@@ -19,19 +20,18 @@ def psnr(img1, img2):
   psnr = 20 * math.log10(max_pixel / math.sqrt(mse))
   return psnr
 
-def bpsnr(bimg1, bimg2):
+def bpsnr(bimg1, bimg2, normalized=False):
   '''Compute average PSNR of a batch of images (possibly complex).
 
   Args:
     bimg1: (batch_size, c, n1, n2)
     bimg2: (batch_size, c, n1, n2)
   '''
-  bimg1 = bimg1.norm(dim=1)
-  bimg2 = bimg2.norm(dim=1)
-  # if normalized:
-  #     recons = rescale(recons)
-  #     gt = rescale(gt)
-  #     zf = rescale(zf)
+  bimg1 = bimg1.norm(dim=1, keepdim=True)
+  bimg2 = bimg2.norm(dim=1, keepdim=True)
+  if normalized:
+      bimg1 = utils.unit_rescale(bimg1)
+      bimg2 = utils.unit_rescale(bimg2)
 
   metrics = []
   for img1, img2 in zip(bimg1, bimg2):
