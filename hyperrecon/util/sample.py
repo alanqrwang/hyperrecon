@@ -5,7 +5,6 @@ class Uniform():
   def __init__(self, r1=0, r2=1):
     self.r1 = r1
     self.r2 = r2
-    print(self.r1, self.r2)
   def __call__(self, size):
     return torch.FloatTensor(*size).uniform_(self.r1, self.r2)
 

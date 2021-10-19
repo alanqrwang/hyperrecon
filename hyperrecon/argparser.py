@@ -60,7 +60,7 @@ class Parser(argparse.ArgumentParser):
               choices=['sgd', 'adam'])
     self.add_argument('--forward_type', type=str, default='csmri',
               choices=['csmri', 'inpainting', 'superresolution', 'denoising'])
-    self.add_argument('--distribution', type=str, default='csmri',
+    self.add_argument('--distribution', type=str, default='uniform',
               choices=['uniform', 'binary', 'constant'])
     self.add_argument('--uniform_bounds', nargs='+', type=float, default=(0., 1.),
               help='Bounds of uniform distribution')
@@ -76,7 +76,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
-      '--method', choices=['dhs', \
+      '--method', choices=['base_train', 'dhs', \
                            'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', \
                            'binary_anneal', \
