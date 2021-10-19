@@ -25,7 +25,7 @@ class Parser(argparse.ArgumentParser):
               help='gpu id to train on')
     self.add_argument('--date', type=str, default=None,
               help='Override date')
-    self.add_argument('--dataset', type=str, default='abide', choices=['brain_arr', 'abide', 'knee_arr', 'fastmri', 'acdc'])
+    self.add_argument('--dataset', type=str, default='abide', choices=['brain_arr', 'abide', 'knee_arr', 'fastmri', 'acdc', 'knee_arr_single'])
     self.add_argument('--num_train_subjects', type=int, default=50,
               help='Number of subjects to train on')
     self.add_argument('--num_val_subjects', type=int, default=5,
@@ -43,7 +43,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--num_epochs', type=int, default=1024,
               help='Total training epochs')
     self.add_argument('--arch', type=str, default='hyperunet',
-              choices=['hyperunet', 'last_layer_hyperunet', 'unet', 'loupe_unet', 'loupe_hyperunet', 'condloupe_hyperunet'])
+              choices=['hyperunet', 'last_layer_hyperunet', 'unet', 'loupe_unet', 'loupe_hyperunet', 'condloupe_hyperunet', 'simple_img'])
     self.add_argument('--unet_hdim', type=int, default=32)
     self.add_argument('--hnet_hdim', type=int,
               help='Hypernetwork architecture', default=64)
@@ -108,7 +108,7 @@ class Parser(argparse.ArgumentParser):
       assert args.topK is not None, 'DHS sampling must set topK'
     elif args.method == 'baseline':
       assert args.hyperparameters is not None, 'Baseline and constant must set hyperparameters'
-      assert args.arch == 'unet'
+      assert args.arch in ['unet', 'simple_img']
     elif args.method == 'constant':
       assert args.hyperparameters is not None, 'Baseline and constant must set hyperparameters'
       assert args.arch == 'hyperunet'
@@ -133,6 +133,8 @@ class Parser(argparse.ArgumentParser):
       assert args.mask_type == 'loupe'
     if args.forward_type == 'denoising':
       assert args.denoising_sigma is not None
+    if args.arch == 'simple_img':
+      assert args.dataset == 'knee_arr_single'
 
   def parse(self):
     args = self.parse_args()

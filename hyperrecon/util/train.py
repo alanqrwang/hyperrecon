@@ -11,10 +11,11 @@ from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
 from hyperrecon.model.unet import Unet, HyperUnet, LoupeUnet, LoupeHyperUnet, ConditionalLoupeHyperUnet
+from hyperrecon.model.image import SimpleImage
 # from hyperrecon.model.unet_v2 import Unet, HyperUnet, LastLayerHyperUnet
 from hyperrecon.util.forward import CSMRIForward, DenoisingForward, InpaintingForward, SuperresolutionForward
 from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHalf, SecondHalf, CenterPatch, RandomBox
-from hyperrecon.data.knee import FastMRI, KneeArr
+from hyperrecon.data.knee import FastMRI, KneeArr, KneeArrSingle
 from hyperrecon.data.brain import Abide, BrainArr
 from hyperrecon.data.cardiac import ACDC
 
@@ -184,6 +185,8 @@ class BaseTrain(object):
       dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects)
     elif self.dataset == 'knee_arr':
       dataset = KneeArr(self.batch_size)
+    elif self.dataset == 'knee_arr_single':
+      dataset = KneeArrSingle(self.batch_size)
     elif self.dataset == 'fastmri':
       dataset = FastMRI(self.batch_size, img_dims=self.image_dims)
     elif self.dataset == 'acdc':
@@ -191,7 +194,10 @@ class BaseTrain(object):
     self.train_loader, self.val_loader, self.test_loader = dataset.load()
 
   def get_model(self):
-    if self.arch == 'unet':
+    if self.arch == 'simple_img':
+      data = next(iter(self.train_loader)).float()
+      self.network = SimpleImage(self.image_dims, data).to(self.device)
+    elif self.arch == 'unet':
       self.network = Unet(
                       in_ch=self.n_ch_in,
                       out_ch=self.n_ch_out,

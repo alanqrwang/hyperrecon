@@ -30,8 +30,6 @@ class CSMRIForward(BaseForward):
     '''
     ksp = fft(fullysampled)
     under_ksp = ksp * mask
-    zf = ifft(under_ksp)
-    under_ksp, zf = scale(under_ksp, zf)
     return under_ksp
 
 class InpaintingForward(BaseForward):

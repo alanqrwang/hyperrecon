@@ -17,18 +17,11 @@ class Data_Consistency(object):
     self.mask_module = mask_module
     self.l2 = torch.nn.MSELoss(reduction='none')
 
-  def forward(self, x_hat, mask):
-    Fx_hat = utils.fft(x_hat)
-    UFx_hat = Fx_hat * mask
-    return UFx_hat
-
   def __call__(self, pred, gt):
     batch_size = len(pred)
     mask = self.mask_module(batch_size).cuda()
-    measurement = self.forward(pred, mask)
-    measurement_gt = self.forward(gt, mask)
-    zf = utils.ifft(measurement_gt)
-    measurement_gt, zf = utils.scale(measurement_gt, zf)
+    measurement = self.forward_model(pred, mask)
+    measurement_gt = self.forward_model(gt, mask)
     dc = torch.sum(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
     return dc
 

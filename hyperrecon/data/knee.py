@@ -43,6 +43,39 @@ class KneeArr(KneeBase):
       train_gt[int(len(train_gt)*0.8):])
     self.testset = ArrDataset(test_gt)
 
+class KneeArrSingle(KneeBase):
+  def __init__(self, batch_size):
+    super(KneeArrSingle, self).__init__(batch_size)
+
+    train_gt = get_train_gt()
+    train_gt = np.moveaxis(train_gt, [0,1,2,3], [0,2,3,1])
+    self.trainset = ArrDataset(
+      train_gt[0:1])
+    print(self.trainset.__len__())
+    self.valset = ArrDataset(
+      train_gt[0:1])
+    self.testset = ArrDataset(
+      train_gt[0:1])
+  
+  def load(self):
+    train_loader = torch.utils.data.DataLoader(self.trainset, 
+          batch_size=1,
+          shuffle=True,
+          num_workers=0,
+          pin_memory=True,
+          drop_last=True)
+    val_loader = torch.utils.data.DataLoader(self.valset,
+          batch_size=1,
+          shuffle=False,
+          num_workers=0,
+          pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(self.testset,
+          batch_size=1,
+          shuffle=False,
+          num_workers=0,
+          pin_memory=True)
+    return train_loader, val_loader, test_loader
+
 def get_train_gt():
   gt_path = '/share/sablab/nfs02/users/aw847/data/knee/knee_train_normalized.npy'
   print('loading', gt_path)
