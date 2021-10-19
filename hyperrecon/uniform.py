@@ -1,6 +1,4 @@
 import torch
-import numpy as np
-import random
 from hyperrecon.util.train import BaseTrain
 from hyperrecon.util.metric import bpsnr
 from hyperrecon.loss import loss_ops
@@ -8,42 +6,6 @@ import time
 from tqdm import tqdm
 import pytorch_ssim
 from hyperrecon.util import utils
-
-class Uniform(BaseTrain):
-  """Uniform."""
-
-  def __init__(self, args):
-    super(Uniform, self).__init__(args=args)
-
-  def sample_hparams(self, num_samples):
-    '''Samples hyperparameters from distribution.'''
-    return torch.FloatTensor(num_samples, self.num_hparams).uniform_(0, 1)
-
-  def set_eval_hparams(self):
-    self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
-    # self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
-    self.test_hparams = torch.tensor(np.linspace(0, 0.01, 20)).float().view(-1, 1)
-    # self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
-    # hparams = []
-    # for i in np.linspace(0, 1, 50):
-    #   for j in np.linspace(0, 1, 50):
-    #     hparams.append([i, j])
-    # self.test_hparams = torch.tensor(hparams).float()
-
-class UniformConstant(BaseTrain):
-  """UniformConstant."""
-
-  def __init__(self, args):
-    super(UniformConstant, self).__init__(args=args)
-  
-  def sample_hparams(self, num_samples):
-    '''Samples hyperparameters from distribution.'''
-    cat = random.random()
-    return torch.ones(num_samples, self.num_hparams) * cat
-
-  def set_eval_hparams(self):
-    self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
-    self.test_hparams = torch.tensor([0., 1.]).view(-1, 1)
 
 class UniformDiversityPrior(BaseTrain):
   """UniformDiversityPrior."""

@@ -10,7 +10,8 @@ import random
 from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
-from hyperrecon.model.unet import Unet, HyperUnet, LoupeUnet, LoupeHyperUnet, ConditionalLoupeHyperUnet
+from hyperrecon.model.unet import Unet, HyperUnet
+from hyperrecon.model.loupeunet import LoupeUnet, LoupeHyperUnet, ConditionalLoupeHyperUnet
 from hyperrecon.model.image import SimpleImage
 # from hyperrecon.model.unet_v2 import Unet, HyperUnet, LastLayerHyperUnet
 from hyperrecon.util.forward import CSMRIForward, DenoisingForward, InpaintingForward, SuperresolutionForward
@@ -18,6 +19,7 @@ from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHa
 from hyperrecon.data.knee import FastMRI, KneeArr, KneeArrSingle
 from hyperrecon.data.brain import Abide, BrainArr
 from hyperrecon.data.cardiac import ACDC
+from hyperrecon.util.sample import Uniform, UniformConstant, Constant, CategoricalConstant
 
 
 class BaseTrain(object):
@@ -43,6 +45,8 @@ class BaseTrain(object):
     self.forward_type = args.forward_type
     self.distance_type = args.distance_type
     self.denoising_sigma = args.denoising_sigma
+    self.distribution = args.distribution
+    self.uniform_bounds = args.uniform_bounds
     # ML
     self.dataset = args.dataset
     self.num_epochs = args.num_epochs
@@ -75,7 +79,19 @@ class BaseTrain(object):
 
   def set_eval_hparams(self):
     # hparams must be list of tensors, each of shape (num_hyperparams)
-    pass
+    if self.distribution == 'constant':
+      self.val_hparams = torch.tensor(self.hyperparameters).view(-1, 1)
+      self.test_hparams = torch.tensor(self.hyperparameters).view(-1, 1)
+    else:
+      self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
+      # self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
+      self.test_hparams = torch.tensor(np.linspace(0, 0.01, 20)).float().view(-1, 1)
+      # self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
+      # hparams = []
+      # for i in np.linspace(0, 1, 50):
+      #   for j in np.linspace(0, 1, 50):
+      #     hparams.append([i, j])
+      # self.test_hparams = torch.tensor(hparams).float()
 
   def set_monitor(self):
     self.list_of_monitor = [
@@ -123,6 +139,7 @@ class BaseTrain(object):
     self.get_dataloader()
     self.mask_module = self.get_mask()
     self.forward_model = self.get_forward_model()
+    self.sampler = self.get_sampler()
 
     self.network = self.get_model()
     self.optimizer = self.get_optimizer()
@@ -177,6 +194,17 @@ class BaseTrain(object):
     elif self.mask_type == 'loupe':
       mask = None
     return mask
+
+  def get_sampler(self):
+    if self.distribution == 'uniform':
+      sampler = Uniform(*self.uniform_bounds)
+    elif self.distribution == 'uniform_constant':
+      sampler = UniformConstant(*self.uniform_bounds)
+    elif self.distribution == 'constant':
+      sampler = Constant(self.hyperparameters)
+    elif self.distribution == 'categorical_constant':
+      sampler = CategoricalConstant([0, 0.5, 1])
+    return sampler
 
   def get_dataloader(self):
     if self.dataset == 'brain_arr':
@@ -464,7 +492,7 @@ class BaseTrain(object):
 
   def sample_hparams(self, num_samples):
     '''Samples hyperparameters from distribution.'''
-    pass
+    return self.sampler((num_samples, self.num_hparams))
 
   def generate_coefficients(self, samples):
     '''Generates coefficients from samples.'''

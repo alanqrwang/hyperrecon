@@ -60,6 +60,10 @@ class Parser(argparse.ArgumentParser):
               choices=['sgd', 'adam'])
     self.add_argument('--forward_type', type=str, default='csmri',
               choices=['csmri', 'inpainting', 'superresolution', 'denoising'])
+    self.add_argument('--distribution', type=str, default='csmri',
+              choices=['uniform', 'binary', 'constant'])
+    self.add_argument('--uniform_bounds', nargs='+', type=float, default=(0., 1.),
+              help='Bounds of uniform distribution')
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
@@ -72,10 +76,10 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
-      '--method', choices=['uniform', 'dhs', 'baseline', 'predict', \
-                           'constant', 'binary', 'hypernet_baseline_fit', \
-                           'hypernet_baseline_fit_layer', 'binary_constant_batch', \
-                           'binary_anneal', 'categorical_constant', 'uniform_constant', \
+      '--method', choices=['dhs', \
+                           'hypernet_baseline_fit', \
+                           'hypernet_baseline_fit_layer', \
+                           'binary_anneal', \
                            'uniform_diversity_prior', 'loupe_agnostic', 'loupe'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
@@ -151,10 +155,11 @@ class Parser(argparse.ArgumentParser):
       return str
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'dataset{dataset}_arch{arch}_method{method}_forward{forward}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}_res{res}'.format(
+                  'dataset{dataset}_arch{arch}_method{method}_dist{dist}_forward{forward}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}_res{res}'.format(
                     dataset=args.dataset,
                     arch=args.arch,
                     method=args.method,
+                    dist=args.distribution,
                     forward=args.forward_type,
                     mask=args.mask_type,
                     rate=args.undersampling_rate,
