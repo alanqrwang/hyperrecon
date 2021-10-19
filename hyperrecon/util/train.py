@@ -580,7 +580,7 @@ class BaseTrain(object):
     if is_val:
       self.validate()
     else:
-      self.test(save_preds=True)
+      self.test(save_preds=False)
   
   def validate(self):
     for hparam in self.val_hparams:

@@ -40,9 +40,10 @@ class LoupeUnet(nn.Module):
     batch_size = len(x)
     rate = self.undersampling_rate.repeat(batch_size)
     undersample_mask = self.loupe(batch_size, rate)
-    measurement, measurement_ft = self.forward_model.generate_measurement(x, undersample_mask)
-    out = self.unet(measurement)
-    return out, measurement, measurement_ft
+    measurement = self.forward_model(x, undersample_mask)
+    inputs = utils.ifft(measurement)
+    out = self.unet(inputs)
+    return out, inputs
   
 class LoupeHyperUnet(nn.Module):
   """HyperUnet for hyperparameter-agnostic image reconstruction"""

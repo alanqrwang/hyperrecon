@@ -43,7 +43,7 @@ def plot_over_hyperparams(path, metric_of_interest, label, legend=False, flip=Fa
     ind_sort = np.argsort(xs)
     xs = np.sort(xs)
     ys = ys[ind_sort]
-    linestyle='-'
+    linestyle='.-'
 
   if flip:
     ys = 1 - ys

@@ -20,7 +20,8 @@ class Loupe(BaseTrain):
     self.val_hparams = torch.tensor(1/float(self.undersampling_rate)).view(-1, 1)
     self.test_hparams = torch.tensor(1/float(self.undersampling_rate)).view(-1, 1)
   
-  def compute_loss(self, pred, gt):
+  def compute_loss(self, pred, gt, *args, **kwargs):
+    del args, kwargs
     return nn.MSELoss()(pred, gt)
   
   def prepare_batch(self, batch):
@@ -38,7 +39,7 @@ class Loupe(BaseTrain):
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
       pred, _ = self.inference(targets)
-      loss = self.compute_loss(pred, targets, None, None, None)
+      loss = self.compute_loss(pred, targets)
       loss.backward()
       self.optimizer.step()
     psnr = bpsnr(targets, pred)
@@ -53,9 +54,9 @@ class Loupe(BaseTrain):
     '''
     targets, _ = self.prepare_batch(batch)
     with torch.set_grad_enabled(False):
-      pred, measurement = self.inference(targets)
+      pred, inputs = self.inference(targets)
 
-    return measurement, targets, pred, hparams
+    return inputs, targets, pred, hparams
   
 class LoupeAgnostic(BaseTrain):
   """RateAgnostic."""
@@ -65,7 +66,7 @@ class LoupeAgnostic(BaseTrain):
 
   def set_eval_hparams(self):
     self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
-    self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
+    self.test_hparams = torch.tensor(np.linspace(0.0, 1.0, 20)).float().view(-1, 1)
   
   def compute_loss(self, pred, gt, *args, **kwargs):
     del args, kwargs
