@@ -85,7 +85,7 @@ class BaseTrain(object):
     else:
       self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
       # self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
-      self.test_hparams = torch.tensor(np.linspace(0, 0.01, 20)).float().view(-1, 1)
+      self.test_hparams = torch.tensor(np.linspace(0, 0.02, 20)).float().view(-1, 1)
       # self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
       # hparams = []
       # for i in np.linspace(0, 1, 50):
@@ -170,6 +170,9 @@ class BaseTrain(object):
         # scales = [0.05797722685674671, 0.27206547738363346]
     # DC + TV
     elif self.stringify_list(self.loss_list) == 'dc_tv':
+      scales = [1, 1]
+    # MinNormDC + TV
+    elif self.stringify_list(self.loss_list) == 'mindc_tv':
       scales = [1, 1]
     else:
       raise ValueError('No loss scale constants found.')

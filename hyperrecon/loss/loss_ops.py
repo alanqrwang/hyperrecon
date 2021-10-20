@@ -10,7 +10,7 @@ import pytorch_ssim
 from hyperrecon.model.layers import GaussianSmoothing
 from torch.nn import functional as F
 
-class Data_Consistency(object):
+class DataConsistency(object):
   def __init__(self, forward_model, mask_module):
     self.forward_model = forward_model
     self.mask_module = mask_module
@@ -24,7 +24,22 @@ class Data_Consistency(object):
     dc = torch.sum(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
     return dc
 
-class Total_Variation(object):
+class MinNormDataConsistency(object):
+  def __init__(self, forward_model, mask_module):
+    self.forward_model = forward_model
+    self.mask_module = mask_module
+    self.l2 = torch.nn.MSELoss(reduction='none')
+
+  def __call__(self, pred, gt, lmbda=10):
+    batch_size = len(pred)
+    mask = self.mask_module(batch_size).cuda()
+    measurement = self.forward_model(pred, mask)
+    measurement_gt = self.forward_model(gt, mask)
+    dc = torch.sum(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
+    norm = pred.view(len(pred), -1).norm(p=2, dim=1)
+    return dc + lmbda*norm
+
+class TotalVariation(object):
   def __call__(self, pred, gt):
     """Total variation loss.
 
@@ -42,7 +57,7 @@ class Total_Variation(object):
     return tv_x + tv_y
 
 
-class L1_Wavelets(object):
+class L1Wavelets(object):
   def __init__(self, device):
     self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(device)
     self.l1 = torch.nn.L1Loss(reduction='none')
@@ -93,7 +108,7 @@ class L1_Wavelets(object):
     return l1_wave
 
 
-class L1_Shearlets(object):
+class L1Shearlets(object):
   def __init__(self, dims):
     scales = [0.5] * 2
     self.shearlet = ShearletTransform(*dims, scales)
@@ -117,7 +132,7 @@ class SSIM(object):
     return ssim_out
 
 
-class Watson_DFT(object):
+class WatsonDFT(object):
   def __init__(self, device):
     provider = LossProvider()
     self.watson_dft = provider.get_loss_function(

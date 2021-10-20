@@ -73,7 +73,7 @@ class Parser(argparse.ArgumentParser):
               choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch', 'random_box', 'loupe'])
     self.add_argument('--distance_type', type=str, default='l2',
               choices=['l2', 'ssim', 'watson_dft', 'unet_enc_feat'])
-    self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
+    self.add_argument('--loss_list', choices=['dc', 'mindc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
       '--method', choices=['base_train', 'dhs', \

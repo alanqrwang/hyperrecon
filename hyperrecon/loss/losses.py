@@ -10,6 +10,7 @@ REGISTERED_SUP_LOSSES = [
                         ]
 REGISTERED_UNSUP_LOSSES = [
                               'dc',
+                              'mindc',
                               'tv',
                               'wave',
                               'shear',
@@ -34,17 +35,19 @@ def generate_loss_ops(loss_type, forward_model, mask, device):
   assert loss_type.lower() in REGISTERED_SUP_LOSSES + REGISTERED_UNSUP_LOSSES
 
   if loss_type.lower() == 'tv':
-    tx_op = loss_ops.Total_Variation()
+    tx_op = loss_ops.TotalVariation()
   elif loss_type.lower() == 'wave':
-    tx_op = loss_ops.L1_Wavelets(device)
+    tx_op = loss_ops.L1Wavelets(device)
   # elif loss_type.lower() == 'shear':
   #   tx_op = loss_ops.L1_Shearlets(mask.shape)
   elif loss_type.lower() == 'ssim':
     tx_op = loss_ops.SSIM()
   elif loss_type.lower() == 'watson-dft':
-    tx_op = loss_ops.Watson_DFT(device)
+    tx_op = loss_ops.WatsonDFT(device)
   elif loss_type.lower() == 'dc':
-    tx_op = loss_ops.Data_Consistency(forward_model, mask)
+    tx_op = loss_ops.DataConsistency(forward_model, mask)
+  elif loss_type.lower() == 'mindc':
+    tx_op = loss_ops.MinNormDataConsistency(forward_model, mask)
   elif loss_type.lower() == 'l1':
     tx_op = loss_ops.L1()
   elif loss_type.lower() == 'mse':
