@@ -12,5 +12,7 @@ class SimpleImage(nn.Module):
       self.pmask.data = init_img
     self.pmask.data = self.pmask.data.cuda()
 
-  def forward(self, zf):
-    return self.pmask.clone()
+  def forward(self, *args):
+    del args
+    mask = self.pmask.clone()
+    return mask

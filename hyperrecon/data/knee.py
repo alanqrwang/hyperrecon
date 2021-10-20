@@ -51,7 +51,6 @@ class KneeArrSingle(KneeBase):
     train_gt = np.moveaxis(train_gt, [0,1,2,3], [0,2,3,1])
     self.trainset = ArrDataset(
       train_gt[0:1])
-    print(self.trainset.__len__())
     self.valset = ArrDataset(
       train_gt[0:1])
     self.testset = ArrDataset(

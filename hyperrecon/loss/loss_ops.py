@@ -9,7 +9,6 @@ import pytorch_ssim
 # from unetsegmentation.predict import Segmenter
 from hyperrecon.model.layers import GaussianSmoothing
 from torch.nn import functional as F
-from hyperrecon.util import utils
 
 class Data_Consistency(object):
   def __init__(self, forward_model, mask_module):
