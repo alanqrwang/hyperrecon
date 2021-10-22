@@ -72,6 +72,7 @@ class BaseTrain(object):
     self.log_interval = args.log_interval
     self.num_train_subjects = args.num_train_subjects
     self.num_val_subjects = args.num_val_subjects
+    self.dc_scale = args.dc_scale
 
     self.set_eval_hparams()
     self.set_monitor()
@@ -85,7 +86,7 @@ class BaseTrain(object):
     else:
       self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
       # self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
-      self.test_hparams = torch.tensor(np.linspace(0, 0.02, 20)).float().view(-1, 1)
+      self.test_hparams = torch.tensor(np.linspace(0, 1.00, 20)).float().view(-1, 1)
       # self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
       # hparams = []
       # for i in np.linspace(0, 1, 50):
@@ -170,7 +171,8 @@ class BaseTrain(object):
         # scales = [0.05797722685674671, 0.27206547738363346]
     # DC + TV
     elif self.stringify_list(self.loss_list) == 'dc_tv':
-      scales = [1, 1]
+      # scales = [self.dc_scale, (1-self.dc_scale)]
+      scales = [0.151795, 0.0616901] # knee_arr, poisson 8p3, worst-case
     # MinNormDC + TV
     elif self.stringify_list(self.loss_list) == 'mindc_tv':
       scales = [1, 1]

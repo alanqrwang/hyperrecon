@@ -257,6 +257,7 @@ def plot_metrics(metric, model_paths,
       else:
         colors = cm.cool(np.linspace(0, 1, len(val_losses)))
         for i, (l, c) in enumerate(zip(val_losses, colors)):
+          print(l[-1])
           _plot_1d(xs, l, label=val_paths[i].split(
             '/')[-1], color=c, linestyle='--', ax=ax, annotate_max=ann_max, annotate_min=ann_min)
 

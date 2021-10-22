@@ -21,7 +21,7 @@ class DataConsistency(object):
     mask = self.mask_module(batch_size).cuda()
     measurement = self.forward_model(pred, mask)
     measurement_gt = self.forward_model(gt, mask)
-    dc = torch.sum(self.l2(measurement, measurement_gt), dim=(1, 2, 3))
+    dc = torch.mean(self.l2(measurement, measurement_gt), dim=(1, 2, 3)) * 2
     return dc
 
 class MinNormDataConsistency(object):
@@ -47,12 +47,12 @@ class TotalVariation(object):
       Input image
     """
     del gt
-    tv_x = torch.sum((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
-    tv_y = torch.sum((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
+    tv_x = torch.mean((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
+    tv_y = torch.mean((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
     if pred.shape[1] == 2:
-      tv_x += torch.sum((pred[:, 1, :, :-1] -
+      tv_x += torch.mean((pred[:, 1, :, :-1] -
                  pred[:, 1, :, 1:]).abs(), dim=(1, 2))
-      tv_y += torch.sum((pred[:, 1, :-1, :] -
+      tv_y += torch.mean((pred[:, 1, :-1, :] -
                  pred[:, 1, 1:, :]).abs(), dim=(1, 2))
     return tv_x + tv_y
 
