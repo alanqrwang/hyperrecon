@@ -82,7 +82,7 @@ class Parser(argparse.ArgumentParser):
                            'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', \
                            'binary_anneal', \
-                           'uniform_diversity_prior', 'loupe_agnostic', 'loupe'], type=str, help='Training method', required=True)
+                           'uniform_diversity_prior', 'loupe_agnostic', 'loupe', 'alternating_minimization'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_bool_arg('unet_residual', default=True)
@@ -129,8 +129,6 @@ class Parser(argparse.ArgumentParser):
       assert 'p' in args.undersampling_rate, 'Invalid undersampling rate for poisson'
     elif 'epi' in args.mask_type:
       assert 'p' not in args.undersampling_rate, 'Invalid undersampling rate for epi'
-    if args.arch == 'unet':
-      assert args.method == 'baseline', 'Unet architecture must use baseline method'
     if args.forward_type == 'csmri':
       assert args.mask_type in ['poisson', 'epi_vertical', 'epi_horizontal', 'loupe'], 'Invalid mask_type for forward model'
     elif args.forward_type == 'inpainting':

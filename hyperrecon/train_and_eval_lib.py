@@ -1,5 +1,6 @@
 """Utilities to run model training and evaluation."""
 
+from hyperrecon.alternating_minimization import AlternatingMinimization
 from hyperrecon.uniform import UniformDiversityPrior
 from hyperrecon.data_driven import DataDriven
 from hyperrecon.binary import BinaryAnneal
@@ -26,6 +27,8 @@ def get_trainer(args):
     trainer = Loupe(args)
   elif args.method.lower() == 'loupe_agnostic':
     trainer = LoupeAgnostic(args)
+  elif args.method.lower() == 'alternating_minimization':
+    trainer = AlternatingMinimization(args)
   else:
     raise NotImplementedError
   return trainer

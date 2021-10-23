@@ -172,7 +172,8 @@ class BaseTrain(object):
     # DC + TV
     elif self.stringify_list(self.loss_list) == 'dc_tv':
       # scales = [self.dc_scale, (1-self.dc_scale)]
-      scales = [0.151795, 0.0616901] # knee_arr, poisson 8p3, worst-case
+      # scales = [0.151795, 0.0616901] # knee_arr, poisson 8p3, worst-case
+      scales = [1,1]
     # MinNormDC + TV
     elif self.stringify_list(self.loss_list) == 'mindc_tv':
       scales = [1, 1]
@@ -460,7 +461,7 @@ class BaseTrain(object):
       utils.save_checkpoint(self.epoch, self.network, self.optimizer,
                   self.ckpt_dir, self.scheduler)
 
-  def compute_loss(self, pred, gt, coeffs, is_training=False):
+  def compute_loss(self, pred, gt, coeffs, scales, is_training=False):
     '''Compute loss.
 
     Args:
@@ -477,8 +478,8 @@ class BaseTrain(object):
     for i in range(len(self.losses)):
       c = coeffs[:, i]
       l = self.losses[i]
-      per_loss_scale = self.per_loss_scale_constants[i]
-      loss += c / per_loss_scale * l(pred, gt)
+      per_loss_scale = scales[i]
+      loss += c / per_loss_scale * l(pred, gt, network=self.network)
     return loss
 
   def process_loss(self, loss):
@@ -567,7 +568,7 @@ class BaseTrain(object):
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
       pred = self.inference(inputs, coeffs)
-      loss = self.compute_loss(pred, targets, coeffs, is_training=True)
+      loss = self.compute_loss(pred, targets, coeffs, scales=self.per_loss_scale_constants, is_training=True)
       loss = self.process_loss(loss)
       loss.backward()
       self.optimizer.step()
@@ -594,7 +595,7 @@ class BaseTrain(object):
       _, gt, pred, coeffs = self.get_predictions(hparam)
       for key in self.val_metrics:
         if 'loss' in key and hparam_str in key:
-          loss = self.compute_loss(pred, gt, coeffs, is_training=False)
+          loss = self.compute_loss(pred, gt, coeffs, [1, 1], is_training=False)
           loss = self.process_loss(loss).item()
           self.val_metrics[key].append(loss)
         elif 'psnr' in key and hparam_str in key:
@@ -622,7 +623,7 @@ class BaseTrain(object):
             np.save(zf_path, input[i].cpu().detach().numpy())
         for key in self.test_metrics:
           if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            loss = self.compute_loss(pred[i], gt[i], coeffs[i], is_training=False)
+            loss = self.compute_loss(pred[i], gt[i], coeffs[i], [1, 1], is_training=False)
             loss = self.process_loss(loss).item()
             self.test_metrics[key].append(loss)
           elif 'psnr' in key and hparam_str in key and 'sub{}'.format(i) in key:
