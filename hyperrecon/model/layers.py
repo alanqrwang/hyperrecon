@@ -71,8 +71,8 @@ class BatchConv2d(nn.Module):
 
     # Reshape input and get weights from hyperkernel
     out = x.permute([1, 0, 2, 3, 4]).contiguous().view(b_j, b_i * c, h, w)
-    kernel = self.get_kernel(hyp_out)
-    kernel = kernel.view(b_i * self.out_channels, self.in_channels, self.kernel_size, self.kernel_size)
+    self.kernel = self.hyperkernel(hyp_out)
+    kernel = self.kernel.view(b_i * self.out_channels, self.in_channels, self.kernel_size, self.kernel_size)
     out = F.conv2d(out, weight=kernel, bias=None, stride=self.stride, dilation=self.dilation, groups=b_i,
              padding=self.padding)
 
@@ -81,16 +81,16 @@ class BatchConv2d(nn.Module):
 
     if include_bias:
       # Get weights from hyperbias
-      bias = self.get_bias(hyp_out)
-      out = out + bias.unsqueeze(1).unsqueeze(3).unsqueeze(3)
+      self.bias = self.hyperbias(hyp_out)
+      out = out + self.bias.unsqueeze(1).unsqueeze(3).unsqueeze(3)
 
     out = out[:,0,...]
     return out
 
-  def get_kernel(self, hyp_out):
-    return self.hyperkernel(hyp_out)
-  def get_bias(self, hyp_out):
-    return self.hyperbias(hyp_out)
+  def get_kernel(self):
+    return self.kernel
+  def get_bias(self):
+    return self.bias
   def get_kernel_shape(self):
     return [self.out_channels, self.in_channels, self.kernel_size, self.kernel_size]
   def get_bias_shape(self):

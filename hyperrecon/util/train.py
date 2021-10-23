@@ -84,15 +84,13 @@ class BaseTrain(object):
       self.val_hparams = torch.tensor(self.hyperparameters).view(-1, 1)
       self.test_hparams = torch.tensor(self.hyperparameters).view(-1, 1)
     else:
-      self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
-      # self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
-      self.test_hparams = torch.tensor(np.linspace(0, 1.00, 20)).float().view(-1, 1)
-      # self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
-      # hparams = []
-      # for i in np.linspace(0, 1, 50):
-      #   for j in np.linspace(0, 1, 50):
-      #     hparams.append([i, j])
-      # self.test_hparams = torch.tensor(hparams).float()
+      hparams = [[0,0], [1,0], [1,1]]
+      self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
+      hparams = []
+      for i in np.linspace(0, 1, 50):
+        for j in np.linspace(0, 1, 50):
+          hparams.append([i, j])
+      self.test_hparams = torch.tensor(hparams).float()
 
   def set_monitor(self):
     self.list_of_monitor = [
@@ -177,6 +175,9 @@ class BaseTrain(object):
     # MinNormDC + TV
     elif self.stringify_list(self.loss_list) == 'mindc_tv':
       scales = [1, 1]
+    # DC + L1PenaltyWeights + TV
+    elif self.stringify_list(self.loss_list) == 'dc_l1pen_tv':
+      scales = [1, 1, 1]
     else:
       raise ValueError('No loss scale constants found.')
     print('\nusing loss scales', scales)
@@ -592,12 +593,11 @@ class BaseTrain(object):
     for hparam in self.val_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Validating with hparam', hparam_str)
-      _, gt, pred, coeffs = self.get_predictions(hparam)
+      _, gt, pred, losses = self.get_predictions(hparam, self.val_loader)
       for key in self.val_metrics:
         if 'loss' in key and hparam_str in key:
-          loss = self.compute_loss(pred, gt, coeffs, [1, 1], is_training=False)
-          loss = self.process_loss(loss).item()
-          self.val_metrics[key].append(loss)
+          loss = self.process_loss(losses)
+          self.val_metrics[key].append(loss.cpu().detach().numpy())
         elif 'psnr' in key and hparam_str in key:
           self.val_metrics[key].append(bpsnr(gt, pred))
         elif 'ssim' in key and hparam_str in key:
@@ -609,7 +609,7 @@ class BaseTrain(object):
     for hparam in self.test_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Testing with hparam', hparam_str)
-      input, gt, pred, coeffs = self.get_predictions(hparam, by_subject=True)
+      input, gt, pred, losses = self.get_predictions(hparam, self.test_loader, by_subject=True)
       for i in range(len(input)):
         # Save predictions to disk
         if save_preds:
@@ -623,9 +623,8 @@ class BaseTrain(object):
             np.save(zf_path, input[i].cpu().detach().numpy())
         for key in self.test_metrics:
           if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            loss = self.compute_loss(pred[i], gt[i], coeffs[i], [1, 1], is_training=False)
-            loss = self.process_loss(loss).item()
-            self.test_metrics[key].append(loss)
+            loss = self.process_loss(losses)
+            self.test_metrics[key].append(loss.cpu().detach().numpy())
           elif 'psnr' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bpsnr(gt[i], pred[i]))
           elif 'ssim' in key and hparam_str in key and 'sub{}'.format(i) in key:
@@ -640,27 +639,32 @@ class BaseTrain(object):
           #   loss_roi, _,_,_,_ = dice(pred[i], gt[i], seg[i])
           #   self.test_metrics[key].append(float(loss_roi.mean()))
 
-  def get_predictions(self, hparam, by_subject=False):
-    '''Get predictions, optionally separated by subject'''
+  def get_predictions(self, hparam, loader, by_subject=False):
+    '''Get predictions for all elements in loader with associate hparam.
+    
+    Returns:
+      Inputs: All inputs into the model
+      GTs: All ground truths
+      Preds: All predictions
+      Losses: All losses
+    '''
     all_inputs = []
     all_gts = []
     all_preds = []
-    all_coeffs = []
+    all_losses = []
 
-    loader = self.test_loader if by_subject else self.val_loader
     for batch in tqdm(loader, total=len(loader)):
-      input, gt, pred, coeff = self.eval_step(batch, hparam)
-
+      input, gt, pred, loss = self.eval_step(batch, hparam)
       all_inputs.append(input)
       all_gts.append(gt)
       all_preds.append(pred)
-      all_coeffs.append(coeff)
+      all_losses.append(loss)
 
     if by_subject:
-      return all_inputs, all_gts, all_preds, all_coeffs
+      return all_inputs, all_gts, all_preds, all_losses
     else:
       return torch.cat(all_inputs, dim=0), torch.cat(all_gts, dim=0),  \
-             torch.cat(all_preds, dim=0), torch.cat(all_coeffs, dim=0)
+             torch.cat(all_preds, dim=0), torch.cat(all_losses, dim=0)
 
 
   def eval_step(self, batch, hparams):
@@ -675,7 +679,9 @@ class BaseTrain(object):
     coeffs = self.generate_coefficients(hparams)
     with torch.set_grad_enabled(False):
       pred = self.inference(inputs, coeffs)
-    return inputs, targets, pred, coeffs
+      scales = torch.ones(len(self.loss_list))
+      loss = self.compute_loss(pred, targets, coeffs, scales=scales, is_training=False)
+    return inputs, targets, pred, loss
 
   @staticmethod
   def stringify_list(l):

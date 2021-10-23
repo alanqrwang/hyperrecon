@@ -14,6 +14,7 @@ REGISTERED_UNSUP_LOSSES = [
                               'tv',
                               'wave',
                               'shear',
+                              'l1pen'
                             ]
 
 
@@ -38,8 +39,8 @@ def generate_loss_ops(loss_type, forward_model, mask, device):
     tx_op = loss_ops.TotalVariation()
   elif loss_type.lower() == 'wave':
     tx_op = loss_ops.L1Wavelets(device)
-  # elif loss_type.lower() == 'shear':
-  #   tx_op = loss_ops.L1_Shearlets(mask.shape)
+  elif loss_type.lower() == 'shear':
+    tx_op = loss_ops.L1_Shearlets(mask.shape)
   elif loss_type.lower() == 'ssim':
     tx_op = loss_ops.SSIM()
   elif loss_type.lower() == 'watson-dft':
@@ -54,6 +55,8 @@ def generate_loss_ops(loss_type, forward_model, mask, device):
     tx_op = loss_ops.MSE()
   elif loss_type.lower() == 'dice':
     tx_op = loss_ops.DICE()
+  elif loss_type.lower() == 'l1pen':
+    tx_op = loss_ops.L1PenaltyWeights()
   else:
     raise NotImplementedError
 

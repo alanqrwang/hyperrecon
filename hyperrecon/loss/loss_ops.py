@@ -11,17 +11,23 @@ from hyperrecon.model.layers import GaussianSmoothing
 from torch.nn import functional as F
 
 class DataConsistency(object):
-  def __init__(self, forward_model, mask_module):
+  def __init__(self, forward_model, mask_module, reduction='sum'):
     self.forward_model = forward_model
     self.mask_module = mask_module
     self.l2 = torch.nn.MSELoss(reduction='none')
+    self.reduction = reduction
+    assert self.reduction in ['sum', 'mean']
 
-  def __call__(self, pred, gt):
+  def __call__(self, pred, gt, **kwargs):
+    del kwargs
     batch_size = len(pred)
     mask = self.mask_module(batch_size).cuda()
     measurement = self.forward_model(pred, mask)
     measurement_gt = self.forward_model(gt, mask)
-    dc = torch.mean(self.l2(measurement, measurement_gt), dim=(1, 2, 3)) * 2
+    if self.reduction == 'sum':
+      dc = torch.sum(self.l2(measurement, measurement_gt), dim=(1, 2, 3)) 
+    else:
+      dc = torch.mean(self.l2(measurement, measurement_gt), dim=(1, 2, 3)) * 2
     return dc
 
 class MinNormDataConsistency(object):
@@ -30,7 +36,7 @@ class MinNormDataConsistency(object):
     self.mask_module = mask_module
     self.l2 = torch.nn.MSELoss(reduction='none')
 
-  def __call__(self, pred, gt, lmbda=10):
+  def __call__(self, pred, gt, lmbda=10, **kwargs):
     batch_size = len(pred)
     mask = self.mask_module(batch_size).cuda()
     measurement = self.forward_model(pred, mask)
@@ -40,21 +46,27 @@ class MinNormDataConsistency(object):
     return dc + lmbda*norm
 
 class TotalVariation(object):
-  def __call__(self, pred, gt):
+  def __init__(self, reduction='sum'):
+    self.reduction = reduction
+    assert self.reduction in ['sum', 'mean']
+
+  def __call__(self, pred, gt, **kwargs):
     """Total variation loss.
 
     x : torch.Tensor (batch_size, n_ch, img_height, img_width)
       Input image
     """
-    del gt
-    tv_x = torch.mean((pred[:, 0, :, :-1] - pred[:, 0, :, 1:]).abs(), dim=(1, 2))
-    tv_y = torch.mean((pred[:, 0, :-1, :] - pred[:, 0, 1:, :]).abs(), dim=(1, 2))
-    if pred.shape[1] == 2:
-      tv_x += torch.mean((pred[:, 1, :, :-1] -
-                 pred[:, 1, :, 1:]).abs(), dim=(1, 2))
-      tv_y += torch.mean((pred[:, 1, :-1, :] -
-                 pred[:, 1, 1:, :]).abs(), dim=(1, 2))
-    return tv_x + tv_y
+    del gt, kwargs
+    tv = 0
+    for c in range(pred.shape[1]):
+      if self.reduction == 'sum':
+        tv_x = torch.sum((pred[:, c, :, :-1] - pred[:, c, :, 1:]).abs(), dim=(1, 2))
+        tv_y = torch.sum((pred[:, c, :-1, :] - pred[:, c, 1:, :]).abs(), dim=(1, 2))
+      else:
+        tv_x = torch.mean((pred[:, c, :, :-1] - pred[:, c, :, 1:]).abs(), dim=(1, 2))
+        tv_y = torch.mean((pred[:, c, :-1, :] - pred[:, c, 1:, :]).abs(), dim=(1, 2))
+      tv += tv_x + tv_y
+    return tv
 
 
 class L1Wavelets(object):
@@ -62,7 +74,7 @@ class L1Wavelets(object):
     self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(device)
     self.l1 = torch.nn.L1Loss(reduction='none')
 
-  def __call__(self, pred, gt):
+  def __call__(self, pred, gt, **kwargs):
 
     def nextPowerOf2(n):
       """Get next power of 2"""
@@ -80,7 +92,7 @@ class L1Wavelets(object):
       Input image
 
     """
-    del gt
+    del gt, kwargs
     Yl, Yh = self.xfm(pred)
 
     batch_size = pred.shape[0]
@@ -113,7 +125,7 @@ class L1Shearlets(object):
     scales = [0.5] * 2
     self.shearlet = ShearletTransform(*dims, scales)
 
-  def __call__(self, pred, gt):
+  def __call__(self, pred, gt, **kwargs):
     del gt
     pred = pred.norm(dim=-1) # Absolute value of complex image
     shears = self.shearlet.forward(pred)
@@ -126,7 +138,8 @@ class SSIM(object):
   def __init__(self):
     self.ssim_loss = pytorch_ssim.SSIM(size_average=False)
 
-  def __call__(self, pred, gt):
+  def __call__(self, pred, gt, **kwargs):
+    del kwargs
     assert pred.shape[1] == 1 and gt.shape[1] == 1, 'Channel dimension incorrect'
     ssim_out = 1-self.ssim_loss(pred, gt)
     return ssim_out
@@ -138,7 +151,8 @@ class WatsonDFT(object):
     self.watson_dft = provider.get_loss_function(
       'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
 
-  def __call__(self, pred, gt):
+  def __call__(self, pred, gt, **kwargs):
+    del kwargs
     loss = self.watson_dft(pred, gt) 
     return loss
 
@@ -146,7 +160,8 @@ class WatsonDFT(object):
 class L1(object):
   def __init__(self):
     self.l1 = torch.nn.L1Loss(reduction='none')
-  def __call__(self, pred, gt):
+  def __call__(self, pred, gt, **kwargs):
+    del kwargs
     l1 = torch.mean(self.l1(pred, gt), dim=(1, 2, 3))
     return l1
 
@@ -154,11 +169,13 @@ class L1(object):
 class MSE(object):
   def __init__(self):
     self.mse_loss = torch.nn.MSELoss(reduction='none')
-  def __call__(self, pred, gt):
+  def __call__(self, pred, gt, **kwargs):
+    del kwargs
     return torch.mean(self.mse_loss(pred, gt), dim=(1, 2, 3))
 
 class L2Loss(object):
-  def __call__(self, pred, gt):
+  def __call__(self, pred, gt, **kwargs):
+    del kwargs
     pred_vec = pred.view(len(pred), -1)
     gt_vec = gt.view(len(gt), -1)
     return (pred_vec - gt_vec).norm(p=2, dim=1)
@@ -181,8 +198,9 @@ class L2Loss(object):
 #     return loss
 
 class UnetEncFeat(object):
-  def __call__(self, unet_network):
-    feat_mean = unet_network.get_feature_mean()
+  def __call__(self, pred, gt, **kwargs):
+    del pred, gt
+    feat_mean = kwargs['network'].get_feature_mean()
     N = len(feat_mean)
     batch1 = feat_mean[:N//2]
     batch2 = feat_mean[N//2:]
@@ -194,9 +212,22 @@ class LPF_L2():
     sigma = 10
     self.smoothing = GaussianSmoothing(1, kernel_size, sigma)
   
-  def __call__(self, pred, gt):
+  def __call__(self, pred, gt, **kwargs):
+    del kwargs
     pred = F.pad(pred, (2, 2, 2, 2), mode='reflect')
     gt = F.pad(gt, (2, 2, 2, 2), mode='reflect')
     pred_smooth = self.smoothing(pred)
     gt_smooth = self.smoothing(gt)
     return (pred_smooth - gt_smooth).norm(p=2)
+
+class L1PenaltyWeights(object):
+  def __call__(self, pred, gt, **kwargs):
+    del gt
+    network = kwargs['network']
+    weights = network.get_conv_weights()
+
+    cap_reg = torch.zeros(len(pred), requires_grad=True).cuda()
+    for i, w in enumerate(weights):
+      w_flat = w.view(len(pred), -1)
+      cap_reg += torch.sum(torch.abs(w_flat), dim=1)
+    return cap_reg

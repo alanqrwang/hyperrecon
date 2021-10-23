@@ -162,3 +162,11 @@ class HyperUnet(nn.Module):
   
   def get_hyp_out(self, hyperparams):
     return self.hnet(hyperparams)
+
+  def get_conv_weights(self):
+    weights = []
+    modules = [module for module in self.unet.modules() if (not isinstance(module, layers.MultiSequential) and isinstance(module, layers.BatchConv2d))]
+    for l in modules:
+      weights.append(l.get_kernel())
+      weights.append(l.get_bias())
+    return weights
