@@ -4,10 +4,10 @@ from tqdm import tqdm
 import torch
 from hyperrecon.util.train import BaseTrain
 
-class AlternatingMinimization(BaseTrain):
+class AdaptiveScaling(BaseTrain):
 
   def __init__(self, args):
-    super(AlternatingMinimization, self).__init__(args=args)
+    super(AdaptiveScaling, self).__init__(args=args)
   
   def set_monitor(self):
     self.list_of_monitor = [
