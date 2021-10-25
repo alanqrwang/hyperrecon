@@ -6,7 +6,6 @@ from hyperrecon.util import metric
 import os
 from torchvision.utils import make_grid
 import matplotlib
-from hyperrecon.util import utils
 
 # global settings for plotting
 matplotlib.rcParams['lines.linewidth'] = 2
@@ -88,33 +87,6 @@ def viz_all(paths, s, hparams, subject, cp, title, base=False, rot90=True):
     _plot_img(pred_slice[j], ax=axes[j+2], rot90=rot90, title=title, xlabel=pred_psnr, vlim=[0, 1])
   
   fig.tight_layout()
-
-def viz_base_and_hyp(hyp_path, base_paths, slices, hparams, subject, base_cps, hyp_cp, rot90=True):
-  gt, zf, base_preds = _collect_base_subject(base_paths, hparams, subject, base_cps)
-  _, _, hyp_preds = _collect_hypernet_subject(hyp_path, hparams, subject, hyp_cp)
-  fig, axes = plt.subplots(len(slices)*2, len(hparams)+1, figsize=((len(hparams)+1)*5, len(slices)*2*5))
-  for i, s in enumerate(slices):
-    gt_slice = gt[s,0]
-    zf_slice = _extract_slices(zf, s)[0]
-    base_slice = _extract_slices(base_preds, s)
-    hyp_slice = _extract_slices(hyp_preds, s)
-    zf_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, zf_slice))
-
-    _plot_img(gt_slice, ax=axes[i*2+0,0], rot90=rot90, top_white_text='Ground Truth')
-    _plot_img(zf_slice, ax=axes[i*2+1,0], rot90=rot90, top_white_text='Input', white_text=zf_psnr)
-    for j in range(len(hparams)):
-      title = r'$\lambda = $' + str(hparams[j]) if i == 0 else None
-      pred_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, base_slice[j]))
-      _plot_img(base_slice[j], ax=axes[i*2+0, j+1], rot90=rot90, title=title, white_text=pred_psnr, vlim=[0, 1])
-    for j in range(len(hparams)):
-      title = r'$\lambda = $' + str(hparams[j])
-      pred_psnr = 'PSNR={:.02f}'.format(metric.psnr(gt_slice, hyp_slice[j]))
-      _plot_img(hyp_slice[j], ax=axes[i*2+1, j+1], rot90=rot90, white_text=pred_psnr, vlim=[0, 1])
-      axes[i*2+1, j+1].patch.set_edgecolor('red')  
-      axes[i*2+1, j+1].patch.set_linewidth('8')  
-    
-    plt.subplots_adjust(wspace=0.01, hspace=0.03)
-  return fig
 
 def viz_all_loupe(paths, s, hparams, subject, cp, title, base=False, rot90=True):
   if base:

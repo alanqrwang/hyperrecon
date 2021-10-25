@@ -135,7 +135,7 @@ def plot_over_hyperparams_2d(model_path, metric_of_interest, flip=False, ax=None
   if flip:
     vals = 1 - vals
 
-  _plot_2d(vals, annotate_min=ann_min, annotate_max=ann_max, xlabel='a', ylabel='b', ax=ax, vlim=vlim, all_ticks='ends')
+  _plot_2d(vals, annotate_min=ann_min, annotate_max=ann_max, xlabel='a', ylabel='b', ax=ax, vlim=vlim, all_ticks='ends', contours=[23, 24, 24.5])
   ax.set_title(metric_of_interest)
   ax.grid()
 

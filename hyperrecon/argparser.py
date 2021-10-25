@@ -13,8 +13,6 @@ class Parser(argparse.ArgumentParser):
               help='filename prefix', required=True)
     self.add_argument('--models_dir', default='/share/sablab/nfs02/users/aw847/models/HyperRecon/',
               type=str, help='directory to save models')
-    self.add_argument('--data_path', default='/share/sablab/nfs02/users/aw847/data/brain/abide/',
-              type=str, help='directory to load data')
     self.add_argument('--log_interval', type=int,
               default=25, help='Frequency of logs')
     self.add_argument('--load', type=str, default=None,
