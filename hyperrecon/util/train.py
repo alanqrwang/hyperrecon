@@ -217,9 +217,9 @@ class BaseTrain(object):
     if self.dataset == 'brain_arr':
       dataset = BrainArr(self.batch_size)
     elif self.dataset == 'abide':
-      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects)
+      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=True)
     elif self.dataset == 'knee_arr':
-      dataset = KneeArr(self.batch_size)
+      dataset = KneeArr(self.batch_size, subsample_test=True)
     elif self.dataset == 'knee_arr_single':
       dataset = KneeArrSingle(self.batch_size)
     elif self.dataset == 'fastmri':
