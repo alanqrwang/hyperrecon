@@ -20,7 +20,7 @@ class Constant():
   def __init__(self, value):
     self.value = value
   def __call__(self, size):
-    return torch.ones(*size) * self.value
+    return self.value.repeat(size[0], 1)
 
 class CategoricalConstant():
   def __init__(self, categories):

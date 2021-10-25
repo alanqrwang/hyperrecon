@@ -86,7 +86,7 @@ class Parser(argparse.ArgumentParser):
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_bool_arg('unet_residual', default=True)
-    self.add_argument('--hyperparameters', type=float, default=None)
+    self.add_argument('--hyperparameters', nargs='+', type=float, default=None)
     self.add_argument('--hypernet_baseline_fit_layer_idx', type=int, default=None)
     self.add_argument('--epoch_of_p_max', type=float, default=None, 
                         help='Epoch when p-value is maximized')
@@ -148,11 +148,11 @@ class Parser(argparse.ArgumentParser):
     else:
       date = args.date
 
-    def stringify_loss(str_loss_list):
-      str = str_loss_list[0]
+    def stringify_list(str_loss_list):
+      string = str(str_loss_list[0])
       for i in range(1, len(str_loss_list)):
-        str += '+' + str_loss_list[i]
-      return str
+        string += '+' + str(str_loss_list[i])
+      return string
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
                   'dataset{dataset}_arch{arch}_method{method}_dist{dist}_forward{forward}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}_res{res}_dcscale{dcscale}'.format(
@@ -165,12 +165,12 @@ class Parser(argparse.ArgumentParser):
                     rate=args.undersampling_rate,
                     lr=args.lr,
                     batch_size=args.batch_size,
-                    losses=stringify_loss(args.loss_list),
+                    losses=stringify_list(args.loss_list),
                     hnet_hdim=args.hnet_hdim,
                     unet_hdim=args.unet_hdim,
                     range_restrict=args.range_restrict,
                     topK=args.topK,
-                    hps=args.hyperparameters,
+                    hps=stringify_list(args.hyperparameters),
                     beta=args.beta,
                     res=args.unet_residual,
                     dcscale=args.dc_scale,

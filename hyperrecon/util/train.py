@@ -53,7 +53,7 @@ class BaseTrain(object):
     self.lr = args.lr
     self.batch_size = args.batch_size
     self.num_steps_per_epoch = args.num_steps_per_epoch
-    self.hyperparameters = args.hyperparameters
+    self.hyperparameters = torch.tensor(args.hyperparameters).view(1, -1)
     self.arch = args.arch
     self.hnet_hdim = args.hnet_hdim
     self.unet_hdim = args.unet_hdim

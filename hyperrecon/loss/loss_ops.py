@@ -227,7 +227,9 @@ class L1PenaltyWeights(object):
     weights = network.get_conv_weights()
 
     cap_reg = torch.zeros(len(pred), requires_grad=True).cuda()
-    for i, w in enumerate(weights):
-      w_flat = w.view(len(pred), -1)
+    for w in weights:
+      w_flat = w.view(len(w), -1)
+      if len(w_flat) != len(pred):
+        w_flat = w_flat.repeat(len(pred), 1)
       cap_reg += torch.sum(torch.abs(w_flat), dim=1)
     return cap_reg

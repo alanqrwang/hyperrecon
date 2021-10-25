@@ -122,6 +122,14 @@ class Unet(nn.Module):
   def get_feature_mean(self):
     return self.feature_mean
 
+  def get_conv_weights(self):
+    weights = []
+    modules = [module for module in self.modules() if (not isinstance(module, layers.MultiSequential) and isinstance(module, nn.Conv2d))]
+    for l in modules:
+      weights.append(l.weight.data)
+      weights.append(l.bias.data)
+    return weights
+
 class HyperUnet(nn.Module):
   """HyperUnet for hyperparameter-agnostic image reconstruction"""
   def __init__(self, in_units_hnet, h_units_hnet, in_ch_main, out_ch_main, h_ch_main, residual=True, use_batchnorm=False):
@@ -164,6 +172,8 @@ class HyperUnet(nn.Module):
     return self.hnet(hyperparams)
 
   def get_conv_weights(self):
+    #TODO: hacky implementation, assumes that forward pass on hyperkernel and hyperbias has been called.
+    #      Also, is dependent on batch size of the forward pass.
     weights = []
     modules = [module for module in self.unet.modules() if (not isinstance(module, layers.MultiSequential) and isinstance(module, layers.BatchConv2d))]
     for l in modules:
