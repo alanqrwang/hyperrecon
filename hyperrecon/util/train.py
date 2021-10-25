@@ -593,11 +593,10 @@ class BaseTrain(object):
     for hparam in self.val_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Validating with hparam', hparam_str)
-      _, gt, pred, losses = self.get_predictions(hparam, self.val_loader)
+      _, gt, pred, loss = self.get_predictions(hparam, self.val_loader)
       for key in self.val_metrics:
         if 'loss' in key and hparam_str in key:
-          loss = self.process_loss(losses)
-          self.val_metrics[key].append(loss.cpu().detach().numpy())
+          self.val_metrics[key].append(loss.item())
         elif 'psnr' in key and hparam_str in key:
           self.val_metrics[key].append(bpsnr(gt, pred))
         elif 'ssim' in key and hparam_str in key:
@@ -609,7 +608,7 @@ class BaseTrain(object):
     for hparam in self.test_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Testing with hparam', hparam_str)
-      input, gt, pred, losses = self.get_predictions(hparam, self.test_loader, by_subject=True)
+      input, gt, pred, loss = self.get_predictions(hparam, self.test_loader, by_subject=True)
       for i in range(len(input)):
         # Save predictions to disk
         if save_preds:
@@ -623,8 +622,7 @@ class BaseTrain(object):
             np.save(zf_path, input[i].cpu().detach().numpy())
         for key in self.test_metrics:
           if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            loss = self.process_loss(losses)
-            self.test_metrics[key].append(loss.cpu().detach().numpy())
+            self.test_metrics[key].append(loss[i].item())
           elif 'psnr' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bpsnr(gt[i], pred[i]))
           elif 'ssim' in key and hparam_str in key and 'sub{}'.format(i) in key:
@@ -646,7 +644,7 @@ class BaseTrain(object):
       Inputs: All inputs into the model
       GTs: All ground truths
       Preds: All predictions
-      Losses: All losses
+      Losses: Average loss for all predictions
     '''
     all_inputs = []
     all_gts = []
@@ -664,7 +662,7 @@ class BaseTrain(object):
       return all_inputs, all_gts, all_preds, all_losses
     else:
       return torch.cat(all_inputs, dim=0), torch.cat(all_gts, dim=0),  \
-             torch.cat(all_preds, dim=0), torch.cat(all_losses, dim=0)
+             torch.cat(all_preds, dim=0), torch.mean(all_losses).mean()
 
 
   def eval_step(self, batch, hparams):
@@ -681,6 +679,7 @@ class BaseTrain(object):
       pred = self.inference(inputs, coeffs)
       scales = torch.ones(len(self.loss_list))
       loss = self.compute_loss(pred, targets, coeffs, scales=scales, is_training=False)
+      loss = self.process_loss(loss)
     return inputs, targets, pred, loss
 
   @staticmethod
