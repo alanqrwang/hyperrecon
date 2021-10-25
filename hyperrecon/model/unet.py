@@ -126,8 +126,8 @@ class Unet(nn.Module):
     weights = []
     modules = [module for module in self.modules() if (not isinstance(module, layers.MultiSequential) and isinstance(module, nn.Conv2d))]
     for l in modules:
-      weights.append(l.weight.data)
-      weights.append(l.bias.data)
+      weights.append(l.weight.data.flatten().view(1, -1))
+      weights.append(l.bias.data.flatten().view(1, -1))
     return weights
 
 class HyperUnet(nn.Module):

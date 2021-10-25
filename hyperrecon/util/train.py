@@ -53,7 +53,7 @@ class BaseTrain(object):
     self.lr = args.lr
     self.batch_size = args.batch_size
     self.num_steps_per_epoch = args.num_steps_per_epoch
-    self.hyperparameters = torch.tensor(args.hyperparameters).view(1, -1)
+    self.hyperparameters = None if args.hyperparameters is None else torch.tensor(args.hyperparameters).view(1, -1)
     self.arch = args.arch
     self.hnet_hdim = args.hnet_hdim
     self.unet_hdim = args.unet_hdim
@@ -81,8 +81,8 @@ class BaseTrain(object):
   def set_eval_hparams(self):
     # hparams must be list of tensors, each of shape (num_hyperparams)
     if self.distribution == 'constant':
-      self.val_hparams = torch.tensor(self.hyperparameters).view(-1, 1)
-      self.test_hparams = torch.tensor(self.hyperparameters).view(-1, 1)
+      self.val_hparams = self.hyperparameters
+      self.test_hparams = self.hyperparameters
     else:
       hparams = [[0,0], [1,0], [1,1]]
       self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])

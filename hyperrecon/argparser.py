@@ -112,7 +112,7 @@ class Parser(argparse.ArgumentParser):
       assert True, 'Cannot set both cont and load path'
     if args.method == 'dhs':
       assert args.topK is not None, 'DHS sampling must set topK'
-    elif args.method == 'baseline':
+    elif args.distribution == 'constant':
       assert args.hyperparameters is not None, 'Baseline and constant must set hyperparameters'
       assert args.arch in ['unet', 'simple_img']
     elif args.method == 'constant':
@@ -149,7 +149,9 @@ class Parser(argparse.ArgumentParser):
       date = args.date
 
     def stringify_list(str_loss_list):
-      string = str(str_loss_list[0])
+      if str_loss_list is None:
+        return None
+      string = str(str_loss_list[0]) 
       for i in range(1, len(str_loss_list)):
         string += '+' + str(str_loss_list[i])
       return string
