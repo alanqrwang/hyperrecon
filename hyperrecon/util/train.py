@@ -476,18 +476,21 @@ class BaseTrain(object):
     '''
     assert len(self.losses) == coeffs.shape[1], 'loss and coeff mismatch'
     loss = 0
+    loss_dict = {}
     for i in range(len(self.losses)):
       c = coeffs[:, i]
-      l = self.losses[i]
       per_loss_scale = scales[i]
-      loss += c / per_loss_scale * l(pred, gt, network=self.network)
-    return loss
+      l = self.losses[i]
+      loss_dict[self.loss_list[i]] = l(pred, gt, network=self.network)
+      loss += c / per_loss_scale * loss_dict[self.loss_list[i]]
+    return loss, loss_dict
 
-  def process_loss(self, loss):
+  def process_loss(self, loss, loss_dict):
     '''Process loss.
 
     Args:
       loss: Per-sample loss (bs)
+      loss_dict: Dictionary of losses separated by loss type
 
     Returns:
       Scalar loss value
@@ -569,8 +572,8 @@ class BaseTrain(object):
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
       pred = self.inference(inputs, coeffs)
-      loss = self.compute_loss(pred, targets, coeffs, scales=self.per_loss_scale_constants, is_training=True)
-      loss = self.process_loss(loss)
+      loss, loss_dict = self.compute_loss(pred, targets, coeffs, scales=self.per_loss_scale_constants, is_training=True)
+      loss = self.process_loss(loss, loss_dict)
       loss.backward()
       self.optimizer.step()
     psnr = bpsnr(targets, pred)
@@ -662,7 +665,7 @@ class BaseTrain(object):
       return all_inputs, all_gts, all_preds, all_losses
     else:
       return torch.cat(all_inputs, dim=0), torch.cat(all_gts, dim=0),  \
-             torch.cat(all_preds, dim=0), torch.mean(all_losses).mean()
+             torch.cat(all_preds, dim=0), torch.tensor(all_losses).mean()
 
 
   def eval_step(self, batch, hparams):
@@ -678,8 +681,8 @@ class BaseTrain(object):
     with torch.set_grad_enabled(False):
       pred = self.inference(inputs, coeffs)
       scales = torch.ones(len(self.loss_list))
-      loss = self.compute_loss(pred, targets, coeffs, scales=scales, is_training=False)
-      loss = self.process_loss(loss)
+      loss, loss_dict = self.compute_loss(pred, targets, coeffs, scales=scales, is_training=False)
+      loss = self.process_loss(loss, loss_dict)
     return inputs, targets, pred, loss
 
   @staticmethod
