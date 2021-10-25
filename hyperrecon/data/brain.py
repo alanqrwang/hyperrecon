@@ -52,7 +52,8 @@ class Abide(BrainBase):
   def __init__(self, 
                batch_size, 
                num_train_subjects=50,
-               num_val_subjects=5):
+               num_val_subjects=5,
+               subsample_test=False):
     super(Abide, self).__init__(batch_size)
     self.data_path = '/share/sablab/nfs02/users/aw847/data/brain/abide/'
 
@@ -63,7 +64,7 @@ class Abide(BrainBase):
       self.data_path, 'validate', total_subjects=num_val_subjects, transform=transform)
     self.testset = SliceVolDataset(
       self.data_path, 'validate', total_subjects=num_val_subjects, transform=transform,
-      subsample=False)
+      subsample=subsample_test)
 
 class SliceDataset(data.Dataset):
   def __init__(self, data_path, split, total_subjects=None, transform=None):

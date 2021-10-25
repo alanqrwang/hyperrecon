@@ -30,7 +30,7 @@ class KneeBase():
     return train_loader, val_loader, test_loader
 
 class KneeArr(KneeBase):
-  def __init__(self, batch_size):
+  def __init__(self, batch_size, subsample_test=False):
     super(KneeArr, self).__init__(batch_size)
 
     train_gt = get_train_gt()
@@ -41,7 +41,10 @@ class KneeArr(KneeBase):
       train_gt[:int(len(train_gt)*0.8)])
     self.valset = ArrDataset(
       train_gt[int(len(train_gt)*0.8):])
-    self.testset = ArrDataset(test_gt)
+    if subsample_test:
+      self.testset = ArrDataset(test_gt)[:10]
+    else:
+      self.testset = ArrDataset(test_gt)
 
 class KneeArrSingle(KneeBase):
   def __init__(self, batch_size):
