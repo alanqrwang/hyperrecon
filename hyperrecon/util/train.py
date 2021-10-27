@@ -19,7 +19,7 @@ from hyperrecon.data.mask import EPIHorizontal, EPIVertical, VDSPoisson, FirstHa
 from hyperrecon.data.knee import FastMRI, KneeArr, KneeArrSingle
 from hyperrecon.data.brain import Abide, BrainArr
 from hyperrecon.data.cardiac import ACDC
-from hyperrecon.util.sample import Uniform, UniformConstant, Constant, CategoricalConstant
+from hyperrecon.util.sample import Uniform, UniformOversample, UniformConstant, Constant, CategoricalConstant
 
 
 class BaseTrain(object):
@@ -204,6 +204,8 @@ class BaseTrain(object):
   def get_sampler(self):
     if self.distribution == 'uniform':
       sampler = Uniform(*self.uniform_bounds)
+    elif self.distribution == 'uniform_oversample':
+      sampler = UniformOversample(*self.uniform_bounds)
     elif self.distribution == 'uniform_constant':
       sampler = UniformConstant(*self.uniform_bounds)
     elif self.distribution == 'constant':

@@ -59,7 +59,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--forward_type', type=str, default='csmri',
               choices=['csmri', 'inpainting', 'superresolution', 'denoising'])
     self.add_argument('--distribution', type=str, default='uniform',
-              choices=['uniform', 'binary', 'constant'])
+              choices=['uniform', 'uniform_oversample', 'binary', 'constant'])
     self.add_argument('--uniform_bounds', nargs='+', type=float, default=(0., 1.),
               help='Bounds of uniform distribution')
     self.add_argument('--dc_scale', type=float,
