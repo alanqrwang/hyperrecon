@@ -68,7 +68,6 @@ class BaseTrain(object):
     self.load = args.load
     self.cont = args.cont
     self.run_dir = args.run_dir
-    self.data_path = args.data_path
     self.log_interval = args.log_interval
     self.num_train_subjects = args.num_train_subjects
     self.num_val_subjects = args.num_val_subjects

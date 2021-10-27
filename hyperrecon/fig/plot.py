@@ -309,12 +309,12 @@ def _plot_img(img, title=None, ax=None, rot90=False, ylabel=None, xlabel=None, v
 
 
 def _plot_1d(xs, vals, linestyle='-', color='blue', label=None, ax=None,
-              annotate_max=False, annotate_min=False):
+              annotate_max=False, annotate_min=False, markersize=20):
   '''Plot line.'''
   ax = ax or plt.gca()
 
   vals = np.array(vals)
-  h = ax.plot(xs, vals, linestyle, color=color, label=label, zorder=1)
+  h = ax.plot(xs, vals, linestyle, color=color, label=label, zorder=1, markersize=markersize)
   if annotate_max:
     n_max = vals.argmax()
     xmax, ymax = xs[n_max], vals[n_max]
@@ -329,19 +329,19 @@ def _plot_1d(xs, vals, linestyle='-', color='blue', label=None, ax=None,
 def _plot_2d(grid, title=None, ax=None, vlim=None, colorbar=True,
               xlabel=None, ylabel=None, labels=None, all_ticks=None, 
               annotate_max=False, annotate_min=False, cmap='coolwarm',
-              white_text=None, contours=None, point=None):
+              white_text=None, contours=None, contour_colors=[
+            'navy', 'royalblue', 'deepskyblue'], point=None):
   ax = ax or plt.gca()
 
   if cmap == 'coolwarm':
-    cm = plt.cm.coolwarm
+    cm = plt.cm.OrRd
   else:
     cm = plt.cm.viridis
 
   num_x, num_y = grid.shape
   if contours:
     X, Y = np.meshgrid(np.arange(num_x), np.arange(num_y))
-    ax.contour(X, Y, grid, contours, colors=[
-            'cyan', 'fuchsia', 'lime'], linewidths=1.5, linestyles='--')
+    ax.contour(X, Y, grid, contours, colors=contour_colors, linewidths=1.5, linestyles='--')
 
   if annotate_max:
     ymax, xmax = np.unravel_index(grid.argmax(), grid.shape)
@@ -386,19 +386,20 @@ def _plot_2d(grid, title=None, ax=None, vlim=None, colorbar=True,
     ax.set_xticks([])
     ax.set_yticks([])
   if xlabel is not None:
-    ax.set_xlabel(xlabel)
+    ax.set_xlabel(xlabel, fontsize=28)
   if ylabel is not None:
-    ax.set_ylabel(ylabel, rotation=0)
+    ax.set_ylabel(ylabel, fontsize=28, rotation=0)
 
   if title is not None:
     ax.set_title(title, fontsize=20)
 
   if white_text is not None:
-    ax.text(0.10, 0.9, white_text, color='white', fontsize=20,
+    ax.text(0.10, 0.9, white_text, color='black', fontsize=20,
         horizontalalignment='left',
         verticalalignment='center',
         transform=ax.transAxes)
-  return ax
+  ax.xaxis.labelpad = -15
+  return ax, h
 
 def plot_prior_maps(path, ax=None, xlabel=None, ylabel=None, ticks='ends'):
   ax = ax or plt.gca()
