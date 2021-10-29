@@ -6,7 +6,7 @@ from pytorch_wavelets import DWTForward
 from torch_radon.shearlet import ShearletTransform
 from perceptualloss.loss_provider import LossProvider
 import pytorch_ssim
-# from unetsegmentation.predict import Segmenter
+from unetsegmentation.predict import Segmenter
 from hyperrecon.model.layers import GaussianSmoothing
 from torch.nn import functional as F
 
@@ -180,22 +180,22 @@ class L2Loss(object):
     gt_vec = gt.view(len(gt), -1)
     return (pred_vec - gt_vec).norm(p=2, dim=1)
 
-# class DICE():
-#   '''Compute Dice score against segmentation labels of clean images.
+class DICE():
+  '''Compute Dice score against segmentation labels of clean images.
 
-#   TODO: segtest.tester currently only supports performing testing on
-#     full volumes, not slices.
-#   '''
-#   def __init__(self):
-#     pretrained_seg_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
-#     self.segmenter = Segmenter(pretrained_seg_path)
+  TODO: segtest.tester currently only supports performing testing on
+    full volumes, not slices.
+  '''
+  def __init__(self):
+    pretrained_seg_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
+    self.segmenter = Segmenter(pretrained_seg_path)
 
-#   def __call__(self, pred, **kwargs):
-#     seg = kwargs['seg']
-#     loss = self.segmenter.predict(
-#                   recon=pred,
-#                   seg_data=seg)
-#     return loss
+  def __call__(self, pred, gt, **kwargs):
+    seg = kwargs['seg']
+    loss = self.segmenter.predict(
+                  recon=pred,
+                  seg_data=seg)
+    return loss
 
 class UnetEncFeat(object):
   def __call__(self, pred, gt, **kwargs):

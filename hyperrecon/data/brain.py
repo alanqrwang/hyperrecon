@@ -11,7 +11,7 @@ import numpy as np
 import os
 from glob import glob
 from torchvision import transforms
-from hyperrecon.model.layers import ClipByPercentile
+from hyperrecon.model.layers import ClipByPercentile, AdditiveGaussianNoise
 from .data_util import ArrDataset
 
 class BrainBase():
@@ -53,11 +53,12 @@ class Abide(BrainBase):
                batch_size, 
                num_train_subjects=50,
                num_val_subjects=5,
-               subsample_test=False):
+               subsample_test=False,
+               noise_std=0.1):
     super(Abide, self).__init__(batch_size)
     self.data_path = '/share/sablab/nfs02/users/aw847/data/brain/abide/'
 
-    transform = transforms.Compose([ClipByPercentile()])
+    transform = transforms.Compose([ClipByPercentile(), AdditiveGaussianNoise(std=noise_std)])
     self.trainset = SliceDataset(
       self.data_path, 'train', total_subjects=num_train_subjects, transform=transform)
     self.valset = SliceDataset(
@@ -107,11 +108,11 @@ class SliceDataset(data.Dataset):
     # Load data and get label
     path, aseg_path = self.slices[index]
     x = np.load(path)[np.newaxis]
-    # y = np.load(aseg_path)[np.newaxis]
+    y = np.load(aseg_path)[np.newaxis]
     if self.transform is not None:
       x = self.transform(x)
 
-    return x
+    return x, y
 
 class SliceVolDataset(data.Dataset):
   def __init__(self, data_path, split, total_subjects=None, transform=None, subsample=False):

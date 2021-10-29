@@ -155,7 +155,7 @@ class Parser(argparse.ArgumentParser):
       return string
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'dataset{dataset}_arch{arch}_method{method}_dist{dist}_forward{forward}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_beta{beta}_res{res}_dcscale{dcscale}'.format(
+                  'dataset{dataset}_arch{arch}_method{method}_dist{dist}_forward{forward}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_gauss{gauss}_res{res}_dcscale{dcscale}'.format(
                     dataset=args.dataset,
                     arch=args.arch,
                     method=args.method,
@@ -171,7 +171,7 @@ class Parser(argparse.ArgumentParser):
                     range_restrict=args.range_restrict,
                     topK=args.topK,
                     hps=stringify_list(args.hyperparameters),
-                    beta=args.beta,
+                    gauss=args.additive_gauss_std,
                     res=args.unet_residual,
                     dcscale=args.dc_scale,
                   ))

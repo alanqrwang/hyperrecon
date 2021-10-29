@@ -108,6 +108,14 @@ class ClipByPercentile(object):
 
     return img_clip
 
+class AdditiveGaussianNoise(object):
+  def __init__(self, mean=0., std=1.):
+    self.std = std
+    self.mean = mean
+      
+  def __call__(self, img):
+    noise = np.random.normal(self.mean, self.std, size=img.shape)
+    return img + noise
 class GaussianSmoothing(nn.Module):
     """
     Apply gaussian smoothing on a

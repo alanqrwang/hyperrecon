@@ -223,7 +223,7 @@ class BaseTrain(object):
     if self.dataset == 'brain_arr':
       dataset = BrainArr(self.batch_size)
     elif self.dataset == 'abide':
-      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=True)
+      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=True, noise_std=self.additive_gauss_std)
     elif self.dataset == 'knee_arr':
       dataset = KneeArr(self.batch_size, subsample_test=True)
     elif self.dataset == 'knee_arr_single':
@@ -468,7 +468,7 @@ class BaseTrain(object):
       utils.save_checkpoint(self.epoch, self.network, self.optimizer,
                   self.ckpt_dir, self.scheduler)
 
-  def compute_loss(self, pred, gt, coeffs, scales, is_training=False):
+  def compute_loss(self, pred, gt, seg, coeffs, scales, is_training=False):
     '''Compute loss.
 
     Args:
@@ -487,7 +487,7 @@ class BaseTrain(object):
       c = coeffs[:, i]
       per_loss_scale = scales[i]
       l = self.losses[i]
-      loss_dict[self.loss_list[i]] = l(pred, gt, network=self.network)
+      loss_dict[self.loss_list[i]] = l(pred, gt, seg=seg, network=self.network)
       loss += c / per_loss_scale * loss_dict[self.loss_list[i]]
     return loss, loss_dict
 
@@ -558,7 +558,9 @@ class BaseTrain(object):
       epoch_loss, epoch_psnr, epoch_time))
 
   def prepare_batch(self, batch):
-    targets = batch.view(-1, 1, *batch.shape[-2:]).float().to(self.device)
+    targets, segs = batch[0], batch[1]
+    targets = targets.view(-1, 1, *targets.shape[-2:]).float().to(self.device)
+    segs = segs.view(-1, 1, *segs.shape[-2:]).float().to(self.device)
     bs = len(targets)
 
     undersample_mask = self.mask_module(bs).to(self.device)
@@ -567,18 +569,18 @@ class BaseTrain(object):
       inputs = utils.ifft(measurements)
     else:
       inputs = measurements
-    return inputs, targets, bs
+    return inputs, targets, segs, bs
 
   def train_step(self, batch):
     '''Train for one step.'''
-    inputs, targets, batch_size = self.prepare_batch(batch)
+    inputs, targets, segs, batch_size = self.prepare_batch(batch)
     hparams = self.sample_hparams(batch_size)
     coeffs = self.generate_coefficients(hparams)
 
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
       pred = self.inference(inputs, coeffs)
-      loss, loss_dict = self.compute_loss(pred, targets, coeffs, scales=self.per_loss_scale_constants, is_training=True)
+      loss, loss_dict = self.compute_loss(pred, targets, segs, coeffs, scales=self.per_loss_scale_constants, is_training=True)
       loss = self.process_loss(loss, loss_dict)
       loss.backward()
       self.optimizer.step()
@@ -681,13 +683,13 @@ class BaseTrain(object):
       batch: Single batch from dataloader
       hparams: Single hyperparameter vector (1, num_hyperparams)
     '''
-    inputs, targets, batch_size = self.prepare_batch(batch)
+    inputs, targets, segs, batch_size = self.prepare_batch(batch)
     hparams = hparams.repeat(batch_size, 1)
     coeffs = self.generate_coefficients(hparams)
     with torch.set_grad_enabled(False):
       pred = self.inference(inputs, coeffs)
       scales = torch.ones(len(self.loss_list))
-      loss, loss_dict = self.compute_loss(pred, targets, coeffs, scales=scales, is_training=False)
+      loss, loss_dict = self.compute_loss(pred, targets, segs, coeffs, scales=scales, is_training=False)
       loss = self.process_loss(loss, loss_dict)
     return inputs, targets, pred, loss
 
