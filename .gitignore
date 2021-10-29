@@ -60,3 +60,5 @@ docs/_build/
 *.sh
 *.npy
 *paper.py
+*fig/
+*.gitignore
