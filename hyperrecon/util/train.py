@@ -83,13 +83,18 @@ class BaseTrain(object):
       self.val_hparams = self.hyperparameters
       self.test_hparams = self.hyperparameters
     else:
-      hparams = [[0,0], [1,0], [1,1]]
-      self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
-      hparams = []
-      for i in np.linspace(0, 1, 50):
-        for j in np.linspace(0, 1, 50):
-          hparams.append([i, j])
-      self.test_hparams = torch.tensor(hparams).float()
+      if self.num_hparams == 1:
+        self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
+        self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
+      elif self.num_hparams == 2:
+        self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
+        hparams = []
+        for i in np.linspace(0, 1, 50):
+          for j in np.linspace(0, 1, 50):
+            hparams.append([i, j])
+        self.test_hparams = torch.tensor(hparams).float()
+      else:
+        raise NotImplementedError()
 
   def set_monitor(self):
     self.list_of_monitor = [
