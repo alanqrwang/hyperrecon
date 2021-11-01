@@ -171,7 +171,7 @@ class SliceVolDataset(data.Dataset):
       xs = x if xs is None else np.concatenate((xs, x), axis=0)
       ys = y if ys is None else np.concatenate((ys, y), axis=0)
 
-    return xs#, ys
+    return xs, ys
 
 # class VolumeDataset(data.Dataset):
 #   def __init__(self, data_path, split, total_subjects=None, transform=None, include_seg=False):

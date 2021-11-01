@@ -9,4 +9,4 @@ class ArrDataset(data.Dataset):
 
   def __getitem__(self, index):
     # Load data and get label
-    return self.x[index]
+    return self.x[index], self.x[index]

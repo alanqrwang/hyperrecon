@@ -156,6 +156,8 @@ class BaseTrain(object):
     if self.stringify_list(self.loss_list) == 'l1_ssim':
       if self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
         scales = [0.05797722685674671, 0.27206547738363346]
+      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri' and self.additive_gauss_std == 0.1:
+        scales = [0.07826, 0.4961207]
       elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
         scales = [0.012755771, 0.0489692]
       elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
@@ -223,9 +225,9 @@ class BaseTrain(object):
     if self.dataset == 'brain_arr':
       dataset = BrainArr(self.batch_size)
     elif self.dataset == 'abide':
-      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=True, noise_std=self.additive_gauss_std)
+      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=False, noise_std=self.additive_gauss_std)
     elif self.dataset == 'knee_arr':
-      dataset = KneeArr(self.batch_size, subsample_test=True)
+      dataset = KneeArr(self.batch_size, subsample_test=False)
     elif self.dataset == 'knee_arr_single':
       dataset = KneeArrSingle(self.batch_size)
     elif self.dataset == 'fastmri':
@@ -598,7 +600,7 @@ class BaseTrain(object):
     if is_val:
       self.validate()
     else:
-      self.test(save_preds=False)
+      self.test(save_preds=True)
   
   def validate(self):
     for hparam in self.val_hparams:

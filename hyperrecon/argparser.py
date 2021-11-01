@@ -92,7 +92,7 @@ class Parser(argparse.ArgumentParser):
                         help='Minimum p value for Bernoulli annealing')
     self.add_argument('--p_max', type=float, default=None, 
                         help='Maximum p value for Bernoulli annealing')
-    self.add_argument('--additive_gauss_std', type=float, default=None, 
+    self.add_argument('--additive_gauss_std', type=float, default=0., 
                         help='Std for additive Gaussian noise')
     self.add_argument('--beta', type=float, default=10000, 
                         help='Scaling factor for diversity loss term')
