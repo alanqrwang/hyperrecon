@@ -58,7 +58,7 @@ class Abide(BrainBase):
     super(Abide, self).__init__(batch_size)
     self.data_path = '/share/sablab/nfs02/users/aw847/data/brain/abide/'
 
-    transform = transforms.Compose([ClipByPercentile(), AdditiveGaussianNoise(std=noise_std)])
+    transform = transforms.Compose([ClipByPercentile()])
     self.trainset = SliceDataset(
       self.data_path, 'train', total_subjects=num_train_subjects, transform=transform)
     self.valset = SliceDataset(

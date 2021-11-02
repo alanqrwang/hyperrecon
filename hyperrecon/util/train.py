@@ -7,6 +7,7 @@ import json
 from glob import glob
 import random
 
+import hyperrecon
 from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
@@ -44,7 +45,6 @@ class BaseTrain(object):
     self.unet_residual = args.unet_residual
     self.forward_type = args.forward_type
     self.distance_type = args.distance_type
-    self.denoising_sigma = args.denoising_sigma
     self.distribution = args.distribution
     self.uniform_bounds = args.uniform_bounds
     # ML
@@ -124,8 +124,8 @@ class BaseTrain(object):
       'watson:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ] + [
       'mae:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
-    # ] + [
-    #   'dice:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
+      'dice:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ]
 
   def set_random_seed(self):
@@ -140,14 +140,15 @@ class BaseTrain(object):
     self.per_loss_scale_constants = self.get_per_loss_scale_constants()
 
     self.get_dataloader()
-    self.mask_module = self.get_mask()
+    self.mask_model = self.get_mask()
     self.forward_model = self.get_forward_model()
     self.sampler = self.get_sampler()
+    self.noise_model = self.get_noise_model()
 
     self.network = self.get_model()
     self.optimizer = self.get_optimizer()
     self.scheduler = self.get_scheduler()
-    self.losses = compose_loss_seq(self.loss_list, self.forward_model, self.mask_module, self.device)
+    self.losses = compose_loss_seq(self.loss_list, self.forward_model, self.mask_model, self.device)
 
   def get_per_loss_scale_constants(self):
     # Constants for mean losses on test sets.
@@ -157,7 +158,7 @@ class BaseTrain(object):
       if self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
         scales = [0.05797722685674671, 0.27206547738363346]
       elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri' and self.additive_gauss_std == 0.1:
-        scales = [0.07826, 0.4961207]
+        scales = [0.0349, 0.1626]
       elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
         scales = [0.012755771, 0.0489692]
       elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
@@ -168,7 +169,7 @@ class BaseTrain(object):
         scales = [1, 1]
       elif self.undersampling_rate == '4' and self.dataset == 'knee_arr' and self.forward_type == 'superresolution':
         scales = [0.037357181310653687, 0.3851676881313324]
-      elif self.denoising_sigma == 0.1 and self.dataset == 'knee_arr' and self.forward_type == 'denoising':
+      elif self.additive_gauss_std == 0.1 and self.dataset == 'knee_arr' and self.forward_type == 'denoising':
         scales = [0.03143206238746643, 0.27412155270576477]
       else:
         scales = [1, 1]
@@ -188,6 +189,10 @@ class BaseTrain(object):
       raise ValueError('No loss scale constants found.')
     print('\nusing loss scales', scales)
     return scales
+
+  def get_noise_model(self):
+    fixed_noise = True if self.num_epochs == 0 else False
+    return hyperrecon.model.layers.AdditiveGaussianNoise(self.image_dims, std=self.additive_gauss_std, fixed=fixed_noise)
 
   def get_mask(self):
     if self.mask_type == 'poisson':
@@ -325,8 +330,7 @@ class BaseTrain(object):
     elif self.forward_type == 'superresolution':
       self.forward_model = SuperresolutionForward(self.undersampling_rate)
     elif self.forward_type == 'denoising':
-      fixed_noise = True if self.num_epochs == 0 else False
-      self.forward_model = DenoisingForward(self.denoising_sigma, self.image_dims, fixed_noise)
+      self.forward_model = DenoisingForward()
     return self.forward_model
 
   def train(self):
@@ -565,8 +569,9 @@ class BaseTrain(object):
     segs = segs.view(-1, 1, *segs.shape[-2:]).float().to(self.device)
     bs = len(targets)
 
-    undersample_mask = self.mask_module(bs).to(self.device)
+    undersample_mask = self.mask_model(bs).to(self.device)
     measurements = self.forward_model(targets, undersample_mask)
+    measurements = self.noise_model(measurements)
     if self.forward_type == 'csmri':
       inputs = utils.ifft(measurements)
     else:
@@ -606,7 +611,7 @@ class BaseTrain(object):
     for hparam in self.val_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Validating with hparam', hparam_str)
-      _, gt, pred, loss = self.get_predictions(hparam, self.val_loader)
+      _, gt, pred, _, loss = self.get_predictions(hparam, self.val_loader)
       for key in self.val_metrics:
         if 'loss' in key and hparam_str in key:
           self.val_metrics[key].append(loss.item())
@@ -621,7 +626,7 @@ class BaseTrain(object):
     for hparam in self.test_hparams:
       hparam_str = self.stringify_list(hparam.tolist())
       print('Testing with hparam', hparam_str)
-      input, gt, pred, loss = self.get_predictions(hparam, self.test_loader, by_subject=True)
+      input, gt, pred, seg, loss = self.get_predictions(hparam, self.test_loader, by_subject=True)
       for i in range(len(input)):
         # Save predictions to disk
         if save_preds:
@@ -646,9 +651,9 @@ class BaseTrain(object):
             self.test_metrics[key].append(bwatson(gt[i], pred[i]))
           elif 'mae' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bmae(gt[i], pred[i]))
-          # elif 'dice' in key and hparam_str in key and 'sub{}'.format(i) in key:
-          #   loss_roi, _,_,_,_ = dice(pred[i], gt[i], seg[i])
-          #   self.test_metrics[key].append(float(loss_roi.mean()))
+          elif 'dice' in key and hparam_str in key and 'sub{}'.format(i) in key:
+            loss_roi, _,_,_,_ = dice(pred[i], gt[i], seg[i])
+            self.test_metrics[key].append(float(loss_roi.mean()))
 
   def get_predictions(self, hparam, loader, by_subject=False):
     '''Get predictions for all elements in loader with associate hparam.
@@ -662,20 +667,23 @@ class BaseTrain(object):
     all_inputs = []
     all_gts = []
     all_preds = []
+    all_segs = []
     all_losses = []
 
     for batch in tqdm(loader, total=len(loader)):
-      input, gt, pred, loss = self.eval_step(batch, hparam)
+      input, gt, pred, seg, loss = self.eval_step(batch, hparam)
       all_inputs.append(input)
       all_gts.append(gt)
       all_preds.append(pred)
+      all_segs.append(seg)
       all_losses.append(loss)
 
     if by_subject:
-      return all_inputs, all_gts, all_preds, all_losses
+      return all_inputs, all_gts, all_preds, all_segs, all_losses
     else:
       return torch.cat(all_inputs, dim=0), torch.cat(all_gts, dim=0),  \
-             torch.cat(all_preds, dim=0), torch.tensor(all_losses).mean()
+             torch.cat(all_preds, dim=0), torch.cat(all_segs, dim=0), \
+             torch.tensor(all_losses).mean()
 
 
   def eval_step(self, batch, hparams):
@@ -693,7 +701,7 @@ class BaseTrain(object):
       scales = torch.ones(len(self.loss_list))
       loss, loss_dict = self.compute_loss(pred, targets, segs, coeffs, scales=scales, is_training=False)
       loss = self.process_loss(loss, loss_dict)
-    return inputs, targets, pred, loss
+    return inputs, targets, pred, segs, loss
 
   @staticmethod
   def stringify_list(l):
