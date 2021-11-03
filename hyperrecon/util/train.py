@@ -10,7 +10,8 @@ import random
 import hyperrecon
 from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
-from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
+from hyperrecon.util.metric import bpsnr, brpsnr, bssim, bhfen, bmae, bwatson
+from hyperrecon.loss.loss_ops import DICE
 from hyperrecon.model.unet import Unet, HyperUnet
 from hyperrecon.model.loupeunet import LoupeUnet, LoupeHyperUnet, ConditionalLoupeHyperUnet
 from hyperrecon.model.image import SimpleImage
@@ -73,6 +74,7 @@ class BaseTrain(object):
     self.num_val_subjects = args.num_val_subjects
     self.dc_scale = args.dc_scale
 
+    self.brain_seg_model = DICE()
     self.set_eval_hparams()
     self.set_monitor()
     self.set_metrics()
@@ -117,6 +119,8 @@ class BaseTrain(object):
     ] + [
       'psnr:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ] + [
+      'rpsnr:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
+    ] + [
       'ssim:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
     ] + [
       'hfen:test:' + self.stringify_list(l.tolist()) + ':sub{}'.format(s) for l in self.test_hparams for s in np.arange(self.num_val_subjects)
@@ -155,8 +159,10 @@ class BaseTrain(object):
     # TODO: handle this better
     # L1 + SSIM
     if self.stringify_list(self.loss_list) == 'l1_ssim':
-      if self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
-        scales = [0.05797722685674671, 0.27206547738363346]
+      if self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri' and self.additive_gauss_std == 0.1:
+        scales = [0.0643, 0.319]
+      elif self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
+        scales = [0.0579, 0.272]
       elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri' and self.additive_gauss_std == 0.1:
         scales = [0.0349, 0.1626]
       elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
@@ -232,7 +238,7 @@ class BaseTrain(object):
     elif self.dataset == 'abide':
       dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=False, noise_std=self.additive_gauss_std)
     elif self.dataset == 'knee_arr':
-      dataset = KneeArr(self.batch_size, subsample_test=False)
+      dataset = KneeArr(self.batch_size, subsample_test=True)
     elif self.dataset == 'knee_arr_single':
       dataset = KneeArrSingle(self.batch_size)
     elif self.dataset == 'fastmri':
@@ -641,7 +647,9 @@ class BaseTrain(object):
         for key in self.test_metrics:
           if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(loss[i].item())
-          elif 'psnr' in key and hparam_str in key and 'sub{}'.format(i) in key:
+          elif key.split(':')[0] == 'rpsnr' and hparam_str in key and 'sub{}'.format(i) in key:
+            self.test_metrics[key].append(brpsnr(gt[i], pred[i], input[i]))
+          elif key.split(':')[0] == 'psnr' and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bpsnr(gt[i], pred[i]))
           elif 'ssim' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bssim(gt[i], pred[i]))
@@ -652,8 +660,8 @@ class BaseTrain(object):
           elif 'mae' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bmae(gt[i], pred[i]))
           elif 'dice' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            loss_roi, _,_,_,_ = dice(pred[i], gt[i], seg[i])
-            self.test_metrics[key].append(float(loss_roi.mean()))
+            dice = self.brain_seg_model(pred[i], gt[i], seg=seg[i])
+            self.test_metrics[key].append(1-float(dice.mean()))
 
   def get_predictions(self, hparam, loader, by_subject=False):
     '''Get predictions for all elements in loader with associate hparam.

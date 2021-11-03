@@ -6,19 +6,21 @@ from unetsegmentation import test as segtest
 from perceptualloss.loss_provider import LossProvider
 from hyperrecon.util import utils
 
-def psnr(img1, img2):
+def psnr(gt, img):
   '''PSNR of two images.  
   
   Args:
     img1: (n1, n2)
     img2: (n1, n2)
   '''
-  mse = np.mean((img1 - img2) ** 2)
+  mse = np.mean((gt - img) ** 2)
   if mse == 0:  
     return 100
   max_pixel = 1.0
-  psnr = 20 * math.log10(max_pixel / math.sqrt(mse))
-  return psnr
+  return 20 * math.log10(max_pixel / math.sqrt(mse))
+
+def rpsnr(gt, img, zfimg):
+  return psnr(gt, img) - psnr(gt, zfimg)
 
 def bpsnr(bimg1, bimg2, normalized=False):
   '''Compute average PSNR of a batch of images (possibly complex).
@@ -38,6 +40,29 @@ def bpsnr(bimg1, bimg2, normalized=False):
     img1 = img1.cpu().detach().numpy()
     img2 = img2.cpu().detach().numpy()
     metrics.append(psnr(img1, img2))
+  return float(np.array(metrics).mean())
+
+def brpsnr(bgt, bimg, bzf, normalized=False):
+  '''Compute average PSNR of a batch of images (possibly complex).
+
+  Args:
+    bimg1: (batch_size, c, n1, n2)
+    bimg2: (batch_size, c, n1, n2)
+  '''
+  bgt = bgt.norm(dim=1, keepdim=True)
+  bimg = bimg.norm(dim=1, keepdim=True)
+  bzf = bzf.norm(dim=1, keepdim=True)
+  if normalized:
+      bgt = utils.unit_rescale(bgt)
+      bimg = utils.unit_rescale(bimg)
+      bzf = utils.unit_rescale(bzf)
+
+  metrics = []
+  for gt, img, zf in zip(bgt, bimg, bzf):
+    gt = gt.cpu().detach().numpy()
+    img = img.cpu().detach().numpy()
+    zf = zf.cpu().detach().numpy()
+    metrics.append(rpsnr(gt, img, zf))
   return float(np.array(metrics).mean())
 
 def ssim(img1, img2):
