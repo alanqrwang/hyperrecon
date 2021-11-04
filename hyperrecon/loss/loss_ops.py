@@ -18,7 +18,7 @@ class DataConsistency(object):
     self.reduction = reduction
     assert self.reduction in ['sum', 'mean']
 
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
     del kwargs
     batch_size = len(pred)
     mask = self.mask_module(batch_size).cuda()
@@ -36,7 +36,8 @@ class MinNormDataConsistency(object):
     self.mask_module = mask_module
     self.l2 = torch.nn.MSELoss(reduction='none')
 
-  def __call__(self, pred, gt, lmbda=10, **kwargs):
+  def __call__(self, gt, pred, lmbda=10, **kwargs):
+    del kwargs
     batch_size = len(pred)
     mask = self.mask_module(batch_size).cuda()
     measurement = self.forward_model(pred, mask)
@@ -50,7 +51,7 @@ class TotalVariation(object):
     self.reduction = reduction
     assert self.reduction in ['sum', 'mean']
 
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
     """Total variation loss.
 
     x : torch.Tensor (batch_size, n_ch, img_height, img_width)
@@ -74,7 +75,7 @@ class L1Wavelets(object):
     self.xfm = DWTForward(J=3, mode='zero', wave='db4').to(device)
     self.l1 = torch.nn.L1Loss(reduction='none')
 
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
 
     def nextPowerOf2(n):
       """Get next power of 2"""
@@ -125,8 +126,8 @@ class L1Shearlets(object):
     scales = [0.5] * 2
     self.shearlet = ShearletTransform(*dims, scales)
 
-  def __call__(self, pred, gt, **kwargs):
-    del gt
+  def __call__(self, gt, pred, **kwargs):
+    del gt, kwargs
     pred = pred.norm(dim=-1) # Absolute value of complex image
     shears = self.shearlet.forward(pred)
     l1_shear = torch.sum(
@@ -138,12 +139,9 @@ class SSIM(object):
   def __init__(self):
     self.ssim_loss = pytorch_ssim.SSIM(size_average=False)
 
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
     del kwargs
-    assert pred.shape[1] == 1 and gt.shape[1] == 1, 'Channel dimension incorrect'
-    ssim_out = 1-self.ssim_loss(pred, gt)
-    return ssim_out
-
+    return 1-self.ssim_loss(gt, pred)
 
 class WatsonDFT(object):
   def __init__(self, device):
@@ -151,34 +149,51 @@ class WatsonDFT(object):
     self.watson_dft = provider.get_loss_function(
       'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
 
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
     del kwargs
-    loss = self.watson_dft(pred, gt) 
+    loss = self.watson_dft(gt, pred) 
     return loss
-
 
 class L1(object):
   def __init__(self):
     self.l1 = torch.nn.L1Loss(reduction='none')
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
     del kwargs
-    l1 = torch.mean(self.l1(pred, gt), dim=(1, 2, 3))
+    l1 = torch.mean(self.l1(gt, pred), dim=(1, 2, 3))
     return l1
 
 
 class MSE(object):
   def __init__(self):
     self.mse_loss = torch.nn.MSELoss(reduction='none')
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
     del kwargs
-    return torch.mean(self.mse_loss(pred, gt), dim=(1, 2, 3))
+    return torch.mean(self.mse_loss(gt, pred), dim=(1, 2, 3))
 
 class L2Loss(object):
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
     del kwargs
-    pred_vec = pred.view(len(pred), -1)
     gt_vec = gt.view(len(gt), -1)
-    return (pred_vec - gt_vec).norm(p=2, dim=1)
+    pred_vec = pred.view(len(pred), -1)
+    return (gt_vec - pred_vec).norm(p=2, dim=1)
+
+class PSNR(object):
+  def __init__(self, max_pixel=1.0):
+    self.max_pixel = max_pixel
+    self.mse = MSE()
+  def __call__(self, gt, pred, **kwargs):
+    del kwargs
+    m = self.mse(gt, pred)
+    return 20 * torch.log10(self.max_pixel / torch.sqrt(m))
+
+class rPSNR(object):
+  def __init__(self):
+    self.psnr = PSNR()
+  def __call__(self, gt, pred, **kwargs):
+    gt = gt.norm(dim=1, keepdim=True)
+    pred = pred.norm(dim=1, keepdim=True)
+    zf = kwargs['zf'].norm(dim=1, keepdim=True)
+    return self.psnr(gt, pred) - self.psnr(gt, zf)
 
 class DICE():
   '''Compute Dice score against segmentation labels of clean images.
@@ -190,7 +205,8 @@ class DICE():
     pretrained_seg_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
     self.segmenter = Segmenter(pretrained_seg_path)
 
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
+    del gt
     seg = kwargs['seg']
     loss = self.segmenter.predict(
                   recon=pred,
@@ -198,8 +214,8 @@ class DICE():
     return loss
 
 class UnetEncFeat(object):
-  def __call__(self, pred, gt, **kwargs):
-    del pred, gt
+  def __call__(self, gt, pred, **kwargs):
+    del gt, pred
     feat_mean = kwargs['network'].get_feature_mean()
     N = len(feat_mean)
     batch1 = feat_mean[:N//2]
@@ -212,16 +228,16 @@ class LPF_L2():
     sigma = 10
     self.smoothing = GaussianSmoothing(1, kernel_size, sigma)
   
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
     del kwargs
-    pred = F.pad(pred, (2, 2, 2, 2), mode='reflect')
     gt = F.pad(gt, (2, 2, 2, 2), mode='reflect')
-    pred_smooth = self.smoothing(pred)
+    pred = F.pad(pred, (2, 2, 2, 2), mode='reflect')
     gt_smooth = self.smoothing(gt)
-    return (pred_smooth - gt_smooth).norm(p=2)
+    pred_smooth = self.smoothing(pred)
+    return (gt_smooth - pred_smooth).norm(p=2)
 
 class L1PenaltyWeights(object):
-  def __call__(self, pred, gt, **kwargs):
+  def __call__(self, gt, pred, **kwargs):
     del gt
     network = kwargs['network']
     weights = network.get_conv_weights()

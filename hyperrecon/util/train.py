@@ -10,8 +10,8 @@ import random
 import hyperrecon
 from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
-from hyperrecon.util.metric import bpsnr, brpsnr, bssim, bhfen, bmae, bwatson
-from hyperrecon.loss.loss_ops import DICE
+from hyperrecon.util.metric import bhfen
+from hyperrecon.loss import loss_ops
 from hyperrecon.model.unet import Unet, HyperUnet
 from hyperrecon.model.loupeunet import LoupeUnet, LoupeHyperUnet, ConditionalLoupeHyperUnet
 from hyperrecon.model.image import SimpleImage
@@ -74,7 +74,7 @@ class BaseTrain(object):
     self.num_val_subjects = args.num_val_subjects
     self.dc_scale = args.dc_scale
 
-    self.brain_seg_model = DICE()
+    self.brain_seg_model = loss_ops.DICE()
     self.set_eval_hparams()
     self.set_monitor()
     self.set_metrics()
@@ -158,27 +158,28 @@ class BaseTrain(object):
     # Constants for mean losses on test sets.
     # TODO: handle this better
     # L1 + SSIM
-    if self.stringify_list(self.loss_list) == 'l1_ssim':
-      if self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri' and self.additive_gauss_std == 0.1:
-        scales = [0.0643, 0.319]
-      elif self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
-        scales = [0.0579, 0.272]
-      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri' and self.additive_gauss_std == 0.1:
-        scales = [0.0349, 0.1626]
-      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
-        scales = [0.012755771, 0.0489692]
-      elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
-        scales = [0.04525472, 0.31786856]
-      elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '4' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
-        scales = [0.041984833776950836, 0.2628784775733948]
-      elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '8' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
-        scales = [1, 1]
-      elif self.undersampling_rate == '4' and self.dataset == 'knee_arr' and self.forward_type == 'superresolution':
-        scales = [0.037357181310653687, 0.3851676881313324]
-      elif self.additive_gauss_std == 0.1 and self.dataset == 'knee_arr' and self.forward_type == 'denoising':
-        scales = [0.03143206238746643, 0.27412155270576477]
-      else:
-        scales = [1, 1]
+    # if self.stringify_list(self.loss_list) == 'l1_ssim':
+      # if self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri' and self.additive_gauss_std == 0.1:
+      #   scales = [0.0643, 0.319]
+      # elif self.mask_type == 'poisson' and self.undersampling_rate == '16p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
+      #   scales = [0.0579, 0.272]
+      # elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri' and self.additive_gauss_std == 0.1:
+      #   scales = [0.0349, 0.1626]
+      # elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'abide' and self.forward_type == 'csmri':
+      #   scales = [0.012755771, 0.0489692]
+      # elif self.mask_type == 'poisson' and self.undersampling_rate == '8p3' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
+      #   scales = [0.04525472, 0.31786856]
+      # elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '4' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
+      #   scales = [0.041984833776950836, 0.2628784775733948]
+      # elif self.mask_type == 'epi_vertical' and self.undersampling_rate == '8' and self.dataset == 'knee_arr' and self.forward_type == 'csmri':
+      #   scales = [1, 1]
+      # elif self.undersampling_rate == '4' and self.dataset == 'knee_arr' and self.forward_type == 'superresolution':
+      #   scales = [0.037357181310653687, 0.3851676881313324]
+      # elif self.additive_gauss_std == 0.1 and self.dataset == 'knee_arr' and self.forward_type == 'denoising':
+      #   scales = [0.03143206238746643, 0.27412155270576477]
+      # else:
+    if True:
+      scales = [0.0556, 0.322]
         # scales = [0.05797722685674671, 0.27206547738363346]
     # DC + TV
     elif self.stringify_list(self.loss_list) == 'dc_tv':
@@ -238,7 +239,7 @@ class BaseTrain(object):
     elif self.dataset == 'abide':
       dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=False, noise_std=self.additive_gauss_std)
     elif self.dataset == 'knee_arr':
-      dataset = KneeArr(self.batch_size, subsample_test=True)
+      dataset = KneeArr(self.batch_size, subsample_test=False)
     elif self.dataset == 'knee_arr_single':
       dataset = KneeArrSingle(self.batch_size)
     elif self.dataset == 'fastmri':
@@ -480,7 +481,7 @@ class BaseTrain(object):
       utils.save_checkpoint(self.epoch, self.network, self.optimizer,
                   self.ckpt_dir, self.scheduler)
 
-  def compute_loss(self, pred, gt, seg, coeffs, scales, is_training=False):
+  def compute_loss(self, gt, pred, seg, coeffs, scales, is_training=False):
     '''Compute loss.
 
     Args:
@@ -499,7 +500,7 @@ class BaseTrain(object):
       c = coeffs[:, i]
       per_loss_scale = scales[i]
       l = self.losses[i]
-      loss_dict[self.loss_list[i]] = l(pred, gt, seg=seg, network=self.network)
+      loss_dict[self.loss_list[i]] = l(gt, pred, seg=seg, network=self.network)
       loss += c / per_loss_scale * loss_dict[self.loss_list[i]]
     return loss, loss_dict
 
@@ -593,11 +594,11 @@ class BaseTrain(object):
     self.optimizer.zero_grad()
     with torch.set_grad_enabled(True):
       pred = self.inference(inputs, coeffs)
-      loss, loss_dict = self.compute_loss(pred, targets, segs, coeffs, scales=self.per_loss_scale_constants, is_training=True)
+      loss, loss_dict = self.compute_loss(targets, pred, segs, coeffs, scales=self.per_loss_scale_constants, is_training=True)
       loss = self.process_loss(loss, loss_dict)
       loss.backward()
       self.optimizer.step()
-    psnr = bpsnr(targets, pred)
+    psnr = loss_ops.PSNR()(targets, pred)
     return loss.cpu().detach().numpy(), psnr, batch_size
 
   def eval_epoch(self, is_val):
@@ -622,9 +623,9 @@ class BaseTrain(object):
         if 'loss' in key and hparam_str in key:
           self.val_metrics[key].append(loss.item())
         elif 'psnr' in key and hparam_str in key:
-          self.val_metrics[key].append(bpsnr(gt, pred))
+          self.val_metrics[key].append(loss_ops.PSNR()(gt, pred))
         elif 'ssim' in key and hparam_str in key:
-          self.val_metrics[key].append(bssim(gt, pred))
+          self.val_metrics[key].append(1-loss_ops.SSIM()(gt, pred))
         elif 'hfen' in key and hparam_str in key:
           self.val_metrics[key].append(bhfen(gt, pred))
 
@@ -647,22 +648,21 @@ class BaseTrain(object):
         for key in self.test_metrics:
           if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(loss[i].item())
-          elif key.split(':')[0] == 'rpsnr' and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(brpsnr(gt[i], pred[i], input[i]))
           elif key.split(':')[0] == 'psnr' and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(bpsnr(gt[i], pred[i]))
-          elif 'ssim' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(bssim(gt[i], pred[i]))
+            self.test_metrics[key].append(loss_ops.PSNR()(gt[i], pred[i]).mean().item())
+          elif key.split(':')[0] == 'rpsnr' and hparam_str in key and 'sub{}'.format(i) in key:
+            self.test_metrics[key].append(loss_ops.rPSNR()(gt[i], pred[i], zf=input[i]).mean().item())
+          elif key.split(':')[0] == 'ssim' and hparam_str in key and 'sub{}'.format(i) in key:
+            self.test_metrics[key].append(1-loss_ops.SSIM()(gt[i], pred[i]).mean().item())
           elif 'hfen' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bhfen(gt[i], pred[i]))
-          elif 'watson' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(bwatson(gt[i], pred[i]))
           elif 'mae' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(bmae(gt[i], pred[i]))
+            self.test_metrics[key].append(loss_ops.L1()(gt[i], pred[i]).mean().item())
           elif 'dice' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            dice = self.brain_seg_model(pred[i], gt[i], seg=seg[i])
-            self.test_metrics[key].append(1-float(dice.mean()))
-
+            self.test_metrics[key].append(1-self.brain_seg_model(pred[i], gt[i], seg=seg[i]).mean().item())
+          elif 'watson' in key and hparam_str in key and 'sub{}'.format(i) in key:
+            self.test_metrics[key].append(loss_ops.WatsonDFT()(gt[i], pred[i]).mean().item())
+            
   def get_predictions(self, hparam, loader, by_subject=False):
     '''Get predictions for all elements in loader with associate hparam.
     
@@ -707,7 +707,7 @@ class BaseTrain(object):
     with torch.set_grad_enabled(False):
       pred = self.inference(inputs, coeffs)
       scales = torch.ones(len(self.loss_list))
-      loss, loss_dict = self.compute_loss(pred, targets, segs, coeffs, scales=scales, is_training=False)
+      loss, loss_dict = self.compute_loss(targets, pred, segs, coeffs, scales=scales, is_training=False)
       loss = self.process_loss(loss, loss_dict)
     return inputs, targets, pred, segs, loss
 

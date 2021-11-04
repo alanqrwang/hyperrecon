@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from hyperrecon.util.train import BaseTrain
-from hyperrecon.util.metric import bpsnr
-from hyperrecon.util.metric import bpsnr, bssim, bhfen, dice, bmae, bwatson
+from hyperrecon.loss import loss_ops
+from hyperrecon.util.metric import bhfen
 import os
 import numpy as np
 
@@ -42,7 +42,7 @@ class Loupe(BaseTrain):
       loss = self.compute_loss(pred, targets)
       loss.backward()
       self.optimizer.step()
-    psnr = bpsnr(targets, pred)
+    psnr = loss_ops.PSNR()(targets, pred)
     return loss.cpu().detach().numpy(), psnr, batch_size
   
   def eval_step(self, batch, hparams):
@@ -87,7 +87,7 @@ class LoupeAgnostic(BaseTrain):
       loss = self.compute_loss(pred, targets)
       loss.backward()
       self.optimizer.step()
-    psnr = bpsnr(targets, pred)
+    psnr = loss_ops.PSNR()(targets, pred)
     return loss.cpu().detach().numpy(), psnr, batch_size
   
   def eval_step(self, batch, hparams):
@@ -126,15 +126,15 @@ class LoupeAgnostic(BaseTrain):
             loss = self.process_loss(loss).item()
             self.test_metrics[key].append(loss)
           elif 'psnr' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(bpsnr(gt[i], pred[i]))
+            self.test_metrics[key].append(loss_ops.PSNR()(gt[i], pred[i]).mean().item())
           elif 'ssim' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(bssim(gt[i], pred[i]))
+            self.test_metrics[key].append(1-loss_ops.SSIM()(gt[i], pred[i]).mean().item())
           elif 'hfen' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(bhfen(gt[i], pred[i]))
           elif 'watson' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(bwatson(gt[i], pred[i]))
+            self.test_metrics[key].append(loss_ops.WatsonDFT()(gt[i], pred[i]))
           elif 'mae' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(bmae(gt[i], pred[i]))
+            self.test_metrics[key].append(loss_ops.L1()(gt[i], pred[i]))
           # elif 'dice' in key and hparam_str in key and 'sub{}'.format(i) in key:
           #   loss_roi, _,_,_,_ = dice(pred[i], gt[i], seg[i])
           #   self.test_metrics[key].append(float(loss_roi.mean()))

@@ -1,6 +1,5 @@
 import torch
 from hyperrecon.util.train import BaseTrain
-from hyperrecon.util.metric import bpsnr
 from hyperrecon.loss import loss_ops
 import time
 from tqdm import tqdm
@@ -90,7 +89,7 @@ class UniformDiversityPrior(BaseTrain):
       loss = self.process_loss(loss)
       loss.backward()
       self.optimizer.step()
-    psnr = bpsnr(targets, pred)
+    psnr = loss_ops.PSNR()(targets, pred)
     return loss.cpu().detach().numpy(), psnr, batch_size // 2, \
       recon_loss.mean().cpu().detach().numpy(), div_loss.mean().cpu().detach().numpy()
 
