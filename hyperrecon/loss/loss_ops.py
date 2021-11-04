@@ -9,6 +9,8 @@ import pytorch_ssim
 from unetsegmentation.predict import Segmenter
 from hyperrecon.model.layers import GaussianSmoothing
 from torch.nn import functional as F
+import lpips
+from hyperrecon.util import utils
 
 class DataConsistency(object):
   def __init__(self, forward_model, mask_module, reduction='sum'):
@@ -151,8 +153,22 @@ class WatsonDFT(object):
 
   def __call__(self, gt, pred, **kwargs):
     del kwargs
+    gt = utils.linear_normalization(gt, (0, 1))
+    pred = utils.linear_normalization(pred, (0, 1))
     loss = self.watson_dft(gt, pred) 
     return loss
+
+class LPIPS(object):
+  def __init__(self):
+    self.loss_fn_vgg = lpips.LPIPS(net='vgg') # closer to "traditional" perceptual loss, when used for optimization
+
+  def __call__(self, gt, pred, **kwargs):
+    del kwargs
+    gt = utils.linear_normalization(gt, (-1, 1))
+    pred = utils.linear_normalization(pred, (-1, 1))
+    gt = utils.gray2rgb(gt)
+    pred = utils.gray2rgb(pred)
+    return self.loss_fn_vgg(gt, pred)
 
 class L1(object):
   def __init__(self):

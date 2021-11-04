@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import torch
 import torch.nn.functional as F
-from .utils import fft, ifft, scale
+from .utils import fft
 
 class BaseForward(ABC):
   def __init__(self):

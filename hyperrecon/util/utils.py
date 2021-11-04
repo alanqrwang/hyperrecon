@@ -9,7 +9,6 @@ import numpy as np
 import os
 import json
 from hyperrecon.model import layers
-from hyperrecon.data import brain
 
 def fft(x):
   """Normalized 2D Fast Fourier Transform
@@ -39,30 +38,8 @@ def ifft(x):
   x = x.permute(0, 3, 1, 2)
   return x
 
-def absval(arr):
-  """
-  Takes absolute value of last dimension, if complex.
-  Input dims:  (N, n_ch, l, w)
-  Output dims: (N, l, w)
-  """
-  assert arr.shape[1] == 2 or arr.shape[1] == 1
-  arr = arr.norm(dim=1)
-  return arr
-
-def scale(y, zf):
-  """Scales inputs for numerical stability"""
-  flat_yzf = torch.flatten(absval(zf), start_dim=1, end_dim=2)
-  max_val_per_batch, _ = torch.max(flat_yzf, dim=1, keepdim=True) 
-
-  # Handling the edge case of image of all 0's
-  max_val_per_batch[max_val_per_batch==0] = 1
-  
-  y = y / max_val_per_batch.view(len(y), 1, 1, 1)
-  zf = zf / max_val_per_batch.view(len(y), 1, 1, 1)
-  return y, zf
-
-def unit_rescale(arr):
-  """Rescales a batch of images into range [0, 1]
+def linear_normalization(arr, new_range=(0, 1)):
+  """Linearly normalizes a batch of images into new_range
 
   arr: (batch_size, n_ch, l, w)
   """
@@ -76,7 +53,11 @@ def unit_rescale(arr):
   max_per_batch = max_per_batch.view(len(arr), 1, 1, 1)
   min_per_batch = min_per_batch.view(len(arr), 1, 1, 1)
 
-  return (arr - min_per_batch) / (max_per_batch - min_per_batch)
+  return (arr - min_per_batch) * (new_range[1]-new_range[0]) / (max_per_batch - min_per_batch) + new_range[0]
+
+def gray2rgb(arr):
+  '''Converts grayscale image to rgb by copying along channel dimension.'''
+  return arr.repeat(1, 3, 1, 1)
 
 def remove_sequential(network, all_layers):
   for layer in network.children():
