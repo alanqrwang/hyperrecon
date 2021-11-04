@@ -44,7 +44,7 @@ def generate_loss_ops(loss_type, forward_model, mask, device):
   elif loss_type.lower() == 'ssim':
     tx_op = loss_ops.SSIM()
   elif loss_type.lower() == 'watson-dft':
-    tx_op = loss_ops.WatsonDFT(device)
+    tx_op = loss_ops.WatsonDFT()
   elif loss_type.lower() == 'dc':
     tx_op = loss_ops.DataConsistency(forward_model, mask)
   elif loss_type.lower() == 'mindc':

@@ -146,10 +146,10 @@ class SSIM(object):
     return 1-self.ssim_loss(gt, pred)
 
 class WatsonDFT(object):
-  def __init__(self, device):
+  def __init__(self):
     provider = LossProvider()
     self.watson_dft = provider.get_loss_function(
-      'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').to(device)
+      'Watson-DFT', colorspace='grey', pretrained=True, reduction='none').cuda()
 
   def __call__(self, gt, pred, **kwargs):
     del kwargs
