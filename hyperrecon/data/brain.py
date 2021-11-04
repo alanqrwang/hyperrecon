@@ -11,7 +11,7 @@ import numpy as np
 import os
 from glob import glob
 from torchvision import transforms
-from hyperrecon.model.layers import ClipByPercentile, AdditiveGaussianNoise
+from hyperrecon.model.layers import ClipByPercentile
 from .data_util import ArrDataset
 
 class BrainBase():
@@ -75,7 +75,7 @@ class SliceDataset(data.Dataset):
     self.transform = transform
     self.total_subjects = total_subjects
 
-    print('Gathering subjects for dataloader')
+    print('Gathering subjects for ABIDE dataloader')
     self.slices = self._gather_slices()
     print('done')
 
