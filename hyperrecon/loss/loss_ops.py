@@ -160,7 +160,7 @@ class WatsonDFT(object):
 
 class LPIPS(object):
   def __init__(self):
-    self.loss_fn_vgg = lpips.LPIPS(net='vgg') # closer to "traditional" perceptual loss, when used for optimization
+    self.loss_fn_vgg = lpips.LPIPS(net='vgg') 
 
   def __call__(self, gt, pred, **kwargs):
     del kwargs
