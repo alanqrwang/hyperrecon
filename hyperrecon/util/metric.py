@@ -1,9 +1,19 @@
 import numpy as np
 import math
 import scipy.ndimage as nd
-from unetsegmentation import test as segtest
-from perceptualloss.loss_provider import LossProvider
-from hyperrecon.util import utils
+
+def psnr(gt, img):
+  '''PSNR of two images.  
+  
+  Args:
+    img1: (n1, n2)
+    img2: (n1, n2)
+  '''
+  mse = np.mean((gt - img) ** 2)
+  if mse == 0:  
+    return 100
+  max_pixel = 1.0
+  return 20 * math.log10(max_pixel / math.sqrt(mse))
 
 def hfen(img, gt, window_size=15, sigma=1.5):
   '''High-frequency error norm.'''
