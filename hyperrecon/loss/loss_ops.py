@@ -160,7 +160,7 @@ class WatsonDFT(object):
 
 class LPIPS(object):
   def __init__(self):
-    self.loss_fn_vgg = lpips.LPIPS(net='vgg') 
+    self.loss_fn_vgg = lpips.LPIPS(net='vgg').cuda() 
 
   def __call__(self, gt, pred, **kwargs):
     del kwargs
@@ -168,7 +168,7 @@ class LPIPS(object):
     pred = utils.linear_normalization(pred, (-1, 1))
     gt = utils.gray2rgb(gt)
     pred = utils.gray2rgb(pred)
-    return self.loss_fn_vgg(gt, pred)
+    return self.loss_fn_vgg(gt, pred)[..., 0, 0, 0]
 
 class L1(object):
   def __init__(self):

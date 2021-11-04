@@ -7,6 +7,7 @@ REGISTERED_SUP_LOSSES = [
                           'l1',
                           'mse',
                           'dice',
+                          'lpips',
                         ]
 REGISTERED_UNSUP_LOSSES = [
                               'dc',
@@ -57,6 +58,8 @@ def generate_loss_ops(loss_type, forward_model, mask, device):
     tx_op = loss_ops.DICE()
   elif loss_type.lower() == 'l1pen':
     tx_op = loss_ops.L1PenaltyWeights()
+  elif loss_type.lower() == 'lpips':
+    tx_op = loss_ops.LPIPS()
   else:
     raise NotImplementedError
 

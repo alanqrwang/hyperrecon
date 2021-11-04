@@ -598,7 +598,7 @@ class BaseTrain(object):
       loss = self.process_loss(loss, loss_dict)
       loss.backward()
       self.optimizer.step()
-    psnr = loss_ops.PSNR()(targets, pred)
+    psnr = loss_ops.PSNR()(targets, pred).mean().item()
     return loss.cpu().detach().numpy(), psnr, batch_size
 
   def eval_epoch(self, is_val):
@@ -623,9 +623,9 @@ class BaseTrain(object):
         if 'loss' in key and hparam_str in key:
           self.val_metrics[key].append(loss.item())
         elif 'psnr' in key and hparam_str in key:
-          self.val_metrics[key].append(loss_ops.PSNR()(gt, pred))
+          self.val_metrics[key].append(loss_ops.PSNR()(gt, pred).mean().item())
         elif 'ssim' in key and hparam_str in key:
-          self.val_metrics[key].append(1-loss_ops.SSIM()(gt, pred))
+          self.val_metrics[key].append(1-loss_ops.SSIM()(gt, pred).mean().item())
         elif 'hfen' in key and hparam_str in key:
           self.val_metrics[key].append(bhfen(gt, pred))
 
