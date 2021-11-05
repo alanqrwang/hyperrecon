@@ -6,12 +6,12 @@ For more details, please read:
 """
 import torch
 from torch.utils import data
-# import torchio as tio
 import numpy as np
 import os
 from glob import glob
 from torchvision import transforms
-from hyperrecon.model.layers import ClipByPercentile
+from hyperrecon.model.layers import ClipByPercentile, ZeroPad
+from hyperrecon.util.noise import RicianNoise
 from .data_util import ArrDataset
 
 class BrainBase():
@@ -41,7 +41,7 @@ class BrainArr(BrainBase):
     super(BrainArr, self).__init__(batch_size)
     self.split_ratio = split_ratio
     train_gt = get_train_gt()
-    test_gt = get_test_gt()
+    test_gt = get_test_gt()[:10]
     self.trainset = ArrDataset(
       train_gt[:int(len(train_gt)*self.split_ratio)])
     self.valset = ArrDataset(
@@ -54,25 +54,30 @@ class Abide(BrainBase):
                num_train_subjects=50,
                num_val_subjects=5,
                subsample_test=False,
-               noise_std=0.1):
+               img_dims=(256,256),
+               rician_snr=5,
+               clip_percentile=100):
     super(Abide, self).__init__(batch_size)
     self.data_path = '/share/sablab/nfs02/users/aw847/data/brain/abide/'
 
-    transform = transforms.Compose([ClipByPercentile()])
+    transform = transforms.Compose([ClipByPercentile(clip_percentile), ZeroPad(img_dims), RicianNoise(snr=rician_snr)])
+    target_transform = transforms.Compose([ZeroPad(img_dims)])
+
     self.trainset = SliceDataset(
-      self.data_path, 'train', total_subjects=num_train_subjects, transform=transform)
+      self.data_path, 'train', total_subjects=num_train_subjects, transform=transform, target_transform=target_transform)
     self.valset = SliceDataset(
-      self.data_path, 'validate', total_subjects=num_val_subjects, transform=transform)
+      self.data_path, 'validate', total_subjects=num_val_subjects, transform=transform, target_transform=target_transform)
     self.testset = SliceVolDataset(
-      self.data_path, 'validate', total_subjects=num_val_subjects, transform=transform,
+      self.data_path, 'validate', total_subjects=num_val_subjects, transform=transform, target_transform=target_transform,
       subsample=subsample_test)
 
 class SliceDataset(data.Dataset):
-  def __init__(self, data_path, split, total_subjects=None, transform=None):
+  def __init__(self, data_path, split, total_subjects=None, transform=None, target_transform=None):
     super(SliceDataset, self).__init__()
     self.data_path = data_path
     self.split = split
     self.transform = transform
+    self.target_transform = target_transform
     self.total_subjects = total_subjects
 
     print('Gathering subjects for ABIDE dataloader')
@@ -107,23 +112,26 @@ class SliceDataset(data.Dataset):
   def __getitem__(self, index):
     # Load data and get label
     path, aseg_path = self.slices[index]
-    x = np.load(path)[np.newaxis]
-    y = np.load(aseg_path)[np.newaxis]
+    x = np.load(path)
+    y = np.load(aseg_path)
     if self.transform is not None:
       x = self.transform(x)
+    if self.target_transform is not None:
+      y = self.target_transform(y)
 
-    return x, y
+    return x[None], y[None]
 
 class SliceVolDataset(data.Dataset):
-  def __init__(self, data_path, split, total_subjects=None, transform=None, subsample=False):
+  def __init__(self, data_path, split, total_subjects=None, transform=None, target_transform=None, subsample=False):
     super(SliceVolDataset, self).__init__()
     self.data_path = data_path
     self.split = split
     self.transform = transform
+    self.target_transform = target_transform
     self.total_subjects = total_subjects
     self.subsample = subsample
 
-    print('Gathering subjects for dataloader')
+    print('Gathering volumes for ABIDE dataloader')
     self.vols = self._gather_vols()
     print('done')
 
@@ -163,96 +171,37 @@ class SliceVolDataset(data.Dataset):
       indices = np.arange(0, 192, 20)
       vol = vol[indices]
     for path, aseg_path in vol:
-      x = np.load(path)[np.newaxis]
-      y = np.load(aseg_path)[np.newaxis]
+      x = np.load(path)
+      y = np.load(aseg_path)
       if self.transform is not None:
         x = self.transform(x)
+      if self.target_transform is not None:
+        y = self.target_transform(y)
       
-      xs = x if xs is None else np.concatenate((xs, x), axis=0)
-      ys = y if ys is None else np.concatenate((ys, y), axis=0)
+      xs = x[None] if xs is None else np.concatenate((xs, x), axis=0)
+      ys = y[None] if ys is None else np.concatenate((ys, y), axis=0)
 
     return xs, ys
 
-# class VolumeDataset(data.Dataset):
-#   def __init__(self, data_path, split, total_subjects=None, transform=None, include_seg=False):
-#     super(VolumeDataset, self).__init__()
-#     self.data_path = data_path
-#     self.split = split
-#     self.transform = transform
-#     self.include_seg = include_seg
-#     self.total_subjects = total_subjects
-
-#     print('Gathering subjects for dataloader')
-#     self.subjects = self._gather_subjects()
-#     print('done')
-
-#   def _gather_subjects(self):
-#     vol_base_path = os.path.join(self.data_path, self.split, 'origs/')
-#     seg_base_path = os.path.join(self.data_path, self.split, 'asegs/')
-#     vol_names = os.listdir(vol_base_path)
-#     num_subjects = len(vol_names) if self.total_subjects is None else self.total_subjects
-
-#     subjects = []
-#     for vol_name in vol_names:
-#       if 'ABIDE' in vol_name and vol_name.endswith('.npz'):
-#         name = vol_name[:-8]
-#         vol_path = os.path.join(vol_base_path, name + 'orig.npz')
-#         seg_path = os.path.join(seg_base_path, name + 'aseg.npz')
-#         if self.include_seg:
-#           subject = tio.Subject(
-#                  mri=tio.ScalarImage(vol_path, reader=self._reader),
-#                  seg=tio.ScalarImage(seg_path, reader=self._reader),
-#                )
-#         else:
-#           subject = tio.Subject(
-#                  mri=tio.ScalarImage(vol_path, reader=self._reader),
-#                )
-#         subjects.append(subject)
-#     return subjects[:num_subjects]
-
-#   def _reader(self, path):
-#     print('loading', path)
-#     img = np.load(path)
-#     img = img['vol_data']
-#     img = torch.from_numpy(img).unsqueeze(0)
-#     img = img.permute(0, 2, 1, 3).float()
-#     # img = img[:,30:140] # Strip beginning and end slices
-#     return img, np.eye(4)
-
-#   def get_tio_dataset(self):
-#     return tio.SubjectsDataset(self.subjects, transform=self.transform)
-
-
-def get_train_gt(img_dims='160_224'):
-  gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
+def get_train_gt():
+  gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_rician_snr5_mu0_sigma1.npy'
+  # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
   # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/train_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
+  print('loading', gt_path)
   gt = np.load(gt_path)
+  if gt.shape[1] != 1:
+    gt = np.moveaxis(gt, [0,1,2,3], [0,2,3,1])
   return gt
 
-def get_train_data(maskname, img_dims='160_224', size='med'):
-  # data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_{maskname}.npy'.format(maskname=maskname)
-  data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/train_mri_normalized_{img_dims}_{maskname}.npy'.format(img_dims=img_dims, maskname=maskname)
-  data = np.load(data_path)
-  return data
-
-
-def get_test_gt(img_dims='160_224', size='med'):
-  if size=='small':
-    gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_10slices.npy'
-  elif size=='med':
-    gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
-    # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/test_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
+def get_test_gt():
+  gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_rician_snr5_mu0_sigma1.npy'
+  # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
+  # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/test_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
+  print('loading', gt_path)
   gt = np.load(gt_path)
+  if gt.shape[1] != 1:
+    gt = np.moveaxis(gt, [0,1,2,3], [0,2,3,1])
   return gt
-
-def get_test_data(maskname, img_dims='160_224', size='med'):
-  if size=='small':
-    data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_4p2_10slices.npy'
-  elif size=='med':
-    # data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_{maskname}.npy'.format(maskname=maskname)
-    data_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/test_mri_normalized_{img_dims}_{maskname}.npy'.format(img_dims=img_dims, maskname=maskname)
-  data = np.load(data_path)
-  return data
 
 def get_seg_data(split, img_dims):
   seg_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/{split}_seg_{img_dims}.npy'.format(split=split, img_dims=img_dims)

@@ -97,31 +97,17 @@ class BatchConv2d(nn.Module):
     return [self.out_channels]
 
 class ClipByPercentile(object):
-  """Divide by 99th percentile and clip values in [0, 1]."""
+  """Divide by specified percentile and clip values in [0, 1]."""
+  def __init__(self, perc=99):
+    self.perc = perc
 
   def __call__(self, img):
-    perc_99 = np.percentile(img, 99)
-    if perc_99 == 0:
-      perc_99 = 1
-    img_divide = img / perc_99
+    val = np.percentile(img, self.perc)
+    if val == 0:
+      val = 1
+    img_divide = img / val
     img_clip = np.clip(img_divide, 0, 1) 
-
     return img_clip
-
-class AdditiveGaussianNoise(object):
-  def __init__(self, image_dims, mean=0., std=1., fixed=False):
-    self.std = std
-    self.mean = mean
-    self.fixed = fixed
-    if fixed:
-      self.noise = torch.normal(mean, std, size=image_dims).cuda()
-
-  def __call__(self, img):
-    if self.fixed:
-      noise = self.noise
-    else:
-      noise = torch.normal(self.mean, self.std, size=img.shape).cuda()
-    return img + noise
 
 class GaussianSmoothing(nn.Module):
     """
@@ -187,3 +173,17 @@ class GaussianSmoothing(nn.Module):
             filtered (torch.Tensor): Filtered output.
         """
         return self.conv(input, weight=self.weight, groups=self.groups)
+
+class ZeroPad(object):
+  def __init__(self, final_size):
+    self.final_size = final_size
+
+  def __call__(self, img):
+    '''
+    '''
+    final_img = np.zeros(self.final_size)
+    size = img.shape
+    pad_row = self.final_size[0] - size[0]
+    pad_col = self.final_size[1] - size[1]
+    final_img[pad_row//2:-pad_row//2, pad_col//2:-pad_col//2] = img
+    return final_img

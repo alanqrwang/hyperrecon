@@ -209,6 +209,9 @@ class rPSNR(object):
     gt = gt.norm(dim=1, keepdim=True)
     pred = pred.norm(dim=1, keepdim=True)
     zf = kwargs['zf'].norm(dim=1, keepdim=True)
+    gt = utils.linear_normalization(gt, (0, 1))
+    pred = utils.linear_normalization(pred, (0, 1))
+    zf = utils.linear_normalization(zf, (0, 1))
     return self.psnr(gt, pred) - self.psnr(gt, zf)
 
 class DICE():

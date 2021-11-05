@@ -91,8 +91,9 @@ class BaseTrain(object):
       elif self.num_hparams == 2:
         self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
         hparams = []
-        for i in np.linspace(0, 1, 50):
-          for j in np.linspace(0, 1, 50):
+        N = 50
+        for i in np.linspace(0, 1, N):
+          for j in np.linspace(0, 1, N):
             hparams.append([i, j])
         self.test_hparams = torch.tensor(hparams).float()
       else:
@@ -199,7 +200,7 @@ class BaseTrain(object):
 
   def get_noise_model(self):
     fixed_noise = True if self.num_epochs == 0 else False
-    return hyperrecon.model.layers.AdditiveGaussianNoise(self.image_dims, std=self.additive_gauss_std, fixed=fixed_noise)
+    return hyperrecon.util.noise.AdditiveGaussianNoise(self.image_dims, std=self.additive_gauss_std, fixed=fixed_noise)
 
   def get_mask(self):
     if self.mask_type == 'poisson':
@@ -237,7 +238,7 @@ class BaseTrain(object):
     if self.dataset == 'brain_arr':
       dataset = BrainArr(self.batch_size)
     elif self.dataset == 'abide':
-      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=False, noise_std=self.additive_gauss_std)
+      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=False)
     elif self.dataset == 'knee_arr':
       dataset = KneeArr(self.batch_size, subsample_test=False)
     elif self.dataset == 'knee_arr_single':
