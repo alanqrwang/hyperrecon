@@ -178,14 +178,14 @@ class SliceVolDataset(data.Dataset):
       if self.target_transform is not None:
         y = self.target_transform(y)
       
-      xs = x[None] if xs is None else np.concatenate((xs, x), axis=0)
-      ys = y[None] if ys is None else np.concatenate((ys, y), axis=0)
+      xs = x[None] if xs is None else np.concatenate((xs, x[None]), axis=0)
+      ys = y[None] if ys is None else np.concatenate((ys, y[None]), axis=0)
 
     return xs, ys
 
 def get_train_gt():
-  gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_rician_snr5_mu0_sigma1.npy'
-  # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
+  # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized_rician_snr5_mu0_sigma1.npy'
+  gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_train_normalized.npy'
   # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/train_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
   print('loading', gt_path)
   gt = np.load(gt_path)
@@ -194,8 +194,8 @@ def get_train_gt():
   return gt
 
 def get_test_gt():
-  gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_rician_snr5_mu0_sigma1.npy'
-  # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
+  # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized_rician_snr5_mu0_sigma1.npy'
+  gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/brain_test_normalized.npy'
   # gt_path = '/share/sablab/nfs02/users/aw847/data/brain/adrian/segs/test_mri_normalized_{img_dims}.npy'.format(img_dims=img_dims)
   print('loading', gt_path)
   gt = np.load(gt_path)
