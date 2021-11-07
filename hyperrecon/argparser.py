@@ -80,7 +80,7 @@ class Parser(argparse.ArgumentParser):
                            'hypernet_baseline_fit', \
                            'hypernet_baseline_fit_layer', \
                            'binary_anneal', \
-                           'uniform_diversity_prior', 'loupe_agnostic', 'loupe', 'alternating_minimization'], type=str, help='Training method', required=True)
+                           'uniform_diversity_prior', 'loupe_agnostic', 'loupe', 'alternating_minimization', 'segment'], type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
     self.add_bool_arg('anneal', default=False)
     self.add_bool_arg('unet_residual', default=True)

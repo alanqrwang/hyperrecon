@@ -74,7 +74,7 @@ class BaseTrain(object):
     self.num_val_subjects = args.num_val_subjects
     self.dc_scale = args.dc_scale
 
-    self.brain_seg_model = loss_ops.DICE()
+    self.brain_seg_model = loss_ops.PretrainedDICE()
     self.set_eval_hparams()
     self.set_monitor()
     self.set_metrics()
@@ -91,7 +91,7 @@ class BaseTrain(object):
       elif self.num_hparams == 2:
         self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
         hparams = []
-        N = 50
+        N = 100
         for i in np.linspace(0, 1, N):
           for j in np.linspace(0, 1, N):
             hparams.append([i, j])
@@ -179,7 +179,7 @@ class BaseTrain(object):
       # elif self.additive_gauss_std == 0.1 and self.dataset == 'knee_arr' and self.forward_type == 'denoising':
       #   scales = [0.03143206238746643, 0.27412155270576477]
       # else:
-    if True:
+    if self.stringify_list(self.loss_list) == 'l1_ssim':
       scales = [0.0556, 0.322]
         # scales = [0.05797722685674671, 0.27206547738363346]
     # DC + TV
@@ -660,7 +660,7 @@ class BaseTrain(object):
           elif 'mae' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(loss_ops.L1()(gt[i], pred[i]).mean().item())
           elif 'dice' in key and hparam_str in key and 'sub{}'.format(i) in key:
-            self.test_metrics[key].append(1-self.brain_seg_model(pred[i], gt[i], seg=seg[i]).mean().item())
+            self.test_metrics[key].append(1-self.brain_seg_model(gt[i], pred[i], seg=seg[i]).mean().item())
           elif 'watson' in key and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(loss_ops.WatsonDFT()(gt[i], pred[i]).mean().item())
             

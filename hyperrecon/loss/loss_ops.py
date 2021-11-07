@@ -10,6 +10,7 @@ from unetsegmentation.predict import Segmenter
 from hyperrecon.model.layers import GaussianSmoothing
 from torch.nn import functional as F
 import lpips
+from hyperrecon.model.unet import Unet
 from hyperrecon.util import utils
 
 class DataConsistency(object):
@@ -214,20 +215,41 @@ class rPSNR(object):
     zf = utils.linear_normalization(zf, (0, 1))
     return self.psnr(gt, pred) - self.psnr(gt, zf)
 
-class DICE():
+class PretrainedDICE():
   '''Compute Dice score against segmentation labels of clean images.
 
   TODO: segtest.tester currently only supports performing testing on
     full volumes, not slices.
   '''
   def __init__(self):
-    pretrained_seg_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
-    self.segmenter = Segmenter(pretrained_seg_path)
+    # pretrained_seg_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
+    ckpt_path = '/share/sablab/nfs02/users/aw847/models/HyperRecon/segment-snr5/Nov_05/datasetabide_archunet_methodsegment_distconstant_forwardcsmri_maskpoisson_rate8p3_lr0.001_bs32_l1+ssim_hnet128_unet32_topKNone_restrictTrue_hp0.0_gauss0.0_resFalse_dcscale0.5/checkpoints/model.0200.h5'
+
+    n_classes = 5 
+    network = Unet(
+                in_ch=1,
+                out_ch=n_classes,
+                h_ch=32,
+                residual=False,
+                use_batchnorm=True
+              ).cuda()
+    self.trained_model = utils.load_checkpoint(network, ckpt_path)
+    self.trained_model.eval()
+    for param in self.trained_model.parameters():
+      param.requires_grad = False
+    self.criterion = DiceLoss(hard=True)
+
+  def predict(self, recon, seg_data):
+    target_onehot = utils.get_onehot(seg_data).cuda()
+    preds = self.trained_model(recon)
+    with torch.set_grad_enabled(True):
+      loss, _, _ = self.criterion(preds, target_onehot, ign_first_ch=True)
+    return loss
 
   def __call__(self, gt, pred, **kwargs):
     del gt
     seg = kwargs['seg']
-    loss = self.segmenter.predict(
+    loss = self.predict(
                   recon=pred,
                   seg_data=seg)
     return loss
@@ -268,3 +290,51 @@ class L1PenaltyWeights(object):
         w_flat = w_flat.repeat(len(pred), 1)
       cap_reg += torch.sum(torch.abs(w_flat), dim=1)
     return cap_reg
+
+class DiceLoss(torch.nn.Module):
+  '''Dice loss.
+
+  Supports 2d or 3d inputs.
+  Supports hard dice or soft dice.
+  If soft dice, returns scalar dice loss for entire slice/volume.
+  If hard dice, returns:
+      total_avg: scalar dice loss for entire slice/volume ()
+      regions_avg: dice loss per region (n_ch)
+      ind_avg: dice loss per region per pixel (bs, n_ch)
+
+  '''
+  def __init__(self, hard=False):
+    super(DiceLoss, self).__init__()
+    self.hard = hard
+
+  def forward(self, pred, target, ign_first_ch=False):
+    eps = 1
+    assert pred.size() == target.size(), 'Input and target are different dim'
+    
+    if len(target.size())==4:
+      n,c,_,_ = target.size()
+    if len(target.size())==5:
+      n,c,_,_,_ = target.size()
+
+    target = target.contiguous().view(n,c,-1)
+    pred = pred.contiguous().view(n,c,-1)
+    
+    if self.hard: # hard Dice
+      pred_onehot = torch.zeros_like(pred)
+      pred = torch.argmax(pred, dim=1, keepdim=True)
+      pred = torch.scatter(pred_onehot, 1, pred, 1.)
+    if ign_first_ch:
+      target = target[:,1:,:]
+      pred = pred[:,1:,:]
+  
+    num = torch.sum(2*(target*pred),2) + eps
+    den = (pred*pred).sum(2) + (target*target).sum(2) + eps
+    dice_loss = 1-num/den
+    ind_avg = dice_loss
+    total_avg = torch.mean(dice_loss, 1)
+    regions_avg = torch.mean(dice_loss, 0)
+    
+    if not self.hard:
+      return total_avg
+    else:
+      return total_avg, regions_avg, ind_avg

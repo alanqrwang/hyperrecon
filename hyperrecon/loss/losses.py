@@ -55,7 +55,7 @@ def generate_loss_ops(loss_type, forward_model, mask, device):
   elif loss_type.lower() == 'mse':
     tx_op = loss_ops.MSE()
   elif loss_type.lower() == 'dice':
-    tx_op = loss_ops.DICE()
+    tx_op = loss_ops.PretrainedDICE()
   elif loss_type.lower() == 'l1pen':
     tx_op = loss_ops.L1PenaltyWeights()
   elif loss_type.lower() == 'lpips':

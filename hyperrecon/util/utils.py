@@ -59,6 +59,33 @@ def gray2rgb(arr):
   '''Converts grayscale image to rgb by copying along channel dimension.'''
   return arr.repeat(1, 3, 1, 1)
 
+def get_onehot(asegs):
+  subset_regs = [[0,130,165,258],   # 0 and 5
+                  [8,10,11,12,13,16,17,18,26,28,47,49,50,51,52,53,54,58,60,172,174], # 2
+                  [2,7,41,46], # 3
+                  [4,5,14,15,24,30,31,43,44,62,63,257],  # 4
+                ]
+
+  batch_size = asegs.shape[0]
+  data_dims = asegs.shape[2:]
+
+  n_classes = len(subset_regs) + 1 # ROIs plus non-ROI
+  one_hot = torch.zeros(batch_size, n_classes, *data_dims)
+
+  for i,subset in enumerate(subset_regs):
+    combined_vol = torch.zeros(asegs.shape, dtype=bool).cuda()
+    for j in range(len(subset)):
+      combined_vol = combined_vol | (asegs == subset[j])
+    one_hot[:,i:i+1,...] = combined_vol.long().float()
+
+  mask = one_hot.sum(1).squeeze()
+  ones = torch.ones_like(mask)
+  non_roi = ones-mask
+  one_hot[:,-1,...] = non_roi
+
+  assert one_hot.sum(1).sum() == batch_size*np.prod(data_dims), 'One-hot encoding does not added up to 1'
+  return one_hot
+
 def remove_sequential(network, all_layers):
   for layer in network.children():
     if type(layer) == layers.BatchConv2d: # if sequential layer, apply recursively to layers in sequential layer

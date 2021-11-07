@@ -8,6 +8,7 @@ from hyperrecon.hypernet_baseline_fit import HypernetBaselineFit
 from hyperrecon.hypernet_baseline_fit_layer import HypernetBaselineFitLayer
 from hyperrecon.loupe import Loupe, LoupeAgnostic
 from hyperrecon.util.train import BaseTrain
+from hyperrecon.segment import Segment
 
 def get_trainer(args):
   """Get trainer."""
@@ -29,6 +30,8 @@ def get_trainer(args):
     trainer = LoupeAgnostic(args)
   elif args.method.lower() == 'alternating_minimization':
     trainer = AdaptiveScaling(args)
+  elif args.method.lower() == 'segment':
+    trainer = Segment(args)
   else:
     raise NotImplementedError
   return trainer
