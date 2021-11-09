@@ -61,4 +61,5 @@ docs/_build/
 *.npy
 *paper.py
 *fig/
+*paper/
 *.gitignore

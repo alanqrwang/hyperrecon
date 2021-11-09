@@ -73,6 +73,7 @@ class BaseTrain(object):
     self.num_train_subjects = args.num_train_subjects
     self.num_val_subjects = args.num_val_subjects
     self.dc_scale = args.dc_scale
+    self.fixed_noise = True if self.num_epochs == 0 else False
 
     self.brain_seg_model = loss_ops.PretrainedDICE()
     self.set_eval_hparams()
@@ -85,13 +86,14 @@ class BaseTrain(object):
       self.val_hparams = self.hyperparameters
       self.test_hparams = self.hyperparameters
     else:
+      N = 100
       if self.num_hparams == 1:
         self.val_hparams = torch.tensor([0., 1.]).view(-1, 1)
-        self.test_hparams = torch.tensor([0., 0.25, 0.5, 0.75, 1.]).view(-1, 1)
+        hparams = np.linspace(0, 1, N)
+        self.test_hparams = torch.tensor(hparams).float().view(-1, 1)
       elif self.num_hparams == 2:
         self.val_hparams = torch.tensor([[0.,0.], [1.,1.]])
         hparams = []
-        N = 100
         for i in np.linspace(0, 1, N):
           for j in np.linspace(0, 1, N):
             hparams.append([i, j])
@@ -199,8 +201,7 @@ class BaseTrain(object):
     return scales
 
   def get_noise_model(self):
-    fixed_noise = True if self.num_epochs == 0 else False
-    return hyperrecon.util.noise.AdditiveGaussianNoise(self.image_dims, std=self.additive_gauss_std, fixed=fixed_noise)
+    return hyperrecon.util.noise.AdditiveGaussianNoise(self.image_dims, std=self.additive_gauss_std, fixed=self.fixed_noise)
 
   def get_mask(self):
     if self.mask_type == 'poisson':
@@ -238,7 +239,7 @@ class BaseTrain(object):
     if self.dataset == 'brain_arr':
       dataset = BrainArr(self.batch_size)
     elif self.dataset == 'abide':
-      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=False)
+      dataset = Abide(self.batch_size, self.num_train_subjects, self.num_val_subjects, subsample_test=False, fixed_noise=self.fixed_noise)
     elif self.dataset == 'knee_arr':
       dataset = KneeArr(self.batch_size, subsample_test=False)
     elif self.dataset == 'knee_arr_single':
@@ -613,7 +614,7 @@ class BaseTrain(object):
     if is_val:
       self.validate()
     else:
-      self.test(save_preds=True)
+      self.test(save_preds=False)
   
   def validate(self):
     for hparam in self.val_hparams:
@@ -642,12 +643,10 @@ class BaseTrain(object):
           zf_path = os.path.join(self.img_dir, 'zf' + 'sub{}'.format(i) + '.npy')
           pred_path = os.path.join(self.img_dir, 'pred'+hparam_str+'sub{}'.format(i)+'cp{:04d}'.format(self.epoch-1) + '.npy')
           np.save(pred_path, pred[i].cpu().detach().numpy())
-          if not os.path.exists(gt_path):
-            np.save(gt_path, gt[i].cpu().detach().numpy())
-          if not os.path.exists(zf_path):
-            np.save(zf_path, input[i].cpu().detach().numpy())
+          np.save(gt_path, gt[i].cpu().detach().numpy())
+          np.save(zf_path, input[i].cpu().detach().numpy())
         for key in self.test_metrics:
-          if 'loss' in key and hparam_str in key and 'sub{}'.format(i) in key:
+          if key.split(':')[0] == 'loss' and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(loss[i].item())
           elif key.split(':')[0] == 'psnr' and hparam_str in key and 'sub{}'.format(i) in key:
             self.test_metrics[key].append(loss_ops.PSNR()(gt[i], pred[i]).mean().item())

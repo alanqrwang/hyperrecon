@@ -223,7 +223,7 @@ class PretrainedDICE():
   '''
   def __init__(self):
     # pretrained_seg_path = '/share/sablab/nfs02/users/aw847/models/UnetSegmentation/abide-dataloader-evan-dice/May_26/0.001_64_32_2/'
-    ckpt_path = '/share/sablab/nfs02/users/aw847/models/HyperRecon/segment-snr5/Nov_05/datasetabide_archunet_methodsegment_distconstant_forwardcsmri_maskpoisson_rate8p3_lr0.001_bs32_l1+ssim_hnet128_unet32_topKNone_restrictTrue_hp0.0_gauss0.0_resFalse_dcscale0.5/checkpoints/model.0200.h5'
+    ckpt_path = '/share/sablab/nfs02/users/aw847/models/HyperRecon/segment-snr5/Nov_05/datasetabide_archunet_methodsegment_distconstant_forwardcsmri_maskpoisson_rate8p3_lr0.001_bs32_l1+ssim_hnet128_unet32_topKNone_restrictTrue_hp0.0_gauss0.0_resFalse_dcscale0.5/checkpoints/model.1024.h5'
 
     n_classes = 5 
     network = Unet(

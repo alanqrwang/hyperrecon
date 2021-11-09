@@ -17,13 +17,24 @@ class AdditiveGaussianNoise(object):
     return img + noise
     
 class RicianNoise(object):
-  def __init__(self, snr=5, mean=0., std=1.):
+  def __init__(self, img_dims, snr=5, mean=0., std=1., fixed=False):
     self.snr = snr
     self.mean = mean
     self.std = std
+    self.fixed = fixed
+    if fixed:
+      self.x_noise = np.random.normal(self.mean, self.std, size=img_dims)
+      self.y_noise = np.random.normal(self.mean, self.std, size=img_dims)
   
   def __call__(self, img):
     level = self.snr * np.max(img) / 100
-    x = level * np.random.normal(self.mean, self.std, size=img.shape) + img
-    y = level * np.random.normal(self.mean, self.std, size=img.shape)
+    if self.fixed:
+      x_noise = self.x_noise
+      y_noise = self.y_noise
+    else:
+      x_noise = np.random.normal(self.mean, self.std, size=img.shape)
+      y_noise = np.random.normal(self.mean, self.std, size=img.shape)
+
+    x = level * x_noise + img
+    y = level * y_noise
     return np.sqrt(x**2 + y**2)

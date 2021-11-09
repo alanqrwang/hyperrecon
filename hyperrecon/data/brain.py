@@ -56,11 +56,12 @@ class Abide(BrainBase):
                subsample_test=False,
                img_dims=(256,256),
                rician_snr=5,
-               clip_percentile=100):
+               clip_percentile=100,
+               fixed_noise=False):
     super(Abide, self).__init__(batch_size)
     self.data_path = '/share/sablab/nfs02/users/aw847/data/brain/abide/'
 
-    transform = transforms.Compose([ClipByPercentile(clip_percentile), ZeroPad(img_dims), RicianNoise(snr=rician_snr)])
+    transform = transforms.Compose([ClipByPercentile(clip_percentile), ZeroPad(img_dims), RicianNoise(img_dims, snr=rician_snr, fixed=fixed_noise)])
     target_transform = transforms.Compose([ZeroPad(img_dims)])
 
     self.trainset = SliceDataset(
