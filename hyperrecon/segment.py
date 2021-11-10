@@ -51,15 +51,11 @@ class Segment(BaseTrain):
 
   def prepare_batch(self, batch):
     inputs, targets = batch[0], batch[1]
-    inputs = inputs.view(-1, 1, *inputs.shape[-2:]).float()
-    targets = targets.view(-1, 1, *targets.shape[-2:]).float()
+    inputs = inputs.view(-1, 1, *inputs.shape[-2:]).float().cuda()
+    targets = targets.view(-1, 1, *targets.shape[-2:]).float().cuda()
 
-    targets_onehot = utils.get_onehot(targets)
+    targets_onehot = utils.get_onehot(targets).cuda()
     batch_size = len(inputs)
-
-    inputs = inputs.cuda()
-    targets = targets.cuda()
-    targets_onehot = targets_onehot.cuda()
     return inputs, targets_onehot, targets, batch_size
 
   def train_step(self, batch):

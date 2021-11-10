@@ -306,23 +306,24 @@ class DiceLoss(torch.nn.Module):
   def __init__(self, hard=False):
     super(DiceLoss, self).__init__()
     self.hard = hard
+    self.softmax = torch.nn.Softmax(dim=1)
 
-  def forward(self, pred, target, ign_first_ch=False):
-    eps = 1
+  def forward(self, pred, target, ign_first_ch=False, eps=1):
+    '''
+    Args:
+      pred: Logits of predictions (bs, n_classes, ...)
+      target: One-hot segmentation map (bs, n_classes, ...)
+    '''
     assert pred.size() == target.size(), 'Input and target are different dim'
-    
-    if len(target.size())==4:
-      n,c,_,_ = target.size()
-    if len(target.size())==5:
-      n,c,_,_,_ = target.size()
-
+    n, c = target.shape[0], target.shape[1]
     target = target.contiguous().view(n,c,-1)
     pred = pred.contiguous().view(n,c,-1)
     
-    if self.hard: # hard Dice
-      pred_onehot = torch.zeros_like(pred)
-      pred = torch.argmax(pred, dim=1, keepdim=True)
-      pred = torch.scatter(pred_onehot, 1, pred, 1.)
+    if self.hard: 
+      pred = torch.argmax(pred, dim=1)
+    else:
+      pred = self.softmax(pred)
+
     if ign_first_ch:
       target = target[:,1:,:]
       pred = pred[:,1:,:]
