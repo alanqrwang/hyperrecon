@@ -29,27 +29,24 @@ This script assumes the data is of shape (256, 256) in order to match the shapes
 Here are some detailed options for each flag:
 
     python -u run.py \
-      -fp $NAME \
+      --models_dir out/
+      --train_path /share/sablab/nfs02/users/aw847/data/knee/knee_train_normalized.npy \ 
+      --test_path /share/sablab/nfs02/users/aw847/data/knee/knee_test_normalized.npy \ 
+      --mask_path data/poisson_disk_8p3_256_256.npy
+      -fp uhs_l1_ssim \
       --log_interval 25 \
       --image_dims 256 256 \
       --lr 0.001 \
       --batch_size 32 \
       --num_epochs 100 \
-      --num_steps_per_epoch 8 \
-      --arch hyperunet \ # Specifies architecture, can be one of [hyperunet or unet]
-      --hnet_hdim 128 \  # Specifies hypernetwork hidden dimension
-      --unet_hdim 32 \   # Specifies main Unet hidden channel dimension
-      --seed 1 \
-      --forward_type csmri \ # Specifies forward model, can be one of [csmri, superresolution, denoising]
-      --undersampling_rate $RATE \ # Specifies under-sampling rate of mask for CS-MRI
-      --loss_list l1 ssim \ # Specifies losses
-      --method base_train \ # Specifies training strategy, can be one of [base_train, dhs]
-      --no_unet_residual \
-      --distribution uniform  \ # Specifies sampling distribution for hyperparameter, can be one of [uniform, uniform_oversample, constant]
-      --models_dir /share/sablab/nfs02/users/aw847/models/HyperRecon/ \
-      --train_path /share/sablab/nfs02/users/aw847/data/knee/knee_train_normalized.npy \ 
-      --test_path /share/sablab/nfs02/users/aw847/data/knee/knee_test_normalized.npy \ 
-      --mask_path data/poisson_disk_8p3_256_256.npy
+      --arch hyperunet \                    # Specifies architecture, can be one of [hyperunet or unet]
+      --hnet_hdim 128 \                     # Specifies hypernetwork hidden dimension
+      --unet_hdim 32 \                      # Specifies main Unet hidden channel dimension
+      --forward_type csmri \                # Specifies forward model, can be one of [csmri, superresolution, denoising]
+      --undersampling_rate $RATE \          # Specifies under-sampling rate of mask for CS-MRI
+      --loss_list l1 ssim \                 # Specifies losses
+      --method base_train \                 # Specifies training strategy, can be one of [base_train, dhs]
+      --distribution uniform                # Specifies sampling distribution for hyperparameter, can be one of [uniform, uniform_oversample, constant]
 
 # HyperRecon Papers
 [link to paper](https://arxiv.org/abs/2101.02194)
