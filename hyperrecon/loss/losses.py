@@ -40,26 +40,16 @@ def generate_loss_ops(loss_type, forward_model, mask, device):
     tx_op = loss_ops.TotalVariation()
   elif loss_type.lower() == 'wave':
     tx_op = loss_ops.L1Wavelets(device)
-  elif loss_type.lower() == 'shear':
-    tx_op = loss_ops.L1_Shearlets(mask.shape)
   elif loss_type.lower() == 'ssim':
     tx_op = loss_ops.SSIM()
-  elif loss_type.lower() == 'watson-dft':
-    tx_op = loss_ops.WatsonDFT()
   elif loss_type.lower() == 'dc':
     tx_op = loss_ops.DataConsistency(forward_model, mask)
-  elif loss_type.lower() == 'mindc':
-    tx_op = loss_ops.MinNormDataConsistency(forward_model, mask)
   elif loss_type.lower() == 'l1':
     tx_op = loss_ops.L1()
   elif loss_type.lower() == 'mse':
     tx_op = loss_ops.MSE()
-  elif loss_type.lower() == 'dice':
-    tx_op = loss_ops.PretrainedDICE()
   elif loss_type.lower() == 'l1pen':
     tx_op = loss_ops.L1PenaltyWeights()
-  elif loss_type.lower() == 'lpips':
-    tx_op = loss_ops.LPIPS()
   else:
     raise NotImplementedError
 

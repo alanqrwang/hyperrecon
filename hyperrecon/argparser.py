@@ -15,22 +15,15 @@ class Parser(argparse.ArgumentParser):
               type=str, help='directory to save models')
     self.add_argument('--log_interval', type=int,
               default=25, help='Frequency of logs')
-    self.add_argument('--load', type=str, default=None,
-              help='Load checkpoint at .h5 path')
-    self.add_argument('--cont', type=int, default=0,
-              help='Load checkpoint at .h5 path')
-    self.add_argument('--gpu_id', type=int, default=0,
-              help='gpu id to train on')
     self.add_argument('--date', type=str, default=None,
               help='Override date')
-    self.add_argument('--dataset', type=str, default='abide', choices=['brain_arr', 'abide', 'knee_arr', 'fastmri', 'acdc', 'knee_arr_single'])
     self.add_argument('--num_train_subjects', type=int, default=50,
               help='Number of subjects to train on')
     self.add_argument('--num_val_subjects', type=int, default=5,
               help='Number of subjects to validate on')
 
     # Machine learning parameters
-    self.add_argument('--image_dims', nargs='+', type=int, default=(160, 224),
+    self.add_argument('--image_dims', nargs='+', type=int, default=(256, 256),
               help='Image dimensions')
     self.add_argument('--lr', type=float, default=1e-3,
               help='Learning rate')
@@ -41,7 +34,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--num_epochs', type=int, default=1024,
               help='Total training epochs')
     self.add_argument('--arch', type=str, default='hyperunet',
-              choices=['hyperunet', 'last_layer_hyperunet', 'unet', 'loupe_unet', 'loupe_hyperunet', 'condloupe_hyperunet', 'simple_img'])
+              choices=['hyperunet', 'unet'])
     self.add_argument('--unet_hdim', type=int, default=32)
     self.add_argument('--hnet_hdim', type=int,
               help='Hypernetwork architecture', default=64)
@@ -59,43 +52,24 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--forward_type', type=str, default='csmri',
               choices=['csmri', 'inpainting', 'superresolution', 'denoising'])
     self.add_argument('--distribution', type=str, default='uniform',
-              choices=['uniform', 'uniform_oversample', 'binary', 'constant'])
+              choices=['uniform', 'uniform_oversample', 'constant'])
     self.add_argument('--uniform_bounds', nargs='+', type=float, default=(0., 1.),
               help='Bounds of uniform distribution')
-    self.add_argument('--dc_scale', type=float,
-              default=0.5, help='Scaling factor for DC')
 
     # Model parameters
     self.add_argument('--topK', type=int, default=None)
     self.add_argument('--undersampling_rate', type=str, default='4p2')
     self.add_argument('--denoising_sigma', type=float, default=None)
-    self.add_argument('--mask_type', type=str, default='poisson',
-              choices=['poisson', 'epi_horizontal', 'epi_vertical', 'first_half', 'second_half', 'center_patch', 'random_box', 'loupe'])
-    self.add_argument('--distance_type', type=str, default='l2',
-              choices=['l2', 'ssim', 'watson_dft', 'unet_enc_feat'])
-    self.add_argument('--loss_list', choices=['dc', 'mindc', 'tv', 'cap', 'wave', 'shear', 'mse', 'l1', 'ssim', 'watson-dft', 'dice', 'l1pen', 'lpips'],
+    self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'mse', 'l1', 'ssim', 'l1pen'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
-      '--method', choices=['base_train', 'dhs', \
-                           'hypernet_baseline_fit', \
-                           'hypernet_baseline_fit_layer', \
-                           'binary_anneal', \
-                           'uniform_diversity_prior', 'loupe_agnostic', 'loupe', 'alternating_minimization', 'segment'], type=str, help='Training method', required=True)
+      '--method', choices=['base_train', 'dhs'], \
+                           type=str, help='Training method', required=True)
     self.add_bool_arg('range_restrict')
-    self.add_bool_arg('anneal', default=False)
     self.add_bool_arg('unet_residual', default=True)
     self.add_argument('--hyperparameters', nargs='+', type=float, default=None)
-    self.add_argument('--hypernet_baseline_fit_layer_idx', type=int, default=None)
-    self.add_argument('--epoch_of_p_max', type=float, default=None, 
-                        help='Epoch when p-value is maximized')
-    self.add_argument('--p_min', type=float, default=None, 
-                        help='Minimum p value for Bernoulli annealing')
-    self.add_argument('--p_max', type=float, default=None, 
-                        help='Maximum p value for Bernoulli annealing')
     self.add_argument('--additive_gauss_std', type=float, default=0., 
                         help='Std for additive Gaussian noise')
-    self.add_argument('--beta', type=float, default=10000, 
-                        help='Scaling factor for diversity loss term')
 
   def add_bool_arg(self, name, default=True):
     """Add boolean argument to argparse parser"""
@@ -106,8 +80,6 @@ class Parser(argparse.ArgumentParser):
 
   def validate_args(self, args):
     assert args.batch_size > 1 and args.batch_size % 2 == 0
-    if args.cont is not None and args.load is not None:
-      assert True, 'Cannot set both cont and load path'
     if args.method == 'dhs':
       assert args.topK is not None, 'DHS sampling must set topK'
     elif args.distribution == 'constant':
@@ -116,10 +88,6 @@ class Parser(argparse.ArgumentParser):
     elif args.method == 'constant':
       assert args.hyperparameters is not None, 'Baseline and constant must set hyperparameters'
       assert args.arch == 'hyperunet'
-    elif args.method == 'hypernet_baseline_fit_layer':
-      assert args.hypernet_baseline_fit_layer_idx is not None
-    elif args.method == 'binary_anneal':
-      assert args.epoch_of_p_max is not None, 'Epoch of p_max must be set'
     if args.range_restrict:
       assert len(
         args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
@@ -127,16 +95,8 @@ class Parser(argparse.ArgumentParser):
       assert 'p' in args.undersampling_rate, 'Invalid undersampling rate for poisson'
     elif 'epi' in args.mask_type:
       assert 'p' not in args.undersampling_rate, 'Invalid undersampling rate for epi'
-    if args.forward_type == 'csmri':
-      assert args.mask_type in ['poisson', 'epi_vertical', 'epi_horizontal', 'loupe'], 'Invalid mask_type for forward model'
-    elif args.forward_type == 'inpainting':
-      assert args.mask_type in ['first_half', 'second_half', 'center_patch', 'random_box'], 'Invalid mask_type for forward model'
-    if args.method == 'loupe_agnostic':
-      assert args.mask_type == 'loupe'
     if args.forward_type == 'denoising':
       assert args.denoising_sigma is not None
-    if args.arch == 'simple_img':
-      assert args.dataset == 'knee_arr_single'
 
   def parse(self):
     args = self.parse_args()
@@ -155,8 +115,7 @@ class Parser(argparse.ArgumentParser):
       return string
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'dataset{dataset}_arch{arch}_method{method}_dist{dist}_forward{forward}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_gauss{gauss}_res{res}_dcscale{dcscale}'.format(
-                    dataset=args.dataset,
+                  'arch{arch}_method{method}_dist{dist}_forward{forward}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_res{res}_dcscale{dcscale}'.format(
                     arch=args.arch,
                     method=args.method,
                     dist=args.distribution,
@@ -171,7 +130,6 @@ class Parser(argparse.ArgumentParser):
                     range_restrict=args.range_restrict,
                     topK=args.topK,
                     hps=stringify_list(args.hyperparameters),
-                    gauss=args.additive_gauss_std,
                     res=args.unet_residual,
                     dcscale=args.dc_scale,
                   ))

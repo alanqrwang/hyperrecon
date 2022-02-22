@@ -9,11 +9,11 @@ if __name__ == "__main__":
 
   # GPU Handling
   if torch.cuda.is_available():
-    args.device = torch.device('cuda:'+str(args.gpu_id))
+    args.device = torch.device('cuda:0')
   else:
     args.device = torch.device('cpu')
     print('WARNING: No GPU detected!')
-  os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
+  os.environ["CUDA_VISIBLE_DEVICES"] = str(0)
 
   trainer = train_and_eval_lib.get_trainer(args)
   trainer.config()

@@ -31,22 +31,6 @@ class CSMRIForward(BaseForward):
     ksp = fft(fullysampled)
     under_ksp = ksp * mask
     return under_ksp
-
-class InpaintingForward(BaseForward):
-  '''Forward model for inpainting.'''
-  def __init__(self):
-    super(InpaintingForward, self).__init__()
-
-  def __call__(self, fullysampled, mask):
-    '''Generate masked version of input.
-    
-    Args:
-      fullysampled: Clean image in image space (N, n_ch, l, w)
-      mask: Stack of masks (N, 1, l, w)
-    '''
-    masked = fullysampled * mask
-    masked = torch.cat((masked, torch.zeros_like(masked)), dim=1)
-    return masked
   
 class SuperresolutionForward(BaseForward):
   '''Forward model for super-resolution.'''

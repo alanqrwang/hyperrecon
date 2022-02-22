@@ -1,39 +1,54 @@
-# HyperRecon: Regularization-Agnostic CS-MRI Reconstruction with Hypernetworks
+# HyperRecon: Computing Multiple Image Reconstructions with a Single Hypernetwork
 
-![Network architecture](figs/Hypernet_Arch_v5.png)
-[link to paper](https://arxiv.org/abs/2101.02194)
+![Network architecture](figs/hyperrecon_arch.png)
 
-## Abstract
 
-Reconstructing under-sampled k-space measurements in Compressed Sensing MRI (CS-MRI) is classically solved with regularized least-squares. Recently, deep learning has been used to amortize this optimization by training reconstruction networks on a dataset of under-sampled measurements.
-Here, a crucial design choice is the regularization function(s) and corresponding weight(s).
-In this paper, we explore a novel strategy of using a hypernetwork to generate the parameters of a separate reconstruction network as a function of the regularization weight(s), resulting in a regularization-agnostic reconstruction model.
-At test time, for a given under-sampled image, our model can rapidly compute reconstructions with different amounts of regularization. We analyze the variability of these reconstructions, especially in situations when the overall quality (as measured by PSNR, for example) is similar. Finally, we propose and empirically demonstrate an efficient and data-driven way of maximizing reconstruction performance given limited hypernetwork capacity.
-
+# Instructions
 ## Requirements
+This code was tested on:
 
-The code was tested on:
+- python 3.7.10
+- pytorch 1.4.0
+- numpy 1.19.2
 
-- python 3.7.5
-- pytorch 1.3.1
-- matplotlib 3.1.2
-- numpy 1.17.4
-- tqdm 4.41.1
+Note that in recent versions of Pytorch (e.g. 1.10), the function `torch.fft()` has been deprecated and has been moved to `torch.fft.fft()`, as well as other changes (e.g. outputting complex types instead of 2-channel).
+Additionally, we found that `BatchConv2d` runs nearly 2x slower in later versions of Pytorch.
 
-## Usage
+## Data
+As a minimally-working example, the code provides an `Arr` class which loads a numpy array for use in a dataset.
+The paths to the train dataset and test dataset can be provided by the `train_path` and `test_path` flags. 
+More sophisticated dataloaders can be integrated by changing the `get_dataloader` function in `util/train.py` accordingly.
 
-### Training UHS
+## Training 
+To run the code with default parameters, a bash script is provided:
 
     bash train.sh
 
-### Training baselines
+This script assumes the data is of shape (256, 256) in order to match the shapes of provided under-sampling masks.
 
-    bash train_base.sh
+Here are some detailed options for each flag:
+    python -u run.py \
+      -fp $NAME \
+      --log_interval 25 \
+      --image_dims 256 256 \
+      --lr 0.001 \
+      --batch_size 32 \
+      --num_epochs 100 \
+      --num_steps_per_epoch 8 \
+      --arch hyperunet \ # Specifies architecture, can be one of [hyperunet or unet]
+      --hnet_hdim 128 \  # Specifies hypernetwork hidden dimension
+      --unet_hdim 32 \   # Specifies main Unet hidden channel dimension
+      --seed 1 \
+      --forward_type csmri \ # Specifies forward model, can be one of [csmri, superresolution, denoising]
+      --undersampling_rate $RATE \ # Specifies under-sampling rate of mask for CS-MRI
+      --loss_list l1 ssim \ # Specifies losses
+      --method base_train \ # Specifies training strategy, can be one of [base_train, dhs]
+      --no_unet_residual \
+      --distribution uniform  \ # Specifies sampling distribution for hyperparameter, can be one of [uniform, uniform_oversample, constant]
+      --models_dir /share/sablab/nfs02/users/aw847/models/HyperRecon/ \
+      --train_path /share/sablab/nfs02/users/aw847/data/knee/knee_train_normalized.npy \ 
+      --test_path /share/sablab/nfs02/users/aw847/data/knee/knee_test_normalized.npy \ 
+      --mask_path data/poisson_disk_8p3_256_256.npy
 
-### Prediction
-
-    bash predict.sh
-
-## Contact
-
-Feel free to open an issue in github for any problems or questions.
+# HyperRecon Papers
+[link to paper](https://arxiv.org/abs/2101.02194)
