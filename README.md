@@ -24,14 +24,14 @@ To run the code with default parameters, a bash script is provided:
 
     bash train.sh
 
-This script assumes the data is of shape (256, 256) in order to match the shapes of provided under-sampling masks.
+This script assumes the data is of shape (256, 256) in order to match the shapes of provided under-sampling masks. If your data has a different size, then specify the path to the under-sampling mask in the `mask_path` flag.
 
 Here are some detailed options for each flag:
 
     python -u run.py \
       --models_dir out/
-      --train_path /share/sablab/nfs02/users/aw847/data/knee/knee_train_normalized.npy \ 
-      --test_path /share/sablab/nfs02/users/aw847/data/knee/knee_test_normalized.npy \ 
+      --train_path ... \
+      --test_path ... \
       --mask_path data/poisson_disk_8p3_256_256.npy
       -fp uhs_l1_ssim \
       --log_interval 25 \
@@ -49,4 +49,10 @@ Here are some detailed options for each flag:
       --distribution uniform                # Specifies sampling distribution for hyperparameter, can be one of [uniform, uniform_oversample, constant]
 
 # HyperRecon Papers
-[link to paper](https://arxiv.org/abs/2101.02194)
+[Regularization-Agnostic Compressed Sensing MRI Reconstruction with Hypernetworks](https://arxiv.org/abs/2101.02194)
+Machine Learning for Medical Image Reconstruction @ MICCAI, 2020
+Alan Q. Wang, Adrian V. Dalca, Mert R. Sabuncu.
+
+[Computing Multiple Image Reconstructions witha Single Hypernetwork](https://arxiv.org/abs/2101.02194)
+Under Review
+Alan Q. Wang, Adrian V. Dalca, Mert R. Sabuncu.
