@@ -14,17 +14,22 @@ This code was tested on:
 Note that in recent versions of Pytorch (e.g. 1.10), the function `torch.fft()` has been deprecated and has been moved to `torch.fft.fft()`, as well as other changes (e.g. outputting complex types instead of 2-channel).
 Additionally, we found that `BatchConv2d` runs nearly 2x slower in later versions of Pytorch.
 
+## Hypernetwork
+The hypernetwork model is located in `hyperrecon/model/hypernetwork.py`.
+
+To use a hypernetwork in your own model, replace a given `Conv2d` layer with `hyperrecon/model/layers/BatchConv2d` layer. The forward call takes as input the feature maps and the output of the hypernetwork.
+
 ## Data
-As a minimally-working example, the code provides an `Arr` class which loads a numpy array for use in a dataset.
-The paths to the train dataset and test dataset can be provided by the `train_path` and `test_path` flags. 
-More sophisticated dataloaders can be integrated by changing the `get_dataloader` function in `util/train.py` accordingly.
+The code provides an `Arr` class which loads a numpy array for use in a dataset. The paths to the train dataset and test dataset can be provided by the `--train_path` and `--test_path` flags. 
+Dataset shapes are expected to be `[num_imgs, 1, l, w]`.
+More sophisticated dataloaders can be integrated by changing the `get_dataloader` function in `hyperrecon/util/train.py` accordingly.
 
 ## Training 
 To run the code with default parameters, a bash script is provided:
 
     bash train.sh
 
-This script assumes the data is of shape (256, 256) in order to match the shapes of provided under-sampling masks. If your data has a different size, then specify the path to the under-sampling mask in the `mask_path` flag.
+This script assumes the data is of shape (256, 256) in order to match the shapes of provided under-sampling masks. If your data has a different size, then specify the path to the under-sampling mask in the `--mask_path` flag.
 
 Here are some detailed options for each flag:
 

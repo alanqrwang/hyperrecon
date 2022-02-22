@@ -8,9 +8,6 @@ class Arr:
     test_gt = np.load(test_path)
     assert len(train_gt.shape) == 4 and len(test_gt.shape) == 4, \
       'Invalid dataset shape'
-    
-    train_gt = np.moveaxis(train_gt, [0,1,2,3], [0,2,3,1])
-    test_gt = np.moveaxis(test_gt, [0,1,2,3], [0,2,3,1])
     assert train_gt.shape[1] == 1 and test_gt.shape[1] == 1, \
       'Invalid channel dimensions'
     self.trainset = ArrDataset(train_gt)
