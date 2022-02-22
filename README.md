@@ -1,9 +1,9 @@
 # HyperRecon: Computing Multiple Image Reconstructions with a Single Hypernetwork
 HyperRecon is a method for producing multiple reconstructions corresponding to different loss functions with a single model.
-It can also serve as a general purpose library for learning-based image reconstruction.
-Current forward models supported are compressed sensing MRI (CS-MRI), superresolution, and denoising.
 ![Network architecture](figs/hyperrecon_arch.png)
 
+It can also serve as a general purpose library for learning-based image reconstruction.
+Current forward models supported are compressed sensing MRI (CS-MRI), superresolution, and denoising.
 
 # Instructions
 ## Requirements
