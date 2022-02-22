@@ -27,6 +27,7 @@ To run the code with default parameters, a bash script is provided:
 This script assumes the data is of shape (256, 256) in order to match the shapes of provided under-sampling masks.
 
 Here are some detailed options for each flag:
+
     python -u run.py \
       -fp $NAME \
       --log_interval 25 \
