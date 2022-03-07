@@ -62,6 +62,6 @@ If you use HyperRecon or some part of the code, please cite:
 Machine Learning for Medical Image Reconstruction @ MICCAI, 2020   
 Alan Q. Wang, Adrian V. Dalca, Mert R. Sabuncu.   
 
-[Computing Multiple Image Reconstructions witha Single Hypernetwork](https://arxiv.org/abs/2101.02194)   
+[Computing Multiple Image Reconstructions with a Single Hypernetwork](https://arxiv.org/abs/2202.11009)
 Under Review   
 Alan Q. Wang, Adrian V. Dalca, Mert R. Sabuncu.   
