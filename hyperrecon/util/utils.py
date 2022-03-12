@@ -55,6 +55,10 @@ def linear_normalization(arr, new_range=(0, 1)):
 
   return (arr - min_per_batch) * (new_range[1]-new_range[0]) / (max_per_batch - min_per_batch) + new_range[0]
 
+def gray2rgb(arr):
+  '''Converts grayscale image to rgb by copying along channel dimension.'''
+  return arr.repeat(1, 3, 1, 1)
+
 def remove_sequential(network, all_layers):
   for layer in network.children():
     if type(layer) == layers.BatchConv2d: # if sequential layer, apply recursively to layers in sequential layer

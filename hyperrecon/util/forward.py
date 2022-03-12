@@ -16,6 +16,16 @@ class BaseForward(ABC):
   def __call__(self, fullysampled, mask):
     pass
 
+class NoneForward(BaseForward):
+  def __call__(self, fullysampled, mask):
+    '''Generate under-sampled k-space data with given binary mask.
+    
+    Args:
+      fullysampled: Clean image in image space (N, n_ch, l, w)
+      mask: Stack of masks (N, 1, l, w)
+    '''
+    return fullysampled
+
 class CSMRIForward(BaseForward):
   '''Forward model for CS-MRI.'''
   def __init__(self):

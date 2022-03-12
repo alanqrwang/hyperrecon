@@ -4,15 +4,16 @@ import os
 import time
 from tqdm import tqdm
 import random
+from glob import glob
+from hyperrecon.data.mask import BaseMask
 
 from hyperrecon.util import utils
 from hyperrecon.loss.losses import compose_loss_seq
 from hyperrecon.util.metric import bhfen
 from hyperrecon.loss import loss_ops
 from hyperrecon.model.unet import Unet, HyperUnet
-from hyperrecon.util.forward import CSMRIForward, DenoisingForward, SuperresolutionForward
+from hyperrecon.util.forward import CSMRIForward, DenoisingForward, SuperresolutionForward, NoneForward
 from hyperrecon.util.noise import AdditiveGaussianNoise
-from hyperrecon.data.mask import VDSPoisson
 from hyperrecon.data.arr import Arr
 from hyperrecon.util.sample import Uniform, UniformOversample, Constant
 
@@ -20,7 +21,6 @@ from hyperrecon.util.sample import Uniform, UniformOversample, Constant
 class BaseTrain(object):
   def __init__(self, args):
     # HyperRecon
-    self.mask_type = args.mask_type
     self.undersampling_rate = args.undersampling_rate
     self.topK = args.topK
     self.method = args.method
@@ -43,7 +43,7 @@ class BaseTrain(object):
     self.arch = args.arch
     self.hnet_hdim = args.hnet_hdim
     self.unet_hdim = args.unet_hdim
-    self.n_ch_in = 2
+    self.n_ch_in = args.n_ch_in 
     self.n_ch_out = args.n_ch_out
     self.scheduler_step_size = args.scheduler_step_size
     self.scheduler_gamma = args.scheduler_gamma
@@ -55,6 +55,8 @@ class BaseTrain(object):
     self.log_interval = args.log_interval
     self.fixed_noise = True if self.num_epochs == 0 else False
     self.device = args.device
+    self.mask_path = args.mask_path
+    self.load = args.load
 
     self.set_eval_hparams()
     self.set_monitor()
@@ -90,6 +92,56 @@ class BaseTrain(object):
       'psnr:val:' + self.stringify_list(l.tolist()) for l in self.val_hparams
     ]
 
+  def manage_checkpoint(self):
+    '''Manage checkpoints.
+    
+    1) If self.load is set, loads from path specified by self.load.
+       Doesn't load optimizer or scheduler state.
+    2) If self.cont is set, loads from current model directory at
+       epoch specified by self.cont.
+       Loads optimizer and scheduler state.
+    3) Otherwise, loads from most recent saved model in current 
+       model directory, if it exists.
+       Loads optimizer and scheduler state.
+    Assumes model path has the form:
+      <ckpt_dir>/model.{epoch:04d}.h5
+    '''
+    load_path = None
+    cont_epoch = None
+    if self.load:  # Load from path
+      load_opt_and_sched = False
+      load_path = self.load
+      self.start_epoch = 1
+    else: # Try to load from latest checkpoint
+      load_opt_and_sched = True
+      model_paths = sorted(glob(os.path.join(self.ckpt_dir, '*')))
+      if len(model_paths) == 0 and self.num_epochs > 0:
+        print('Randomly initialized model')
+        self.start_epoch = 1
+      elif len(model_paths) > 0:
+        cont_epoch = int(model_paths[-1].split('.')[-2])
+        self.start_epoch = cont_epoch + 1
+      else:
+        raise ValueError('No model found for prediction', self.run_dir)
+
+    if cont_epoch is not None:
+      load_path = os.path.join(
+        self.ckpt_dir, 'model.{epoch:04d}.h5'.format(epoch=cont_epoch))
+
+      self.metrics.update({key: list(np.loadtxt(os.path.join(
+        self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_metrics})
+      self.val_metrics.update({key: list(np.loadtxt(os.path.join(
+        self.metric_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_val_metrics})
+      self.monitor.update({key: list(np.loadtxt(os.path.join(
+        self.monitor_dir, key + '.txt')))[:cont_epoch] for key in self.list_of_monitor})
+    if load_path is not None:
+      if load_opt_and_sched:
+        self.network, self.optimizer, self.scheduler = utils.load_checkpoint(
+          self.network, load_path, self.optimizer, self.scheduler)
+      else:
+        self.network = utils.load_checkpoint(
+          self.network, load_path)
+
   def set_random_seed(self):
     seed = self.seed
     if seed > 0:
@@ -114,8 +166,7 @@ class BaseTrain(object):
 
   def get_per_loss_scale_constants(self):
     # Constants for mean losses on test sets.
-    # L1 + SSIM
-    scales = [0.0556, 0.322]
+    scales = [1, 1]
     print('\nusing loss scales', scales)
     return scales
 
@@ -123,7 +174,7 @@ class BaseTrain(object):
     return AdditiveGaussianNoise(self.image_dims, std=self.additive_gauss_std, fixed=self.fixed_noise)
 
   def get_mask(self):
-    mask = VDSPoisson(self.image_dims, self.undersampling_rate)
+    mask = BaseMask(self.mask_path)
     return mask
 
   def get_sampler(self):
@@ -181,6 +232,8 @@ class BaseTrain(object):
       self.forward_model = SuperresolutionForward(self.undersampling_rate)
     elif self.forward_type == 'denoising':
       self.forward_model = DenoisingForward()
+    elif self.forward_type == 'none':
+      self.forward_model = NoneForward()
     return self.forward_model
 
   def train(self):
@@ -188,16 +241,15 @@ class BaseTrain(object):
     self.epoch = 0
     if self.num_epochs == 0:
       self.train_epoch_begin()
-      self.train_epoch_end(is_val=False, save_metrics=False, save_ckpt=False)
+      self.train_epoch_end(save_metrics=False, save_ckpt=False)
     else:
       for epoch in range(0, self.num_epochs+1):
         self.epoch = epoch
 
         self.train_epoch_begin()
         self.train_epoch()
-        self.train_epoch_end(is_val=True, save_metrics=True, save_ckpt=(
+        self.train_epoch_end(save_metrics=True, save_ckpt=(
           self.epoch % self.log_interval == 0))
-      self.train_epoch_end(is_val=False, save_metrics=True, save_ckpt=True)
 
   def train_begin(self):
     # Logging
@@ -226,13 +278,16 @@ class BaseTrain(object):
     if not os.path.exists(self.img_dir):
       os.makedirs(self.img_dir)
 
+    # Checkpoint Loading
+    self.manage_checkpoint()
+
   def train_epoch_begin(self):
     print('\nEpoch %d/%d' % (self.epoch, self.num_epochs))
     print('Learning rate:', self.scheduler.get_last_lr())
 
-  def train_epoch_end(self, is_val=True, save_metrics=False, save_ckpt=False):
+  def train_epoch_end(self, save_metrics=False, save_ckpt=False):
     '''Save loss and checkpoints. Evaluate if necessary.'''
-    self.eval_epoch(is_val)
+    self.eval_epoch()
 
     if save_metrics:
       utils.save_metrics(self.metric_dir, self.metrics, *self.list_of_metrics)
@@ -333,17 +388,24 @@ class BaseTrain(object):
       epoch_loss, epoch_psnr, epoch_time))
 
   def prepare_batch(self, batch):
-    targets = batch[0]
-    targets = targets.view(-1, 1, *targets.shape[-2:]).float().to(self.device)
-    bs = len(targets)
-
-    undersample_mask = self.mask_model(bs).to(self.device)
-    measurements = self.forward_model(targets, undersample_mask)
-    measurements = self.noise_model(measurements)
-    if self.forward_type == 'csmri':
-      inputs = utils.ifft(measurements)
+    if self.forward_type == 'none':
+      inputs, targets = batch
+      inputs = inputs.view(-1, 1, *inputs.shape[-2:]).float().to(self.device)
+      targets = targets.view(-1, 1, *targets.shape[-2:]).float().to(self.device)
+    
     else:
-      inputs = measurements
+      targets = batch[0]
+      targets = targets.view(-1, 1, *targets.shape[-2:]).float().to(self.device)
+
+      undersample_mask = self.mask_model(bs).to(self.device)
+      measurements = self.forward_model(targets, undersample_mask)
+      measurements = self.noise_model(measurements)
+      if self.forward_type == 'csmri':
+        inputs = utils.ifft(measurements)
+      else:
+        inputs = measurements
+
+    bs = len(targets)
     return inputs, targets, bs
 
   def train_step(self, batch):
@@ -362,7 +424,7 @@ class BaseTrain(object):
     psnr = loss_ops.PSNR()(targets, pred).mean().item()
     return loss.cpu().detach().numpy(), psnr, batch_size
 
-  def eval_epoch(self, is_val):
+  def eval_epoch(self):
     '''Eval for one epoch.
     
     For each hyperparameter, computes all reconstructions for that 

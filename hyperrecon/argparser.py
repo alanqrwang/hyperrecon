@@ -13,6 +13,8 @@ class Parser(argparse.ArgumentParser):
               help='filename prefix', required=True)
     self.add_argument('--models_dir', default='/share/sablab/nfs02/users/aw847/models/HyperRecon/',
               type=str, help='directory to save models')
+    self.add_argument('--mask_path', default='data/poisson_disk_8p3_256_256.npy',
+              type=str, help='directory to save models')
     self.add_argument('--log_interval', type=int,
               default=25, help='Frequency of logs')
     self.add_argument('--date', type=str, default=None,
@@ -21,6 +23,8 @@ class Parser(argparse.ArgumentParser):
               help='Number of subjects to train on')
     self.add_argument('--num_val_subjects', type=int, default=5,
               help='Number of subjects to validate on')
+    self.add_argument('--load', type=str, default=None,
+              help='Load path')
 
     # Machine learning parameters
     self.add_argument('--image_dims', nargs='+', type=int, default=(256, 256),
@@ -38,6 +42,8 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--unet_hdim', type=int, default=32)
     self.add_argument('--hnet_hdim', type=int,
               help='Hypernetwork architecture', default=64)
+    self.add_argument('--n_ch_in', type=int,
+              help='Number of input channels of main network', default=1)
     self.add_argument('--n_ch_out', type=int,
               help='Number of output channels of main network', default=1)
     self.add_argument('--scheduler_step_size', type=int,
@@ -50,7 +56,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--optimizer_type', type=str, default='adam',
               choices=['sgd', 'adam'])
     self.add_argument('--forward_type', type=str, default='csmri',
-              choices=['csmri', 'inpainting', 'superresolution', 'denoising'])
+              choices=['csmri', 'superresolution', 'denoising', 'none'])
     self.add_argument('--distribution', type=str, default='uniform',
               choices=['uniform', 'uniform_oversample', 'constant'])
     self.add_argument('--uniform_bounds', nargs='+', type=float, default=(0., 1.),
@@ -60,7 +66,7 @@ class Parser(argparse.ArgumentParser):
     self.add_argument('--topK', type=int, default=None)
     self.add_argument('--undersampling_rate', type=str, default='4p2')
     self.add_argument('--denoising_sigma', type=float, default=None)
-    self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'mse', 'l1', 'ssim', 'l1pen'],
+    self.add_argument('--loss_list', choices=['dc', 'tv', 'cap', 'wave', 'mse', 'l1', 'ssim', 'l1pen', 'lpips'],
               nargs='+', type=str, help='<Required> Set flag', required=True)
     self.add_argument(
       '--method', choices=['base_train', 'dhs'], \
@@ -91,10 +97,6 @@ class Parser(argparse.ArgumentParser):
     if args.range_restrict:
       assert len(
         args.loss_list) <= 3, 'Range restrict loss must have 3 or fewer loss functions'
-    if args.mask_type == 'poisson':
-      assert 'p' in args.undersampling_rate, 'Invalid undersampling rate for poisson'
-    elif 'epi' in args.mask_type:
-      assert 'p' not in args.undersampling_rate, 'Invalid undersampling rate for epi'
     if args.forward_type == 'denoising':
       assert args.denoising_sigma is not None
 
@@ -115,12 +117,11 @@ class Parser(argparse.ArgumentParser):
       return string
 
     args.run_dir = os.path.join(args.models_dir, args.filename_prefix, date,
-                  'arch{arch}_method{method}_dist{dist}_forward{forward}_mask{mask}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_res{res}_dcscale{dcscale}'.format(
+                  'arch{arch}_method{method}_dist{dist}_forward{forward}_rate{rate}_lr{lr}_bs{batch_size}_{losses}_hnet{hnet_hdim}_unet{unet_hdim}_topK{topK}_restrict{range_restrict}_hp{hps}_res{res}'.format(
                     arch=args.arch,
                     method=args.method,
                     dist=args.distribution,
                     forward=args.forward_type,
-                    mask=args.mask_type,
                     rate=args.undersampling_rate,
                     lr=args.lr,
                     batch_size=args.batch_size,
@@ -131,7 +132,6 @@ class Parser(argparse.ArgumentParser):
                     topK=args.topK,
                     hps=stringify_list(args.hyperparameters),
                     res=args.unet_residual,
-                    dcscale=args.dc_scale,
                   ))
     if not os.path.exists(args.run_dir):
       os.makedirs(args.run_dir)

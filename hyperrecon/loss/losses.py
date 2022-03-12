@@ -7,7 +7,6 @@ REGISTERED_SUP_LOSSES = [
                           'l1',
                           'mse',
                           'dice',
-                          'lpips',
                         ]
 REGISTERED_UNSUP_LOSSES = [
                               'dc',
