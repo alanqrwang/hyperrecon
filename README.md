@@ -63,5 +63,5 @@ Machine Learning for Medical Image Reconstruction @ MICCAI, 2020
 Alan Q. Wang, Adrian V. Dalca, Mert R. Sabuncu.   
 
 [Computing Multiple Image Reconstructions witha Single Hypernetwork](https://www.melba-journal.org/papers/2022:017.html)   
-Machine Learning for Biomedical Imaging (MELBA) Journal
+Machine Learning for Biomedical Imaging (MELBA) Journal   
 Alan Q. Wang, Adrian V. Dalca, Mert R. Sabuncu.   
